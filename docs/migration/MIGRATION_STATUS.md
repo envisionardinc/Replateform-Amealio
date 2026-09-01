@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P1.7.1 — Identity foundation COMPLETE)
+- **Last updated:** 2026-09-01 (P1.6.1 — TurboRepo monorepo foundation COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -38,9 +38,11 @@ Single source of truth for the controlled replatforming. Update this file whenev
 
 - **P1.7.1 — Identity (analyze + minimal foundation): COMPLETE.** First business-domain migration. Read-only analysis of baseline auth across all three repos (file-cited; consumer vs merchant vs admin differences documented) → [domains/22-IDENTITY-ANALYSIS.md](./domains/22-IDENTITY-ANALYSIS.md). Implemented a minimal, evidence-backed Identity foundation in `apps/api/src/modules/identity/`: consumer user management (register/get; duplicate→409; unverified default), `PasswordHasher` port + bcrypt adapter (baseline algorithm), `UserRepository` port + Prisma adapter, and role-based authorization infra (`RolesGuard` + `Principal` + `CurrentUser`). **No schema change** (P1.5 intact); **no token/OTP/social auth, no permission-tree evaluator, no HTTP endpoints, no data migration.** Validation: build ✓, lint ✓, format ✓, **54/54 tests passing** (32 Identity + app/config/DB). OD-11 untouched.
 
+- **P1.6.1 — TurboRepo Monorepo Foundation: COMPLETE.** Introduced Turbo (`turbo@2.10.12`) + npm workspaces as the orchestration layer, promoting the existing NestJS API to the `@amealio/api` workspace (`apps/api`). **Prisma kept at root** (no move); P1.5 schema/migrations **unchanged**. Root commands delegate to Turbo (`build`/`test`/`lint`) with a repo-wide `format:check`; test task is uncached (DB-dependent). Docs: [architecture/23-TURBOREPO-MONOREPO.md](./architecture/23-TURBOREPO-MONOREPO.md). Validation: build ✓, lint ✓, format:check ✓, **54/54 tests**, API starts + `/api/v1/health` ok, `db:validate` 11/11, `migrate status` up to date — no regression to P1.5/P1.6/P1.7.1.
+
 ## Current activity
 
-- **P1.7.1 (Identity) complete** as an analysis + minimal foundation. Authentication (token issuance/verification, OTP, social/WhatsApp) and permission-tree enforcement are **deferred** (baseline behavior is Feathers-specific and partly UNKNOWN; would require invention/cutover strategy). **No further P1.7 domains started.** Merchant/Location, Catalog/Menu, Orders, Payments, Reservations, Notifications, Admin remain pending controlled steps; OD-11 and owner-decision domains remain blocked.
+- **P1.6.1 complete.** Monorepo foundation established and validated; existing functionality intact. **No domain migration performed.** Next controlled steps (still pending): Merchant/Location, Catalog/Menu, Orders, Payments, Reservations, Notifications, Admin (each individually), plus deferred authentication endpoints and frontend migration. OD-11 and owner-decision domains remain blocked.
 
 ## Next activity
 

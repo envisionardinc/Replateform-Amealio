@@ -1,6 +1,6 @@
-/** Jest config — single test runner for the target platform (P1.6).
- * ts-jest emits decorator metadata required by NestJS DI (esbuild/tsx does not).
- * Covers NestJS app tests (apps/api) and the P1.5 database validation (tests/).
+/** Jest config for the @amealio/api workspace (P1.6.1).
+ * ts-jest emits decorator metadata required by NestJS DI. Covers the API's unit,
+ * e2e, and the P1.5 database validation (moved into this workspace's test/).
  */
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
@@ -8,7 +8,7 @@ module.exports = {
   testEnvironment: 'node',
   rootDir: '.',
   setupFiles: ['<rootDir>/jest.setup.ts'],
-  roots: ['<rootDir>/apps', '<rootDir>/tests'],
+  roots: ['<rootDir>/src', '<rootDir>/test'],
   testMatch: ['**/*.spec.ts', '**/*.e2e-spec.ts', '**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {

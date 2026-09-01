@@ -2,20 +2,23 @@
   "name": "amealio-platform",
   "version": "0.0.0",
   "private": true,
-  "description": "Amealio target platform — NestJS modular monolith foundation (P1.6) on the P1.5 PostgreSQL/Prisma foundation. Application foundation only; no business domains yet.",
+  "description": "Amealio target platform — TurboRepo monorepo. Root orchestrates workspace tasks (apps/*) via Turbo and owns Prisma/PostgreSQL (P1.5). Business domains live inside apps/api (modular monolith).",
+  "workspaces": [
+    "apps/*"
+  ],
+  "packageManager": "npm@10.9.7",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "nest build",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:prod": "node dist/main.js",
-    "lint": "eslint \"apps/**/*.ts\" \"prisma/**/*.ts\" \"tests/**/*.ts\"",
-    "format": "prettier --write \"apps/**/*.ts\" \"tests/**/*.ts\" \"prisma/**/*.ts\"",
-    "format:check": "prettier --check \"apps/**/*.ts\" \"tests/**/*.ts\" \"prisma/**/*.ts\"",
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint && eslint \"prisma/**/*.ts\"",
+    "format": "prettier --write \"apps/**/*.ts\" \"prisma/**/*.ts\"",
+    "format:check": "prettier --check \"apps/**/*.ts\" \"prisma/**/*.ts\"",
+    "start": "npm run start --workspace @amealio/api",
+    "start:dev": "npm run start:dev --workspace @amealio/api",
+    "start:prod": "npm run start:prod --workspace @amealio/api",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
@@ -23,9 +26,10 @@
     "db:reset": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "db:validate": "jest tests/schema.test.ts",
+    "db:validate": "npm run test --workspace @amealio/api -- test/schema.test.ts",
     "db:up": "docker compose up -d db",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -62,6 +66,7 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "tsx": "^4.19.2",
+    "turbo": "^2.3.3",
     "typescript": "^5.6.3"
   }
 }

@@ -14,6 +14,7 @@ Home for the controlled replatforming of Amealio: discovery inventory, target-de
 | [SOURCE_REPOSITORIES.md](./SOURCE_REPOSITORIES.md) | Read-only source repositories reference |
 | [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) | P0.3: India baseline source set (APPROVED, D-011) |
 | [india-baseline/](./india-baseline/) (`01`–`13`) | P1.1: deep India baseline system analysis (overview, relationships, frontend, API, data model, domains, rules, integrations, realtime, auth, workflows, gaps, migration implications) |
+| [india-baseline/](./india-baseline/) (`14`–`16`) | P1.2: capability matrix, baseline acceptance criteria + Definition of Done, end-to-end baseline journeys |
 
 ## Phase model
 

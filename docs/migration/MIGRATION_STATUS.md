@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P1.3 — Target Migration Map COMPLETE)
+- **Last updated:** 2026-09-01 (P1.4 — Target PostgreSQL Data Model design COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -28,9 +28,12 @@ Single source of truth for the controlled replatforming. Update this file whenev
 - **P1.2 — Define the India Baseline Capability Matrix: COMPLETE.** Capability matrix + acceptance criteria + Definition of Done + critical journeys → [14](./india-baseline/14-CAPABILITY-MATRIX.md)–[16](./india-baseline/16-END-TO-END-BASELINE-JOURNEYS.md).
 - **P1.3 — Create the Target Migration Map: COMPLETE.** Defined *how* the approved baseline is replatformed (design/mapping only) → [india-baseline/17-TARGET-MIGRATION-MAP.md](./india-baseline/17-TARGET-MIGRATION-MAP.md) + [target-architecture/](./target-architecture/) (`01`–`12`): architecture options (recommend modular monolith + service seams), domain boundaries, source→target mapping (REUSE/ADAPT/REFACTOR/REIMPLEMENT/REPLACE/DEPRECATE), conceptual data map (no schema), API/frontend/auth/integration/realtime maps, domain-by-domain sequence, carried-forward owner decisions, and P0/P1/P2 risks. No code, schema, data migration, or production changes; deferred repos not introduced; owner-decisions not resolved.
 
+- **P1.4 — Design the Target PostgreSQL Data Model: COMPLETE.** Documented the conceptual target data model → [database/](./database/) (`01`–`18`): domain model, entity↔legacy mapping, identifier strategy, relationships/constraints, enum/status strategy (OD-11), money/pricing, order model, payment/settlement model, reservation model, notification model, audit/soft-delete, ownership, indexing, migration complexity, integrity rules, extension seams, ERD, and the decision register. **Design only — no schema, migrations, tables, data migration, or code.** Owner-decisions and OD-11 enum mappings are **not** resolved.
+  - **Blocked data-model decisions (require owner/data input):** DR-02a..e (OD-11 numeric enum mappings — order/payment status, payment method, `t_type`, wallet role) — **gate Orders/Payments/Wallet data migration**; DR-03a (India GST components/rates); DR-14/15/16/17 (Celebrations/Events/Ticketing, ONDC, Loyalty, Wallet inclusion — owner-decision); DR-07a (enterprise Organization tenancy). See [database/18-DATA-MODEL-DECISIONS.md](./database/18-DATA-MODEL-DECISIONS.md).
+
 ## Current activity
 
-- **P1.3 complete.** Target migration map documented (architecture recommendation + sequence + risks). **No application functionality written; no PostgreSQL schema; migration not started.** Awaiting owner decisions (esp. enum mapping OD-11 which gates Orders/Payments data) and authorization to begin implementation.
+- **P1.4 complete.** Target data model designed and internally consistent (conceptual). **No application functionality written; no PostgreSQL schema/migrations; no data migration.** Blocked on OD-11 (enum mappings) and owner-decision items before affected schema/migration can proceed.
 
 ## Next activity
 

@@ -16,6 +16,7 @@ Home for the controlled replatforming of Amealio: discovery inventory, target-de
 | [india-baseline/](./india-baseline/) (`01`–`13`) | P1.1: deep India baseline system analysis (overview, relationships, frontend, API, data model, domains, rules, integrations, realtime, auth, workflows, gaps, migration implications) |
 | [india-baseline/](./india-baseline/) (`14`–`16`) | P1.2: capability matrix, baseline acceptance criteria + Definition of Done, end-to-end baseline journeys |
 | [india-baseline/17-TARGET-MIGRATION-MAP.md](./india-baseline/17-TARGET-MIGRATION-MAP.md) + [target-architecture/](./target-architecture/) (`01`–`12`) | P1.3: target migration map — architecture options, domain boundaries, source→target/data/API/frontend/auth/integration/realtime maps, migration sequence, owner-decisions, risks |
+| [database/](./database/) (`01`–`18`) | P1.4: target PostgreSQL **data model design** — domain model, entity mapping, identifiers, relationships, enum/OD-11 strategy, money, order/payment/reservation/notification models, audit/soft-delete, ownership, indexing, migration complexity, integrity rules, extension seams, ERD, decisions (design only, no schema) |
 
 ## Phase model
 

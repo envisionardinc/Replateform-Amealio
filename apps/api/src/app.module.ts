@@ -5,6 +5,7 @@ import { validateEnv } from './config/env.validation';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { EventsModule } from './common/events/events.module';
 import { HealthModule } from './health/health.module';
+import { IdentityModule } from './modules/identity/identity.module';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { LoggingInterceptor } from './common/logging/logging.interceptor';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
@@ -28,6 +29,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     PrismaModule,
     EventsModule,
     HealthModule,
+    IdentityModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

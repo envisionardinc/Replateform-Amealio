@@ -44,7 +44,7 @@ async function main() {
 
   // --- Staff ---
   await prisma.staffMember.upsert({
-    where: { id: (await stableId('staff-owner', merchant.id)) },
+    where: { id: await stableId('staff-owner', merchant.id) },
     update: {},
     create: {
       id: await stableId('staff-owner', merchant.id),
@@ -90,7 +90,11 @@ async function main() {
     update: {},
     create: { name: 'Mains', code: 'MAINS', type: 'FOOD' },
   });
-  await prisma.cuisine.upsert({ where: { name: 'North Indian' }, update: {}, create: { name: 'North Indian' } });
+  await prisma.cuisine.upsert({
+    where: { name: 'North Indian' },
+    update: {},
+    create: { name: 'North Indian' },
+  });
   const uom = await prisma.unitOfMeasure.upsert({
     where: { code: 'PLATE' },
     update: {},
@@ -112,7 +116,13 @@ async function main() {
   const section = await prisma.menuSection.upsert({
     where: { id: await stableId('section-mains', menu.id) },
     update: {},
-    create: { id: await stableId('section-mains', menu.id), menuId: menu.id, categoryId: category.id, name: 'Mains', sortOrder: 1 },
+    create: {
+      id: await stableId('section-mains', menu.id),
+      menuId: menu.id,
+      categoryId: category.id,
+      name: 'Mains',
+      sortOrder: 1,
+    },
   });
   const item = await prisma.menuItem.upsert({
     where: { legacyId: 'seed-item-1' },
@@ -151,7 +161,11 @@ async function main() {
       email: 'dev.user@example.test',
       isVerified: true,
       profile: { create: { preferences: { veg: true } } },
-      addresses: { create: [{ line1: 'DEV 1 Test Street', city: 'Bengaluru', pinCode: '560001', isDefault: true }] },
+      addresses: {
+        create: [
+          { line1: 'DEV 1 Test Street', city: 'Bengaluru', pinCode: '560001', isDefault: true },
+        ],
+      },
     },
   });
 
@@ -179,5 +193,11 @@ async function stableId(label: string, scope: string): Promise<string> {
 }
 
 main()
-  .then(async () => { await prisma.$disconnect(); })
-  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });

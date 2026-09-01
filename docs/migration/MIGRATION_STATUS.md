@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P1.5 — PostgreSQL Development Foundation COMPLETE)
+- **Last updated:** 2026-09-01 (P1.6 — NestJS Application Foundation COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -33,9 +33,12 @@ Single source of truth for the controlled replatforming. Update this file whenev
 
 - **P1.5 — Build the PostgreSQL Development Foundation: COMPLETE.** First target-database implementation task. Established a reproducible local PostgreSQL 16 dev environment (Docker `docker-compose.yml` + local fallback), Prisma 5 (D-004) tooling, `.env.example` (dev/test only), and **Prisma migrations implementing the approved P1.4 baseline model** (CORE + OPTIONAL entities; deferred/owner-decision domains excluded). Added synthetic seed data and an automated validation suite (**11/11 passing**). Docs: [database/19-DEVELOPMENT-DATABASE.md](./database/19-DEVELOPMENT-DATABASE.md), [database/20-SCHEMA-IMPLEMENTATION.md](./database/20-SCHEMA-IMPLEMENTATION.md). **No production access, no MongoDB changes, no legacy data migrated; OD-11 and GST rates not guessed.**
 
+- **P1.6 — Build the NestJS Application Foundation: COMPLETE.** Second implementation task. Established the `apps/api` NestJS 10 modular-monolith foundation on the P1.5 database (Prisma integration via a global `PrismaService`, typed/validated config, `/api/v1/health`, structured logging + request-id, global exception filter with a consistent error shape, `ValidationPipe`, URI versioning, CORS, graceful shutdown), plus **conventions** for module boundaries, domain events (in-process port), provider/integration ports, and security decorators (metadata only). Single test runner (Jest + ts-jest). **No business domains, integrations, or authentication implemented.** Docs: [application/21-NESTJS-FOUNDATION.md](./application/21-NESTJS-FOUNDATION.md).
+  - Validation: `npm run build` ✓, `npm run lint` ✓, `npm run format:check` ✓, `npm test` → **19/19 passing** (config validation, DB schema 11/11, app bootstrap + health + error-shape), local `node dist/main.js` startup + `/api/v1/health` = `{status:ok, db:up}` ✓. P1.5 migrations/schema unchanged and intact.
+
 ## Current activity
 
-- **P1.5 complete.** PostgreSQL dev foundation reproducible; migrations apply cleanly; schema matches the approved P1.4 model; validation passing. **No application services implemented; no legacy data migrated.** OD-11 enum mappings and owner-decision domains remain blocked before affected data migration can proceed. (P1.6 not started.)
+- **P1.6 complete.** NestJS foundation builds, starts, lints, and tests successfully on top of the intact P1.5 database. **No domain implementation; no P1.7 started.** Domains (Identity, Merchant/Location, Catalog/Menu, Orders, Payments, Reservations, Notifications, Admin) will be migrated individually in subsequent controlled steps. OD-11 and owner-decision domains remain blocked.
 
 ## Next activity
 

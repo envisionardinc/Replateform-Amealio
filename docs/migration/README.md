@@ -15,6 +15,7 @@ Home for the controlled replatforming of Amealio: discovery inventory, target-de
 | [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) | P0.3: India baseline source set (APPROVED, D-011) |
 | [india-baseline/](./india-baseline/) (`01`–`13`) | P1.1: deep India baseline system analysis (overview, relationships, frontend, API, data model, domains, rules, integrations, realtime, auth, workflows, gaps, migration implications) |
 | [india-baseline/](./india-baseline/) (`14`–`16`) | P1.2: capability matrix, baseline acceptance criteria + Definition of Done, end-to-end baseline journeys |
+| [india-baseline/17-TARGET-MIGRATION-MAP.md](./india-baseline/17-TARGET-MIGRATION-MAP.md) + [target-architecture/](./target-architecture/) (`01`–`12`) | P1.3: target migration map — architecture options, domain boundaries, source→target/data/API/frontend/auth/integration/realtime maps, migration sequence, owner-decisions, risks |
 
 ## Phase model
 

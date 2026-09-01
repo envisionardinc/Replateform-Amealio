@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P0.3 FINAL — India baseline APPROVED)
+- **Last updated:** 2026-09-01 (P1.1 — Deep India Baseline System Analysis COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -23,11 +23,12 @@ Single source of truth for the controlled replatforming. Update this file whenev
 - **Phase 0 — Target design** (in review): `docs/architecture/` — canonical PostgreSQL/Prisma domain model, ERD, multi-tenancy, India-first localization, and the approved target repository structure.
 - **Phase 1 — Governance:** established engineering rules (`AGENTS.md`), project overview (`README.md`), migration hub (`docs/migration/README.md`), this status tracker, and the decision log (`DECISIONS.md`).
 - **Phase 1 — P0.2 Repository landscape:** inventoried and classified all 6 available repositories (30-point each) and produced the India-baseline comparison → [REPOSITORY_LANDSCAPE.md](./REPOSITORY_LANDSCAPE.md) and [SOURCE_REPOSITORIES.md](./SOURCE_REPOSITORIES.md).
-- **Phase 1 — P0.3 Baseline source decision (APPROVED):** reviewed evidence + Git history, proposed a baseline source set, and the **owner APPROVED** it → [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) (D-011, **APPROVED**). **Approved core India baseline** = `amealio-vendordashboard` + `amealio_web_app` + `amealiodashboardmvp-`. **Deferred feature/satellite** (not initial baseline) = `amealio-nestjs-backend`, `amealio-self-delivery-app`. **Blocker B1 resolved.**
+- **Phase 1 — P0.3 Baseline source decision (APPROVED):** owner-approved baseline source set → [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) (D-011). Core = `amealio-vendordashboard` + `amealio_web_app` + `amealiodashboardmvp-`; deferred = `amealio-nestjs-backend`, `amealio-self-delivery-app`. **Blocker B1 resolved.**
+- **P1.1 — Deep India Baseline System Analysis: COMPLETE.** Analyzed the three approved repos as one logical platform across all 13 required areas → [india-baseline/](./india-baseline/) (`01`–`13`): system overview, repository relationships, frontend inventory, backend/API inventory, data model, business domains, business rules, integrations, realtime/async, auth/authz, end-to-end workflows + dependency map, gaps/risks, migration implications. Analysis only — no code, DB, or production changes; deferred repos referenced only for documented dependencies.
 
 ## Current activity
 
-- **P0.3 FINAL complete** — India baseline scope approved and documented. **No application functionality is being written; P1 migration not started.** Awaiting authorization to begin Phase 2 (baseline restoration).
+- **P1.1 complete.** India baseline understood as one platform and documented with traceable source references. **No application functionality written; migration not started.**
 
 ## Next activity
 

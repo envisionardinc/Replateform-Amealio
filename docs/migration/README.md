@@ -12,7 +12,8 @@ Home for the controlled replatforming of Amealio: discovery inventory, target-de
 | [DECISIONS.md](./DECISIONS.md) | Architectural & process decision log |
 | [REPOSITORY_LANDSCAPE.md](./REPOSITORY_LANDSCAPE.md) | P0.2: inventory & classification of all repositories + India-baseline comparison |
 | [SOURCE_REPOSITORIES.md](./SOURCE_REPOSITORIES.md) | Read-only source repositories reference |
-| [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) | P0.3: proposed India baseline source set (awaiting owner confirmation) |
+| [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) | P0.3: India baseline source set (APPROVED, D-011) |
+| [india-baseline/](./india-baseline/) (`01`–`13`) | P1.1: deep India baseline system analysis (overview, relationships, frontend, API, data model, domains, rules, integrations, realtime, auth, workflows, gaps, migration implications) |
 
 ## Phase model
 

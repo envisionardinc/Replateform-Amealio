@@ -1,7 +1,24 @@
 # India Baseline — Source-of-Truth Decision (P0.3)
 
-> **Status: PROPOSED — AWAITING OWNER CONFIRMATION.**
-> This is a proposal derived from already-documented evidence and Git history. It does **not** finalize the India baseline (blocker **B1**). No application code was written, copied, merged, or modified; no production systems were accessed.
+> **Status: APPROVED (owner-approved 2026-09-01).**
+> The owner reviewed the proposal below and approved it. This **resolves blocker B1**. The approved baseline matches the proposal exactly (core = 3 repositories; the two 2026-era repositories are deferred). No application code was written, copied, merged, or modified; no production systems were accessed. This document is not a migration authorization — it fixes the baseline **scope**.
+
+## Approved outcome
+
+**APPROVED INDIA BASELINE — CORE (restore first):**
+1. `amealio-vendordashboard`
+2. `amealio_web_app`
+3. `amealiodashboardmvp-`
+
+**DEFERRED FEATURE / SATELLITE SOURCES (NOT part of the initial baseline):**
+4. `amealio-nestjs-backend`
+5. `amealio-self-delivery-app`
+
+These two will be evaluated and introduced **progressively only after** the India baseline has been restored and validated.
+
+**Order of operations:** RESTORE INDIA BASELINE FIRST → VALIDATE → FREEZE → INTRODUCE ADDITIONAL CAPABILITIES PROGRESSIVELY.
+
+Recorded as **D-011 (APPROVED)** in [DECISIONS.md](../DECISIONS.md). The analysis that led to this outcome is retained below unchanged.
 
 - **Date:** 2026-09-01
 - **Inputs reviewed:** [REPOSITORY_LANDSCAPE.md](../REPOSITORY_LANDSCAPE.md), [SOURCE_REPOSITORIES.md](../SOURCE_REPOSITORIES.md), [MIGRATION_STATUS.md](../MIGRATION_STATUS.md), [DECISIONS.md](../DECISIONS.md)
@@ -117,8 +134,8 @@ For the two supporting repos, is the functionality **(A)** required for the hist
 4. Are recommendations/AI and the ONDC micro-server in baseline scope, and where are their repositories?
 5. Confirm the authoritative branch per repo (all currently `main`).
 
-## Proposed decision (for DECISIONS.md)
+## Decision (for DECISIONS.md)
 
-> **PROPOSED — AWAITING OWNER CONFIRMATION.** India baseline **core** = `amealio-vendordashboard` + `amealio_web_app` + `amealiodashboardmvp-`. The two 2026-era repositories (`amealio-nestjs-backend`, `amealio-self-delivery-app`) are proposed as **later-added satellite/feature sources** to be introduced **progressively after** the baseline is restored — **not** part of the historical baseline — pending owner confirmation of the questions above. Recorded as D-011 in [DECISIONS.md](../DECISIONS.md).
+> **APPROVED (owner, 2026-09-01).** India baseline **core** = `amealio-vendordashboard` + `amealio_web_app` + `amealiodashboardmvp-`. The two 2026-era repositories (`amealio-nestjs-backend`, `amealio-self-delivery-app`) are **deferred feature/satellite sources**, introduced **progressively after** the baseline is restored and validated — **not** part of the initial baseline. This **resolves B1**. Recorded as D-011 (APPROVED) in [DECISIONS.md](../DECISIONS.md). The residual questions above are tracked for the progressive-introduction phase and do **not** block baseline restoration.
 
-**Do not begin P1 migration until an owner confirms this decision (resolving B1).**
+**This decision fixes baseline scope only. P1 application migration is not started by this approval.**

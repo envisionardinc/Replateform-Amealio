@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P0.3 baseline source decision — proposed)
+- **Last updated:** 2026-09-01 (P0.3 FINAL — India baseline APPROVED)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -23,24 +23,24 @@ Single source of truth for the controlled replatforming. Update this file whenev
 - **Phase 0 — Target design** (in review): `docs/architecture/` — canonical PostgreSQL/Prisma domain model, ERD, multi-tenancy, India-first localization, and the approved target repository structure.
 - **Phase 1 — Governance:** established engineering rules (`AGENTS.md`), project overview (`README.md`), migration hub (`docs/migration/README.md`), this status tracker, and the decision log (`DECISIONS.md`).
 - **Phase 1 — P0.2 Repository landscape:** inventoried and classified all 6 available repositories (30-point each) and produced the India-baseline comparison → [REPOSITORY_LANDSCAPE.md](./REPOSITORY_LANDSCAPE.md) and [SOURCE_REPOSITORIES.md](./SOURCE_REPOSITORIES.md).
-- **Phase 1 — P0.3 Baseline source decision (proposed):** reviewed evidence + Git history and produced a proposed baseline source set → [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) (D-011, **PROPOSED — AWAITING OWNER CONFIRMATION**). Proposes core = backend + consumer + admin/merchant; the two 2026-era repos as later-added satellites/feature sources (not historical baseline).
+- **Phase 1 — P0.3 Baseline source decision (APPROVED):** reviewed evidence + Git history, proposed a baseline source set, and the **owner APPROVED** it → [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) (D-011, **APPROVED**). **Approved core India baseline** = `amealio-vendordashboard` + `amealio_web_app` + `amealiodashboardmvp-`. **Deferred feature/satellite** (not initial baseline) = `amealio-nestjs-backend`, `amealio-self-delivery-app`. **Blocker B1 resolved.**
 
 ## Current activity
 
-- **Baseline source decision proposed (P0.3).** Awaiting **owner confirmation** of D-011 to resolve B1. **No application functionality is being written; P1 migration not started.**
+- **P0.3 FINAL complete** — India baseline scope approved and documented. **No application functionality is being written; P1 migration not started.** Awaiting authorization to begin Phase 2 (baseline restoration).
 
 ## Next activity
 
-- **Phase 2 — Restore India baseline** (requires approvals below before starting):
-  1. **Designate the India baseline source** repository/repositories (see Blocker B1).
-  2. Decide whether to scaffold the target monorepo skeleton (`apps/`, `packages/`, `prisma/`, `turbo.json`) as the first controlled increment (see Decision D-009, pending).
-  3. Restore the India baseline in small, reviewable increments, preserving business behavior.
+- **Phase 2 — Restore India baseline** (scope now fixed to the three approved core repos). Order of operations: **restore → validate → freeze → introduce additional capabilities progressively.** Before implementation begins:
+  1. Confirm remaining Phase-0 design approvals (B4) and enum mappings (B2); run the secret-rotation workstream (B3).
+  2. Decide whether to scaffold the target monorepo skeleton (`apps/`, `packages/`, `prisma/`, `turbo.json`) as the first controlled increment (Decision D-009, pending).
+  3. Restore the India baseline in small, reviewable increments, preserving business behavior. Do **not** include the two deferred repositories.
 
 ## Blockers
 
 | ID | Blocker | Needed to proceed | Owner |
 |----|---------|-------------------|-------|
-| B1 | The **designated India baseline source** is not confirmed. A **proposed** decision exists (D-011 / [BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md)): core = backend + consumer + admin/merchant; the two 2026-era repos proposed as satellites/feature sources. | **Owner confirmation** of the proposed baseline source set (D-011). | Owner / Stakeholders |
+| ~~B1~~ | **RESOLVED (2026-09-01).** India baseline source confirmed by owner — D-011 APPROVED ([BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md)): core = backend + consumer + admin/merchant; the two 2026-era repos deferred. | — | — |
 | B2 | **Env-driven enum values** (order/payment status/method, transaction types) are not resolvable from source. | Confirmed integer↔enum mappings before any data/behavior migration. | Backend owners |
 | B3 | **Committed secrets** exist in reference env files. | Secret-rotation workstream must run before any baseline restore that touches config. | Security |
 | B4 | Target design docs (Phase 0) are **proposals pending review**. | Review/approval of `docs/architecture/*` and open questions in `10-migration-risks.md`. | Architecture review |
@@ -63,7 +63,7 @@ Recorded in [DECISIONS.md](./DECISIONS.md). Current headline decisions:
 | D-007 | ONDC as a separate bounded context/service | Proposed |
 | D-008 | Monorepo (Turborepo) with NestJS API + Next.js apps | Proposed |
 | D-009 | Scaffold monorepo skeleton as first Phase-2 increment | Proposed |
-| D-011 | India baseline source set (core = backend + consumer + admin/merchant; 2026 repos = satellites/feature sources) | Proposed — awaiting owner confirmation |
+| D-011 | India baseline source set (core = backend + consumer + admin/merchant; 2026 repos = deferred satellites/feature sources) | **Approved** |
 
 ## Source repositories (read-only)
 
@@ -73,10 +73,10 @@ Recorded in [DECISIONS.md](./DECISIONS.md). Current headline decisions:
 | Consumer web | `amealio_web_app` | CRA / React 18 | Diner web app |
 | Admin console | `amealiodashboardmvp-` | CRA / React 16 | Same repo as merchant |
 | Merchant dashboard | `amealiodashboardmvp-` | CRA / React 16 | Portal chosen by hostname |
-| Delivery tracking API | `amealio-nestjs-backend` | NestJS + PostgreSQL | Only existing PG component |
-| Delivery-boy app | `amealio-self-delivery-app` | Next.js | Courier app |
+| Delivery tracking API | `amealio-nestjs-backend` | NestJS + PostgreSQL | **Deferred (D-011)** — not in initial baseline |
+| Delivery-boy app | `amealio-self-delivery-app` | Next.js | **Deferred (D-011)** — not in initial baseline |
 
-Detail: [01-reference-inventory.md](./01-reference-inventory.md).
+Approved India baseline (D-011): **core** = `amealio-vendordashboard`, `amealio_web_app`, `amealiodashboardmvp-`; **deferred** = `amealio-nestjs-backend`, `amealio-self-delivery-app`. Detail: [01-reference-inventory.md](./01-reference-inventory.md), [SOURCE_REPOSITORIES.md](./SOURCE_REPOSITORIES.md).
 
 ## Target architecture (planned — pending review)
 

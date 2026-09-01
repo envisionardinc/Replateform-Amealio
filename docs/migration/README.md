@@ -10,6 +10,8 @@ Home for the controlled replatforming of Amealio: discovery inventory, target-de
 |----------|---------|
 | [MIGRATION_STATUS.md](./MIGRATION_STATUS.md) | Single source of truth: current phase, activities, blockers, sources, target, migrated capabilities |
 | [DECISIONS.md](./DECISIONS.md) | Architectural & process decision log |
+| [REPOSITORY_LANDSCAPE.md](./REPOSITORY_LANDSCAPE.md) | P0.2: inventory & classification of all repositories + India-baseline comparison |
+| [SOURCE_REPOSITORIES.md](./SOURCE_REPOSITORIES.md) | Read-only source repositories reference |
 
 ## Phase model
 

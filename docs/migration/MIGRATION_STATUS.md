@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P1.4 — Target PostgreSQL Data Model design COMPLETE)
+- **Last updated:** 2026-09-01 (P1.5 — PostgreSQL Development Foundation COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -31,9 +31,11 @@ Single source of truth for the controlled replatforming. Update this file whenev
 - **P1.4 — Design the Target PostgreSQL Data Model: COMPLETE.** Documented the conceptual target data model → [database/](./database/) (`01`–`18`): domain model, entity↔legacy mapping, identifier strategy, relationships/constraints, enum/status strategy (OD-11), money/pricing, order model, payment/settlement model, reservation model, notification model, audit/soft-delete, ownership, indexing, migration complexity, integrity rules, extension seams, ERD, and the decision register. **Design only — no schema, migrations, tables, data migration, or code.** Owner-decisions and OD-11 enum mappings are **not** resolved.
   - **Blocked data-model decisions (require owner/data input):** DR-02a..e (OD-11 numeric enum mappings — order/payment status, payment method, `t_type`, wallet role) — **gate Orders/Payments/Wallet data migration**; DR-03a (India GST components/rates); DR-14/15/16/17 (Celebrations/Events/Ticketing, ONDC, Loyalty, Wallet inclusion — owner-decision); DR-07a (enterprise Organization tenancy). See [database/18-DATA-MODEL-DECISIONS.md](./database/18-DATA-MODEL-DECISIONS.md).
 
+- **P1.5 — Build the PostgreSQL Development Foundation: COMPLETE.** First target-database implementation task. Established a reproducible local PostgreSQL 16 dev environment (Docker `docker-compose.yml` + local fallback), Prisma 5 (D-004) tooling, `.env.example` (dev/test only), and **Prisma migrations implementing the approved P1.4 baseline model** (CORE + OPTIONAL entities; deferred/owner-decision domains excluded). Added synthetic seed data and an automated validation suite (**11/11 passing**). Docs: [database/19-DEVELOPMENT-DATABASE.md](./database/19-DEVELOPMENT-DATABASE.md), [database/20-SCHEMA-IMPLEMENTATION.md](./database/20-SCHEMA-IMPLEMENTATION.md). **No production access, no MongoDB changes, no legacy data migrated; OD-11 and GST rates not guessed.**
+
 ## Current activity
 
-- **P1.4 complete.** Target data model designed and internally consistent (conceptual). **No application functionality written; no PostgreSQL schema/migrations; no data migration.** Blocked on OD-11 (enum mappings) and owner-decision items before affected schema/migration can proceed.
+- **P1.5 complete.** PostgreSQL dev foundation reproducible; migrations apply cleanly; schema matches the approved P1.4 model; validation passing. **No application services implemented; no legacy data migrated.** OD-11 enum mappings and owner-decision domains remain blocked before affected data migration can proceed. (P1.6 not started.)
 
 ## Next activity
 

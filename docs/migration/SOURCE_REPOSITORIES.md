@@ -36,15 +36,16 @@ Classification legend: **A** India baseline candidate · **B** baseline supporti
 
 ## India baseline — decision status
 
-The India baseline **may span multiple repositories** and has **not** been finalized (blocker **B1**). A **proposed** baseline source decision (P0.3) now exists: [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) — status **PROPOSED — AWAITING OWNER CONFIRMATION** (D-011). Full landscape evidence: [REPOSITORY_LANDSCAPE.md → "INDIA BASELINE — DECISION REQUIRED"](./REPOSITORY_LANDSCAPE.md#india-baseline--decision-required).
+**APPROVED (owner, 2026-09-01).** The India baseline is confirmed and **blocker B1 is resolved**. Decision: [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) · D-011 (APPROVED) in [DECISIONS.md](./DECISIONS.md). Full landscape evidence: [REPOSITORY_LANDSCAPE.md → "INDIA BASELINE — DECISION REQUIRED"](./REPOSITORY_LANDSCAPE.md#india-baseline--decision-required).
 
-| Repository | Proposed baseline role (P0.3) | Basis |
-|------------|-------------------------------|-------|
-| `amealio-vendordashboard` | **Core baseline** | Foundational system of record |
-| `amealio_web_app` | **Core baseline** | Consumer surface (since 2023) |
-| `amealiodashboardmvp-` | **Core baseline** | Admin+merchant surface (since 2020) |
-| `amealio-nestjs-backend` | **Satellite / feature source** (later enhancement) | New in 2026 (10 commits); separate PostgreSQL |
-| `amealio-self-delivery-app` | **Satellite / feature source** (later enhancement) | New in 2026 (46 commits, beta) |
+| Repository | Approved baseline role (D-011) | Basis |
+|------------|--------------------------------|-------|
+| `amealio-vendordashboard` | **Core baseline (restore first)** | Foundational system of record |
+| `amealio_web_app` | **Core baseline (restore first)** | Consumer surface (since 2023) |
+| `amealiodashboardmvp-` | **Core baseline (restore first)** | Admin+merchant surface (since 2020) |
+| `amealio-nestjs-backend` | **Deferred feature/satellite** (not initial baseline) | New in 2026 (10 commits); separate PostgreSQL |
+| `amealio-self-delivery-app` | **Deferred feature/satellite** (not initial baseline) | New in 2026 (46 commits, beta) |
 
-- **Do not resolve B1 by guessing.** Confirmation is a stakeholder decision recorded in [DECISIONS.md](./DECISIONS.md) (D-011) and reflected in [MIGRATION_STATUS.md](./MIGRATION_STATUS.md).
-- The P0.2 landscape A–F classifications are unchanged; P0.3 refines the **baseline-membership** proposal (the two supporting repos are proposed as additive, not foundational).
+- **Order of operations:** restore India baseline → validate → freeze → introduce additional capabilities progressively.
+- The two deferred repositories are **not** part of the initial baseline restoration and must not be treated as such.
+- The P0.2 landscape A–F classifications are unchanged; D-011 fixes **baseline membership**.

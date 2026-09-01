@@ -81,16 +81,15 @@ Architectural and process decisions for the Amealio replatforming. Append new en
 ## Baseline source decisions
 
 ### D-011 — India baseline source set
-- **Status:** **PROPOSED — AWAITING OWNER CONFIRMATION**
+- **Status:** **APPROVED** (owner-approved 2026-09-01; supersedes the prior "PROPOSED — AWAITING OWNER CONFIRMATION" state)
 - **Context:** P0.2 landscape + P0.3 Git-history analysis. Core surfaces are long-lived (`amealiodashboardmvp-` since 2020, `amealio_web_app` since 2023, `amealio-vendordashboard` foundational by dependency despite a 2026 history reset). The two supporting repos are new in 2026 (`amealio-nestjs-backend` first commit 2026-04-29, 10 commits; `amealio-self-delivery-app` 2026-05-01, 46 commits, `Beta.1.0.6`).
-- **Proposed decision:**
-  - **Core baseline:** `amealio-vendordashboard`, `amealio_web_app`, `amealiodashboardmvp-`.
-  - **Satellite / feature sources (introduce progressively after baseline, NOT historical baseline):** `amealio-nestjs-backend`, `amealio-self-delivery-app`.
-  - Supporting-repo determination: both are **later enhancements / separate satellite capabilities** (B/C), not required for the historical baseline (A); residual **D** items need owner confirmation.
+- **Decision (APPROVED by owner):**
+  - **Core India baseline (restore first):** `amealio-vendordashboard`, `amealio_web_app`, `amealiodashboardmvp-`. These three repositories collectively represent the India baseline that must be restored first.
+  - **Deferred feature / satellite sources (NOT part of the initial baseline):** `amealio-nestjs-backend`, `amealio-self-delivery-app`. To be evaluated and introduced progressively **only after** the India baseline has been restored and validated.
 - **Rationale:** Git dates, commit counts, feature-branch naming, a separate PostgreSQL datastore for tracking, and the driver app's dependency on the tracker all indicate the two 2026 repos are additive to a core platform that operated for years without them.
 - **Evidence & full analysis:** [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md).
-- **Consequences:** resolves blocker **B1** only when an owner confirms. Until then, no Phase 2 / P1 migration begins. Do not treat the supporting repos as baseline by default.
-- **Owner confirmation needed on:** whether real-time tracking is "current baseline" vs enhancement; production status of the delivery-boy app / older DeliveryBoy-App; identity of the integration service; ONDC/recommendations scope; authoritative branch per repo.
+- **Consequences:** **resolves blocker B1.** Baseline order of operations: **restore India baseline → validate → freeze → introduce additional capabilities progressively.** The two deferred repositories must not be treated as part of the initial baseline restoration. No Phase 2 / P1 migration begins from this decision alone — it authorizes the baseline scope, not implementation.
+- **Residual items (tracked for the progressive-introduction phase, do not block baseline):** whether real-time tracking is "current baseline" vs enhancement; production status of the delivery-boy app / older DeliveryBoy-App; identity of the integration service; ONDC/recommendations scope; authoritative branch per repo.
 
 ---
 

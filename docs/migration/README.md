@@ -18,6 +18,7 @@ Home for the controlled replatforming of Amealio: discovery inventory, target-de
 | [india-baseline/17-TARGET-MIGRATION-MAP.md](./india-baseline/17-TARGET-MIGRATION-MAP.md) + [target-architecture/](./target-architecture/) (`01`–`12`) | P1.3: target migration map — architecture options, domain boundaries, source→target/data/API/frontend/auth/integration/realtime maps, migration sequence, owner-decisions, risks |
 | [database/](./database/) (`01`–`18`) | P1.4: target PostgreSQL **data model design** — domain model, entity mapping, identifiers, relationships, enum/OD-11 strategy, money, order/payment/reservation/notification models, audit/soft-delete, ownership, indexing, migration complexity, integrity rules, extension seams, ERD, decisions (design only, no schema) |
 | [database/19-DEVELOPMENT-DATABASE.md](./database/19-DEVELOPMENT-DATABASE.md) + [database/20-SCHEMA-IMPLEMENTATION.md](./database/20-SCHEMA-IMPLEMENTATION.md) | P1.5: **PostgreSQL development foundation** — local DB (Docker/local), Prisma migrations implementing the P1.4 baseline model, seed, and validation suite (implementation; no data migration) |
+| [application/21-NESTJS-FOUNDATION.md](./application/21-NESTJS-FOUNDATION.md) | P1.6: **NestJS application foundation** — `apps/api` modular monolith on the P1.5 DB (config, Prisma integration, health, logging, error handling, request-id, domain-event + provider-port conventions, security seams, Jest tests). No business domains/integrations/auth. |
 
 ## Phase model
 

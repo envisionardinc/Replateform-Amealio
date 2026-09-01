@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P1.2 — India Baseline Capability Matrix COMPLETE)
+- **Last updated:** 2026-09-01 (P1.3 — Target Migration Map COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -25,11 +25,12 @@ Single source of truth for the controlled replatforming. Update this file whenev
 - **Phase 1 — P0.2 Repository landscape:** inventoried and classified all 6 available repositories (30-point each) and produced the India-baseline comparison → [REPOSITORY_LANDSCAPE.md](./REPOSITORY_LANDSCAPE.md) and [SOURCE_REPOSITORIES.md](./SOURCE_REPOSITORIES.md).
 - **Phase 1 — P0.3 Baseline source decision (APPROVED):** owner-approved baseline source set → [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md) (D-011). Core = `amealio-vendordashboard` + `amealio_web_app` + `amealiodashboardmvp-`; deferred = `amealio-nestjs-backend`, `amealio-self-delivery-app`. **Blocker B1 resolved.**
 - **P1.1 — Deep India Baseline System Analysis: COMPLETE.** Analyzed the three approved repos as one logical platform across all 13 required areas → [india-baseline/](./india-baseline/) (`01`–`13`). Analysis only.
-- **P1.2 — Define the India Baseline Capability Matrix: COMPLETE.** Produced the capability matrix, behavioral acceptance criteria + Definition of Done, and the end-to-end baseline journeys → [14-CAPABILITY-MATRIX.md](./india-baseline/14-CAPABILITY-MATRIX.md), [15-BASELINE-ACCEPTANCE-CRITERIA.md](./india-baseline/15-BASELINE-ACCEPTANCE-CRITERIA.md), [16-END-TO-END-BASELINE-JOURNEYS.md](./india-baseline/16-END-TO-END-BASELINE-JOURNEYS.md). Every capability is evidence-backed and classified (REQUIRED / PARTIAL / OPTIONAL / NON-BASELINE / DEPRECATED / OWNER-DECISION); baseline exclusions and "not part of baseline" vs "not implemented" are explicit. Specification only — no code, schema, data migration, or production changes.
+- **P1.2 — Define the India Baseline Capability Matrix: COMPLETE.** Capability matrix + acceptance criteria + Definition of Done + critical journeys → [14](./india-baseline/14-CAPABILITY-MATRIX.md)–[16](./india-baseline/16-END-TO-END-BASELINE-JOURNEYS.md).
+- **P1.3 — Create the Target Migration Map: COMPLETE.** Defined *how* the approved baseline is replatformed (design/mapping only) → [india-baseline/17-TARGET-MIGRATION-MAP.md](./india-baseline/17-TARGET-MIGRATION-MAP.md) + [target-architecture/](./target-architecture/) (`01`–`12`): architecture options (recommend modular monolith + service seams), domain boundaries, source→target mapping (REUSE/ADAPT/REFACTOR/REIMPLEMENT/REPLACE/DEPRECATE), conceptual data map (no schema), API/frontend/auth/integration/realtime maps, domain-by-domain sequence, carried-forward owner decisions, and P0/P1/P2 risks. No code, schema, data migration, or production changes; deferred repos not introduced; owner-decisions not resolved.
 
 ## Current activity
 
-- **P1.2 complete.** "India baseline restored" is now defined (capability matrix + acceptance criteria + Definition of Done + critical journeys). **No application functionality written; target/PostgreSQL design not started; migration not started.**
+- **P1.3 complete.** Target migration map documented (architecture recommendation + sequence + risks). **No application functionality written; no PostgreSQL schema; migration not started.** Awaiting owner decisions (esp. enum mapping OD-11 which gates Orders/Payments data) and authorization to begin implementation.
 
 ## Next activity
 

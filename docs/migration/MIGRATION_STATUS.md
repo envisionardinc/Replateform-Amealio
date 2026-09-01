@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P1.6 — NestJS Application Foundation COMPLETE)
+- **Last updated:** 2026-09-01 (P1.7.1 — Identity foundation COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -36,9 +36,11 @@ Single source of truth for the controlled replatforming. Update this file whenev
 - **P1.6 — Build the NestJS Application Foundation: COMPLETE.** Second implementation task. Established the `apps/api` NestJS 10 modular-monolith foundation on the P1.5 database (Prisma integration via a global `PrismaService`, typed/validated config, `/api/v1/health`, structured logging + request-id, global exception filter with a consistent error shape, `ValidationPipe`, URI versioning, CORS, graceful shutdown), plus **conventions** for module boundaries, domain events (in-process port), provider/integration ports, and security decorators (metadata only). Single test runner (Jest + ts-jest). **No business domains, integrations, or authentication implemented.** Docs: [application/21-NESTJS-FOUNDATION.md](./application/21-NESTJS-FOUNDATION.md).
   - Validation: `npm run build` ✓, `npm run lint` ✓, `npm run format:check` ✓, `npm test` → **19/19 passing** (config validation, DB schema 11/11, app bootstrap + health + error-shape), local `node dist/main.js` startup + `/api/v1/health` = `{status:ok, db:up}` ✓. P1.5 migrations/schema unchanged and intact.
 
+- **P1.7.1 — Identity (analyze + minimal foundation): COMPLETE.** First business-domain migration. Read-only analysis of baseline auth across all three repos (file-cited; consumer vs merchant vs admin differences documented) → [domains/22-IDENTITY-ANALYSIS.md](./domains/22-IDENTITY-ANALYSIS.md). Implemented a minimal, evidence-backed Identity foundation in `apps/api/src/modules/identity/`: consumer user management (register/get; duplicate→409; unverified default), `PasswordHasher` port + bcrypt adapter (baseline algorithm), `UserRepository` port + Prisma adapter, and role-based authorization infra (`RolesGuard` + `Principal` + `CurrentUser`). **No schema change** (P1.5 intact); **no token/OTP/social auth, no permission-tree evaluator, no HTTP endpoints, no data migration.** Validation: build ✓, lint ✓, format ✓, **54/54 tests passing** (32 Identity + app/config/DB). OD-11 untouched.
+
 ## Current activity
 
-- **P1.6 complete.** NestJS foundation builds, starts, lints, and tests successfully on top of the intact P1.5 database. **No domain implementation; no P1.7 started.** Domains (Identity, Merchant/Location, Catalog/Menu, Orders, Payments, Reservations, Notifications, Admin) will be migrated individually in subsequent controlled steps. OD-11 and owner-decision domains remain blocked.
+- **P1.7.1 (Identity) complete** as an analysis + minimal foundation. Authentication (token issuance/verification, OTP, social/WhatsApp) and permission-tree enforcement are **deferred** (baseline behavior is Feathers-specific and partly UNKNOWN; would require invention/cutover strategy). **No further P1.7 domains started.** Merchant/Location, Catalog/Menu, Orders, Payments, Reservations, Notifications, Admin remain pending controlled steps; OD-11 and owner-decision domains remain blocked.
 
 ## Next activity
 

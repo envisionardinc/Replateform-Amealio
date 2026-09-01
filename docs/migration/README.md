@@ -19,6 +19,7 @@ Home for the controlled replatforming of Amealio: discovery inventory, target-de
 | [database/](./database/) (`01`–`18`) | P1.4: target PostgreSQL **data model design** — domain model, entity mapping, identifiers, relationships, enum/OD-11 strategy, money, order/payment/reservation/notification models, audit/soft-delete, ownership, indexing, migration complexity, integrity rules, extension seams, ERD, decisions (design only, no schema) |
 | [database/19-DEVELOPMENT-DATABASE.md](./database/19-DEVELOPMENT-DATABASE.md) + [database/20-SCHEMA-IMPLEMENTATION.md](./database/20-SCHEMA-IMPLEMENTATION.md) | P1.5: **PostgreSQL development foundation** — local DB (Docker/local), Prisma migrations implementing the P1.4 baseline model, seed, and validation suite (implementation; no data migration) |
 | [application/21-NESTJS-FOUNDATION.md](./application/21-NESTJS-FOUNDATION.md) | P1.6: **NestJS application foundation** — `apps/api` modular monolith on the P1.5 DB (config, Prisma integration, health, logging, error handling, request-id, domain-event + provider-port conventions, security seams, Jest tests). No business domains/integrations/auth. |
+| [domains/22-IDENTITY-ANALYSIS.md](./domains/22-IDENTITY-ANALYSIS.md) | P1.7.1: **Identity** — baseline auth analysis (consumer/merchant/admin, file-cited) + minimal evidence-backed foundation (consumer user management, bcrypt hasher, role-based authorization infra). No token/OTP/social auth, no data migration, no schema change. |
 
 ## Phase model
 

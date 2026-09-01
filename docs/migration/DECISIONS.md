@@ -78,6 +78,22 @@ Architectural and process decisions for the Amealio replatforming. Append new en
 
 ---
 
+## Baseline source decisions
+
+### D-011 — India baseline source set
+- **Status:** **PROPOSED — AWAITING OWNER CONFIRMATION**
+- **Context:** P0.2 landscape + P0.3 Git-history analysis. Core surfaces are long-lived (`amealiodashboardmvp-` since 2020, `amealio_web_app` since 2023, `amealio-vendordashboard` foundational by dependency despite a 2026 history reset). The two supporting repos are new in 2026 (`amealio-nestjs-backend` first commit 2026-04-29, 10 commits; `amealio-self-delivery-app` 2026-05-01, 46 commits, `Beta.1.0.6`).
+- **Proposed decision:**
+  - **Core baseline:** `amealio-vendordashboard`, `amealio_web_app`, `amealiodashboardmvp-`.
+  - **Satellite / feature sources (introduce progressively after baseline, NOT historical baseline):** `amealio-nestjs-backend`, `amealio-self-delivery-app`.
+  - Supporting-repo determination: both are **later enhancements / separate satellite capabilities** (B/C), not required for the historical baseline (A); residual **D** items need owner confirmation.
+- **Rationale:** Git dates, commit counts, feature-branch naming, a separate PostgreSQL datastore for tracking, and the driver app's dependency on the tracker all indicate the two 2026 repos are additive to a core platform that operated for years without them.
+- **Evidence & full analysis:** [india-baseline/BASELINE_SOURCE_DECISION.md](./india-baseline/BASELINE_SOURCE_DECISION.md).
+- **Consequences:** resolves blocker **B1** only when an owner confirms. Until then, no Phase 2 / P1 migration begins. Do not treat the supporting repos as baseline by default.
+- **Owner confirmation needed on:** whether real-time tracking is "current baseline" vs enhancement; production status of the delivery-boy app / older DeliveryBoy-App; identity of the integration service; ONDC/recommendations scope; authoritative branch per repo.
+
+---
+
 ## Decisions still required (tracked, not yet made)
 
 | Ref | Question |

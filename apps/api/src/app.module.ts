@@ -25,6 +25,9 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
       isGlobal: true,
       validate: validateEnv,
       cache: true,
+      // Monorepo: the API workspace may run with cwd=apps/api (via Turbo) or the
+      // repo root. Load the root .env in both cases (the repo keeps a single .env).
+      envFilePath: ['.env', '../../.env'],
     }),
     PrismaModule,
     EventsModule,

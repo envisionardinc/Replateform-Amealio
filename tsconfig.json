@@ -1,4 +1,5 @@
 {
+  "//": "Shared TypeScript base for the monorepo. Workspace apps extend this (e.g. apps/api/tsconfig.json).",
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
@@ -14,10 +15,6 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": false,
     "sourceMap": true,
-    "baseUrl": ".",
-    "outDir": "dist",
     "types": ["node", "jest"]
-  },
-  "include": ["apps/**/*.ts", "prisma/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  }
 }

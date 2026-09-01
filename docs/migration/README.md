@@ -20,6 +20,7 @@ Home for the controlled replatforming of Amealio: discovery inventory, target-de
 | [database/19-DEVELOPMENT-DATABASE.md](./database/19-DEVELOPMENT-DATABASE.md) + [database/20-SCHEMA-IMPLEMENTATION.md](./database/20-SCHEMA-IMPLEMENTATION.md) | P1.5: **PostgreSQL development foundation** — local DB (Docker/local), Prisma migrations implementing the P1.4 baseline model, seed, and validation suite (implementation; no data migration) |
 | [application/21-NESTJS-FOUNDATION.md](./application/21-NESTJS-FOUNDATION.md) | P1.6: **NestJS application foundation** — `apps/api` modular monolith on the P1.5 DB (config, Prisma integration, health, logging, error handling, request-id, domain-event + provider-port conventions, security seams, Jest tests). No business domains/integrations/auth. |
 | [domains/22-IDENTITY-ANALYSIS.md](./domains/22-IDENTITY-ANALYSIS.md) | P1.7.1: **Identity** — baseline auth analysis (consumer/merchant/admin, file-cited) + minimal evidence-backed foundation (consumer user management, bcrypt hasher, role-based authorization infra). No token/OTP/social auth, no data migration, no schema change. |
+| [architecture/23-TURBOREPO-MONOREPO.md](./architecture/23-TURBOREPO-MONOREPO.md) | P1.6.1: **TurboRepo monorepo foundation** — Turbo + npm workspaces orchestrating `apps/api`; Prisma kept at root; root↔app commands, task pipeline, caching, future-frontend placement. Workspace/architecture only (no domain/data/schema change). |
 
 ## Phase model
 

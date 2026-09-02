@@ -572,26 +572,44 @@ model RestaurantTable {
 // Catalog (shared taxonomy)
 // =====================================================================
 
+// Platform reference taxonomy (admin-defined). Represents the legacy unified
+// `Category` (parent) + `Sub Category` (child) taxonomy: one hierarchical tree
+// discriminated by `type`, selected by merchants and consumed by users.
+// Icons/media are EMBEDDED string fields (icon URL/key, icon_code, hexColor) —
+// mirroring legacy `Sub Category` — NOT a separate Icon entity (P1.7.4).
 model Category {
-  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  code      String?    @unique
-  type      String?
-  parentId  String?    @db.Uuid
-  parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryChildren")
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  deletedAt DateTime?
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId    String?    @unique
+  name        String
+  code        String?    @unique
+  type        String?
+  description String?
+  icon        String?
+  iconCode    String?
+  hexColor    String?
+  status      String?
+  parentId    String?    @db.Uuid
+  parent      Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryChildren")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
 
   menuSections MenuSection[]
 
   @@index([parentId])
+  @@index([type])
 }
 
+// Platform cuisine reference (admin-defined lookup; legacy `Cusine`). Kept as a
+// dedicated lookup per P1.4 (database/05-ENUM-STATUS-STRATEGY). Icon embedded.
 model Cuisine {
-  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name String @unique
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId    String? @unique
+  name        String  @unique
+  description String?
+  icon        String?
+  status      String?
 }
 
 model UnitOfMeasure {

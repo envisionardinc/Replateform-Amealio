@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { ConsumerAuthModule } from './modules/identity/authentication/consumer-auth.module';
 import { StaffAuthModule } from './modules/identity/staff-authentication/staff-auth.module';
+import { MerchantModule } from './modules/merchant/merchant.module';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { LoggingInterceptor } from './common/logging/logging.interceptor';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
@@ -37,6 +38,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     IdentityModule,
     ConsumerAuthModule,
     StaffAuthModule,
+    MerchantModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { NewUserData, UserRepository } from '../domain/ports/user.repository';
+import { AuthUserRecord, NewUserData, UserRepository } from '../domain/ports/user.repository';
 import { User } from '../domain/user.entity';
 
 /** Prisma adapter for the UserRepository port (P1.5 `User` table). */
@@ -34,6 +34,22 @@ export class PrismaUserRepository extends UserRepository {
       where: { phoneCountryCode_phone: { phoneCountryCode, phone } },
     });
     return row ? PrismaUserRepository.toDomain(row) : null;
+  }
+
+  async findAuthByPhone(phoneCountryCode: string, phone: string): Promise<AuthUserRecord | null> {
+    const row = await this.prisma.user.findUnique({
+      where: { phoneCountryCode_phone: { phoneCountryCode, phone } },
+      select: { id: true, passwordHash: true, isBlocked: true, isVerified: true },
+    });
+    return row;
+  }
+
+  async findAuthByEmail(email: string): Promise<AuthUserRecord | null> {
+    const row = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, passwordHash: true, isBlocked: true, isVerified: true },
+    });
+    return row;
   }
 
   private static toDomain(row: Prisma.UserGetPayload<object>): User {

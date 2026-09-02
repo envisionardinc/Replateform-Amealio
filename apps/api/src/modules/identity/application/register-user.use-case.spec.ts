@@ -29,6 +29,12 @@ class FakeUserRepository extends UserRepository {
   async findByPhone(cc: string, phone: string): Promise<User | null> {
     return this.store.get(`${cc}:${phone}`) ?? null;
   }
+  async findAuthByPhone() {
+    return null;
+  }
+  async findAuthByEmail() {
+    return null;
+  }
 }
 
 class FakeHasher extends PasswordHasher {

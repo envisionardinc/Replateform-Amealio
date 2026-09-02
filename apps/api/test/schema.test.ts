@@ -167,3 +167,125 @@ describe('PostgreSQL schema foundation', () => {
     expect(withDeleted?.deletedAt).toBeInstanceOf(Date);
   });
 });
+
+// Staff/admin identity schema foundation (P1.7.1D). Schema-level checks only —
+// no authentication behavior is implemented or asserted here.
+describe('Staff/admin identity schema (P1.7.1D)', () => {
+  it('creates a merchant-scoped StaffMember (merchantId populated)', async () => {
+    const m = await makeMerchant();
+    const s = await prisma.staffMember.create({
+      data: { merchantId: m.id, name: uniq('Staff'), staffRole: 'MERCHANT_STAFF' },
+    });
+    expect(s.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(s.merchantId).toBe(m.id);
+  });
+
+  it('creates a platform-scoped StaffMember with merchantId NULL (SUPER_ADMIN)', async () => {
+    const s = await prisma.staffMember.create({
+      data: { name: uniq('Admin'), staffRole: 'SUPER_ADMIN' },
+    });
+    expect(s.merchantId).toBeNull();
+    expect(s.staffRole).toBe('SUPER_ADMIN');
+  });
+
+  it('defaults status to ACTIVE and supports BLOCKED', async () => {
+    const active = await prisma.staffMember.create({ data: { name: uniq('Staff') } });
+    expect(active.status).toBe('ACTIVE');
+    const blocked = await prisma.staffMember.create({
+      data: { name: uniq('Staff'), status: 'BLOCKED' },
+    });
+    expect(blocked.status).toBe('BLOCKED');
+  });
+
+  it('enforces StaffMember -> Merchant foreign key', async () => {
+    await expect(
+      prisma.staffMember.create({
+        data: { merchantId: '00000000-0000-0000-0000-000000000000', name: uniq('Staff') },
+      }),
+    ).rejects.toThrow(/foreign key|constraint/i);
+  });
+
+  it('keeps the StaffMember -> Role relationship coherent', async () => {
+    const m = await makeMerchant();
+    const role = await prisma.role.create({
+      data: { merchantId: m.id, name: uniq('ROLE'), scope: 'MERCHANT' },
+    });
+    const s = await prisma.staffMember.create({
+      data: { merchantId: m.id, name: uniq('Staff'), roleId: role.id },
+    });
+    const withRole = await prisma.staffMember.findUniqueOrThrow({
+      where: { id: s.id },
+      include: { role: true },
+    });
+    expect(withRole.role?.id).toBe(role.id);
+  });
+
+  it('enforces StaffMember.legacyId uniqueness', async () => {
+    const legacyId = uniq('legacy');
+    await prisma.staffMember.create({ data: { name: uniq('Staff'), legacyId } });
+    await expect(
+      prisma.staffMember.create({ data: { name: uniq('Staff'), legacyId } }),
+    ).rejects.toThrow(/unique|constraint/i);
+  });
+
+  it('stores a PASSWORD StaffCredential referencing a StaffMember', async () => {
+    const m = await makeMerchant();
+    const s = await prisma.staffMember.create({ data: { merchantId: m.id, name: uniq('Staff') } });
+    const cred = await prisma.staffCredential.create({
+      data: { staffMemberId: s.id, type: 'PASSWORD', secretHash: uniq('bcrypt') },
+    });
+    expect(cred.type).toBe('PASSWORD');
+    expect(cred.staffMemberId).toBe(s.id);
+  });
+
+  it('enforces one credential per (staffMember, type)', async () => {
+    const s = await prisma.staffMember.create({ data: { name: uniq('Staff') } });
+    await prisma.staffCredential.create({
+      data: { staffMemberId: s.id, type: 'PASSWORD', secretHash: uniq('bcrypt') },
+    });
+    await expect(
+      prisma.staffCredential.create({
+        data: { staffMemberId: s.id, type: 'PASSWORD', secretHash: uniq('bcrypt') },
+      }),
+    ).rejects.toThrow(/unique|constraint/i);
+  });
+
+  it('stores a StaffSession referencing a StaffMember with a unique refresh hash', async () => {
+    const s = await prisma.staffMember.create({ data: { name: uniq('Staff') } });
+    const hash = uniq('refresh');
+    const sess = await prisma.staffSession.create({
+      data: {
+        staffMemberId: s.id,
+        refreshTokenHash: hash,
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    expect(sess.staffMemberId).toBe(s.id);
+    await expect(
+      prisma.staffSession.create({
+        data: {
+          staffMemberId: s.id,
+          refreshTokenHash: hash,
+          expiresAt: new Date(Date.now() + 86_400_000),
+        },
+      }),
+    ).rejects.toThrow(/unique|constraint/i);
+  });
+
+  it('cascade-deletes staff credentials and sessions when a StaffMember is deleted', async () => {
+    const s = await prisma.staffMember.create({ data: { name: uniq('Staff') } });
+    await prisma.staffCredential.create({
+      data: { staffMemberId: s.id, type: 'PASSWORD', secretHash: uniq('bcrypt') },
+    });
+    await prisma.staffSession.create({
+      data: {
+        staffMemberId: s.id,
+        refreshTokenHash: uniq('refresh'),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    await prisma.staffMember.delete({ where: { id: s.id } });
+    expect(await prisma.staffCredential.count({ where: { staffMemberId: s.id } })).toBe(0);
+    expect(await prisma.staffSession.count({ where: { staffMemberId: s.id } })).toBe(0);
+  });
+});

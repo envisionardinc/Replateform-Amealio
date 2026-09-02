@@ -1,6 +1,7 @@
-# 26 — Staff/Admin Authentication & Identity Schema Design (P1.7.1C)
+# 26 — Staff/Admin Authentication & Identity Schema Design (P1.7.1C) + Schema Implementation (P1.7.1D)
 
-> **Status:** DESIGN / ANALYSIS ONLY — nothing implemented, no Prisma change, no migration, no endpoints, no data migration.
+> **Design status (P1.7.1C — §§1–23 below):** DESIGN / ANALYSIS ONLY — no code/schema changed in that phase.
+> **Implementation status (P1.7.1D — §24 below): staff/admin identity PostgreSQL schema implemented; authentication remains deferred.**
 > **Purpose:** Resolve **AUTH-D8** ("what identity/auth schema is required for staff/admin?") and the remaining staff/admin identity decisions, producing an **implementation-ready** design that a later, dedicated phase can build in small reviewable steps.
 > **Upstream (authoritative):** [22-IDENTITY-ANALYSIS.md](./22-IDENTITY-ANALYSIS.md), [24-AUTHENTICATION-ARCHITECTURE.md](./24-AUTHENTICATION-ARCHITECTURE.md), [25-CONSUMER-AUTHENTICATION.md](./25-CONSUMER-AUTHENTICATION.md).
 > **Consumer authentication (P1.7.1B) is DONE and MUST NOT be modified or redesigned here.**
@@ -431,3 +432,53 @@ This phase does **NOT**: implement staff/admin authentication · modify `prisma/
 - ✅ Future implementation sequence + test strategy defined.
 - ✅ **No implementation, no schema change, no migration** — verified; `prisma/schema.prisma` and all migrations unchanged.
 - ✅ Deliverable committed; status + hub updated (not marked "implementation complete").
+
+---
+
+## 24. Implementation (P1.7.1D — schema only)
+
+> **Implementation status: P1.7.1D schema implemented; authentication remains deferred.**
+> This phase implemented **only** the PostgreSQL schema foundation from §§15–17 above. No staff/admin login, JWT, refresh rotation, logout, guards, RBAC enforcement, permission evaluation, act-as, or data migration was implemented. Consumer authentication (P1.7.1B) was not touched.
+
+### 24.1 Migration
+
+- **Name:** `20260902010630_p1_7_1d_staff_admin_identity` (single, additive, minimal).
+- **Applied to** `amealio_dev` and `amealio_test`; `prisma migrate status` → *up to date*. No historical migration modified.
+
+### 24.2 Enums added
+
+- `StaffAccountStatus { ACTIVE, BLOCKED }` — DELETED is represented via `deletedAt` (soft-delete convention), not an enum value. `DISABLED` **not** added (design §11 did not require it).
+- `StaffCredentialType { PASSWORD }` — only value now; extensible without a `StaffMember` redesign.
+
+### 24.3 `StaffMember` (modified)
+
+| Field | Change | Notes |
+|---|---|---|
+| `legacyId String? @unique` | **added** | migration traceability only (unpopulated); follows the repo `legacyId` convention |
+| `merchantId String? @db.Uuid` | **now nullable** | populated ⇒ merchant-scoped; NULL ⇒ platform-scoped (SUPER_ADMIN) |
+| `merchant Merchant? @relation(..., onDelete: Restrict)` | **optional + Restrict** | see deviation D1 |
+| `status StaffAccountStatus @default(ACTIVE)` | **added** | account lifecycle (§11) |
+| `credentials StaffCredential[]`, `sessions StaffSession[]` | **added** | back-relations |
+| `@@index([status])` | **added** | (kept `@@index([merchantId])`) |
+| `name`, `email?`, `phone?`, `staffRole`, `roleId?`, `role?`, `createdAt`, `updatedAt`, `deletedAt` | unchanged | login-identifier uniqueness on `email`/`phone` intentionally **not** added (O1 open) |
+
+### 24.4 `StaffCredential` (new)
+
+`id` (uuid PK) · `staffMemberId` (uuid FK → `StaffMember`, `onDelete: Cascade`) · `type StaffCredentialType @default(PASSWORD)` · `secretHash String` (bcrypt hash for PASSWORD; never plaintext) · `createdAt` · `updatedAt`. Constraints: `@@unique([staffMemberId, type])`, `@@index([staffMemberId])`. No `deletedAt` (matches design §6).
+
+### 24.5 `StaffSession` (new)
+
+`id` (uuid PK) · `staffMemberId` (uuid FK → `StaffMember`, `onDelete: Cascade`) · `refreshTokenHash String @unique` · `expiresAt DateTime` · `createdAt DateTime`. Constraints/indexes: `refreshTokenHash` unique, `@@index([staffMemberId])`, `@@index([expiresAt])`. Mirrors the consumer `Session` security shape (revocation = row delete; rotation = update hash+expiry) **without modifying** the consumer `Session`. Behavior is implemented in a later phase.
+
+### 24.6 Role / permission
+
+Reused the **existing** `Role` / `RolePermission` (P1.5); `StaffMember.roleId → Role` already existed and is unchanged. No new role tables, no permission catalogue invented (AUTH-D6 still open).
+
+### 24.7 Deliberate deviations from P1.7.1C
+
+- **D1 — `StaffMember → Merchant` FK is `onDelete: Restrict`** (P1.5 had `Cascade`; §16 did not specify). Rationale: with a now-nullable FK, `SetNull` would silently promote merchant staff to platform scope, and `Cascade` would destroy staff identities on merchant hard-delete. Merchants use soft-delete (`deletedAt`), so `Restrict` is the safe, non-destructive choice (aligns with the phase rule against cascade-deleting staff).
+- **D2 — `StaffSession.actAsMerchantId` NOT added.** Design §16 lists it under **FUTURE EXTENSION**; adding a reserved FK purely for a future feature would be speculative. It will be added in the act-as implementation phase.
+
+### 24.8 Tests & validation
+
+10 schema-level tests added to `apps/api/test/schema.test.ts` (merchant-scoped staff, NULL-merchant SUPER_ADMIN, ACTIVE/BLOCKED status, `StaffMember→Merchant` FK, `StaffMember→Role` coherence, `legacyId` uniqueness, PASSWORD credential + `(staffMember,type)` uniqueness, `StaffSession` + `refreshTokenHash` uniqueness, cascade delete of credentials/sessions). Full suite: **85/85 passing** (75 prior + 10 new). Build ✓, lint ✓, format:check ✓, `prisma validate` ✓, `prisma migrate status` up to date.

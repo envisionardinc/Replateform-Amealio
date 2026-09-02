@@ -12,6 +12,8 @@ import { MerchantModule } from './modules/merchant/merchant.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { ReferenceDataModule } from './modules/reference-data/reference-data.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { UserProfileModule } from './modules/user-profile/user-profile.module';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { LoggingInterceptor } from './common/logging/logging.interceptor';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
@@ -45,6 +47,8 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     SubscriptionModule,
     ReferenceDataModule,
     CatalogModule,
+    OnboardingModule,
+    UserProfileModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

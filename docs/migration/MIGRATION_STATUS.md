@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-02 (P1.7.1B — Consumer Authentication COMPLETE)
+- **Last updated:** 2026-09-02 (P1.7.1C — Staff/Admin Authentication & Identity Schema Design COMPLETE — design/analysis only)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -44,9 +44,11 @@ Single source of truth for the controlled replatforming. Update this file whenev
 
 - **P1.7.1B — Consumer Authentication: COMPLETE** (local/dev only; no cutover). Implemented consumer password authentication on the target platform (`apps/api/src/modules/identity/authentication/`): register/login/refresh/logout/me, **Bearer access JWT** + **rotating server-side refresh sessions** (sha256-hashed, revocable, **replay-detected**), a **JWT consumer guard**, and blocked-status enforcement — reusing the P1.5 `User`+`Session` (**no schema change**). Feature-flagged (`CONSUMER_AUTH_ENABLED`); legacy raw-header rejected; legacy apps untouched. Deferred: OTP/phone-only/social/WhatsApp/reset/verification and staff/admin/merchant auth. Docs: [domains/25-CONSUMER-AUTHENTICATION.md](./domains/25-CONSUMER-AUTHENTICATION.md). Validation: build/lint/format ✓, **75/75 tests** (54 prior + 21 new), live smoke ✓ (register→login→me→refresh-rotate→replay-401→logout→refresh-401), Prisma schema/migrations unchanged.
 
+- **P1.7.1C — Staff/Admin Authentication & Identity Schema Design: COMPLETE** (design/analysis only — **nothing implemented**). Resolved **AUTH-D8** as an implementation-ready design and settled the remaining staff/admin identity questions. Re-inspected the legacy `VendorUser`/`role-management`/`admin-auth` (bcrypt; admin logs in via `userId`; admin token minted with the **consumer** `authentication` secret — a defect to drop; stateless JWT, no refresh rotation; deep boolean permission trees; act-as exists) and the target models. **Recommended target:** SUPER_ADMIN = `StaffMember` with **nullable `merchantId`**; **separate `StaffCredential`** (one `PASSWORD` row now; extensible) and **separate `StaffSession`** (rotating hashed refresh — leaves consumer `Session`/P1.7.1B untouched); `status StaffAccountStatus{ACTIVE,BLOCKED}` + `deletedAt`; RBAC on the **existing** `Role`/`RolePermission`; act-as-merchant deferred but modelled as explicit/audited (`StaffSession.actAsMerchantId` + existing `AuditLog`). Future Prisma delta (NOT applied): +2 models, +2 enums, 3 `StaffMember` modifications — all additive/reversible. Docs: [domains/26-STAFF-ADMIN-AUTHENTICATION-DESIGN.md](./domains/26-STAFF-ADMIN-AUTHENTICATION-DESIGN.md). **AUTH-D8 design-complete pending owner schema sign-off; AUTH-D4/D5/D6/D7/D9 remain owner decisions (recommendations recorded).** Validation: build/lint/format ✓, 75/75 tests, **`prisma/schema.prisma` + migrations unchanged**, no application/frontend/data changes.
+
 ## Current activity
 
-- **P1.7.1B complete.** Consumer authentication works and is fully validated. **Overall authentication migration is NOT complete** — staff/admin/merchant authentication, OTP/social, and cutover are still pending. **No domain migration started.** Next: consumer OTP/reset if owner-scoped, then staff/admin auth after AUTH-D8 schema additions; Merchant/Location awaits AUTH-D2 confirmation. OD-11 and owner-decision domains remain blocked.
+- **P1.7.1C complete (design only).** Staff/admin auth is now **implementation-ready** but **not started** — it is **blocked on owner approval of the AUTH-D8 schema additions** (nullable `merchantId`, `StaffCredential`, `StaffSession`, status/credential enums) and the AUTH-D4/D6/D7 owner decisions. **Overall authentication migration is NOT complete**; no staff/admin/merchant auth, no schema change, no data migration performed. Next (on approval): the reviewed staff-auth schema migration, then staff credential/session/login/refresh/guard/scope/RBAC in small reversible slices (§18 of doc 26). Merchant/Location still awaits AUTH-D2 confirmation; OD-11 and owner-decision domains remain blocked.
 
 ## Next activity
 

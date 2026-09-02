@@ -268,12 +268,17 @@ model User {
 }
 
 model UserProfile {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String   @unique @db.Uuid
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  preferences Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String   @unique @db.Uuid
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Profile/onboarding state (P1.7.8) ← legacy User have_submited_details_profile
+  // (bool) + profile_percentage (int). `preferences` (existing Json) holds the
+  // legacy preference arrays (dietary/cuisine/celebration_subcategory/...).
+  detailsSubmitted     Boolean  @default(false)
+  completionPercentage Int      @default(0)
+  preferences          Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model Address {
@@ -324,17 +329,19 @@ model Organization {
 }
 
 model Merchant {
-  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  legacyId       String?       @unique
-  organizationId String?       @db.Uuid
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  legalName      String
-  email          String?       @unique
-  phone          String?       @unique
-  isBlocked      Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  deletedAt      DateTime?
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId            String?       @unique
+  organizationId      String?       @db.Uuid
+  organization        Organization? @relation(fields: [organizationId], references: [id])
+  legalName           String
+  email               String?       @unique
+  phone               String?       @unique
+  isBlocked           Boolean       @default(false)
+  // Merchant onboarding gate (P1.7.8) ← legacy VendorUser.have_vendor_submitted_details
+  onboardingSubmitted Boolean       @default(false)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  deletedAt           DateTime?
 
   staff           StaffMember[]
   roles           Role[]
@@ -471,25 +478,29 @@ model RestaurantChain {
 }
 
 model Restaurant {
-  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  legacyId     String?          @unique
-  merchantId   String           @db.Uuid
-  merchant     Merchant         @relation(fields: [merchantId], references: [id])
-  chainId      String?          @db.Uuid
-  chain        RestaurantChain? @relation(fields: [chainId], references: [id])
-  name         String
-  city         String?
-  state        String?
-  pinCode      String?
-  country      String?          @default("IN")
-  timezone     String?          @default("Asia/Kolkata")
-  currencyCode String           @default("INR")
-  lat          Float?
-  lon          Float?
-  status       String           @default("ACTIVE")
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  deletedAt    DateTime?
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId       String?          @unique
+  merchantId     String           @db.Uuid
+  merchant       Merchant         @relation(fields: [merchantId], references: [id])
+  chainId        String?          @db.Uuid
+  chain          RestaurantChain? @relation(fields: [chainId], references: [id])
+  name           String
+  city           String?
+  state          String?
+  pinCode        String?
+  country        String?          @default("IN")
+  timezone       String?          @default("Asia/Kolkata")
+  currencyCode   String           @default("INR")
+  lat            Float?
+  lon            Float?
+  status         String           @default("ACTIVE")
+  // Restaurant onboarding progress (P1.7.8): onboardingStep ← legacy
+  // restaurant.page_completed_till (integer step counter); softOnboarding ← same.
+  onboardingStep Int              @default(0)
+  softOnboarding Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
 
   operatingHours    OperatingHours[]
   reservationBlocks ReservationBlock[]

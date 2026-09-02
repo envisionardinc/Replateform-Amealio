@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-01 (P1.6.1 — TurboRepo monorepo foundation COMPLETE)
+- **Last updated:** 2026-09-02 (P1.7.1A — Authentication Architecture & Migration Decision COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -40,9 +40,11 @@ Single source of truth for the controlled replatforming. Update this file whenev
 
 - **P1.6.1 — TurboRepo Monorepo Foundation: COMPLETE.** Introduced Turbo (`turbo@2.10.12`) + npm workspaces as the orchestration layer, promoting the existing NestJS API to the `@amealio/api` workspace (`apps/api`). **Prisma kept at root** (no move); P1.5 schema/migrations **unchanged**. Root commands delegate to Turbo (`build`/`test`/`lint`) with a repo-wide `format:check`; test task is uncached (DB-dependent). Docs: [architecture/23-TURBOREPO-MONOREPO.md](./architecture/23-TURBOREPO-MONOREPO.md). Validation: build ✓, lint ✓, format:check ✓, **54/54 tests**, API starts + `/api/v1/health` ok, `db:validate` 11/11, `migrate status` up to date — no regression to P1.5/P1.6/P1.7.1.
 
+- **P1.7.1A — Authentication Architecture & Migration Decision: COMPLETE.** Decision/architecture only (no auth implemented). Re-confirmed consumer/merchant/admin auth from source; produced the authentication behavior matrix, legacy-quirk classification, and the recommended target (**Option C — unified canonical Identity with distinct principals**: consumer `User` + staff `StaffMember`), plus target token/session + authorization design, the **merchant/admin boundary**, future user-migration + cutover strategies, PostgreSQL impact, and an owner-decision register. Docs: [domains/24-AUTHENTICATION-ARCHITECTURE.md](./domains/24-AUTHENTICATION-ARCHITECTURE.md). **OD-11 confirmed irrelevant to auth.** Consumer auth is schema-sufficient; **staff/admin auth requires future schema additions (AUTH-D8, reviewed migration)**. Validation: build/lint/format ✓, 54/54 tests, Prisma schema/migrations unchanged.
+
 ## Current activity
 
-- **P1.6.1 complete.** Monorepo foundation established and validated; existing functionality intact. **No domain migration performed.** Next controlled steps (still pending): Merchant/Location, Catalog/Menu, Orders, Payments, Reservations, Notifications, Admin (each individually), plus deferred authentication endpoints and frontend migration. OD-11 and owner-decision domains remain blocked.
+- **P1.7.1A complete** — authentication architecture decided (pending owner approvals AUTH-D1..D9). **No authentication implemented; no domain migration.** Recommended next step: implement **consumer authentication** (feature-flagged, no cutover) once AUTH-D1/D2/D3 are approved; defer staff/admin auth until schema additions (AUTH-D8) are approved. Merchant/Location must wait on the merchant/admin boundary (AUTH-D2). OD-11 and owner-decision domains remain blocked.
 
 ## Next activity
 

@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { istUsagePeriodWindow } from '../domain/usage-frequency';
 import type {
   AppliedOffer,
   OrderItemRecord,
@@ -108,6 +109,8 @@ export class OrderRepository {
             validTo: true,
             maxUsageLimit: true,
             perUserLimit: true,
+            useLimit: true,
+            useFrequency: true,
           },
         },
       },
@@ -132,6 +135,8 @@ export class OrderRepository {
       validTo: o.validTo,
       maxUsageLimit: o.maxUsageLimit,
       perUserLimit: o.perUserLimit,
+      useLimit: o.useLimit,
+      useFrequency: o.useFrequency,
     };
   }
 
@@ -160,6 +165,27 @@ export class OrderRepository {
           });
           if (perUser >= r.perUserLimit) {
             throw new ConflictException('Per-user usage limit reached for this offer');
+          }
+        }
+        // Usage-frequency gate (P1.7.26B): per-user redemptions within the current
+        // IST calendar period (useFrequency), capped by useLimit. Legacy enforces
+        // this ONLY for global offers (doc 55, OD-USG-3) and per-user; the count is
+        // DERIVED from ACTIVE redemptions in the window (no mutable counter), and
+        // runs under the same coupon FOR UPDATE lock acquired above (concurrency).
+        if (r.isGlobal && r.useLimit !== null && r.useFrequency && r.userId) {
+          const window = istUsagePeriodWindow(r.useFrequency, new Date());
+          if (window) {
+            const inPeriod = await tx.couponRedemption.count({
+              where: {
+                couponId: r.couponId,
+                userId: r.userId,
+                status: 'ACTIVE',
+                createdAt: { gte: window.start, lt: window.endExclusive },
+              },
+            });
+            if (inPeriod >= r.useLimit) {
+              throw new ConflictException('Offer usage frequency limit reached for this period');
+            }
           }
         }
       }

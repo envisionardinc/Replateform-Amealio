@@ -156,6 +156,9 @@ export class OrderService {
         discountAppliedMinor: discountTotalMinor,
         maxUsageLimit: offer.maxUsageLimit,
         perUserLimit: offer.perUserLimit,
+        isGlobal: offer.isGlobal,
+        useLimit: offer.useLimit,
+        useFrequency: offer.useFrequency,
       };
     } else {
       discountTotalMinor = input.discountTotalMinor ?? 0n;

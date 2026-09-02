@@ -40,10 +40,64 @@ export interface CreateOrderInput {
   items: CreateOrderItemInput[];
   // optional order-level money components (default 0); grandTotal is derived
   taxTotalMinor?: bigint;
+  // discountTotalMinor: client-supplied ad-hoc discount. IGNORED when `couponCode`
+  // is supplied — the server computes the authoritative offer discount (P1.7.24).
   discountTotalMinor?: bigint;
   feeTotalMinor?: bigint;
   deliveryChargeMinor?: bigint;
   currencyCode?: string;
+  // Applied offer identity (client may supply the INTENT only). The server
+  // validates the offer/coupon and calculates the discount; client-supplied
+  // discount/total are NEVER trusted when this is present (P1.7.24).
+  couponCode?: string | null;
+}
+
+export type RedemptionStatusName = 'ACTIVE' | 'REVERSED';
+
+/**
+ * A validated offer resolved from a coupon code, carrying exactly the fields the
+ * server needs to compute the discount and enforce usage limits (P1.7.24). Kept
+ * separate from P1.7.22 `OfferRecord` so that configuration types stay untouched.
+ */
+export interface AppliedOffer {
+  offerId: string;
+  couponId: string;
+  active: boolean;
+  deletedAt: Date | null;
+  isGlobal: boolean;
+  merchantId: string | null;
+  restaurantId: string | null;
+  discountPercent: number | null;
+  discountMinor: bigint | null;
+  maxDiscountMinor: bigint | null;
+  minOrderMinor: bigint | null;
+  maxOrderMinor: bigint | null;
+  serviceTypes: string[] | null;
+  validFrom: Date | null;
+  validTo: Date | null;
+  maxUsageLimit: number | null;
+  perUserLimit: number | null;
+}
+
+/** Server-resolved redemption directive persisted atomically with the Order. */
+export interface RedemptionDirective {
+  offerId: string;
+  couponId: string;
+  userId: string | null;
+  discountAppliedMinor: bigint;
+  maxUsageLimit: number | null;
+  perUserLimit: number | null;
+}
+
+export interface RedemptionRecord {
+  id: string;
+  couponId: string;
+  userId: string | null;
+  orderId: string | null;
+  status: RedemptionStatusName;
+  discountAppliedMinor: bigint | null;
+  reversedAt: Date | null;
+  createdAt: Date;
 }
 
 export interface OrderItemRecord {
@@ -81,6 +135,8 @@ export interface OrderRecord {
   deliveryChargeMinor: bigint;
   grandTotalMinor: bigint;
   currencyCode: string;
+  offerId: string | null;
+  couponId: string | null;
   items: OrderItemRecord[];
   statusEvents: OrderStatusEventRecord[];
 }

@@ -5,11 +5,13 @@ import { MerchantScopeService } from '../../merchant/application/merchant-scope.
 import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.repository';
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
 import { OrderRepository } from '../infrastructure/order.repository';
+import { assertOfferEligible, calculateDiscountMinor } from '../domain/offer-discount';
 import type {
   CreateOrderInput,
   OrderRecord,
   OrderStatusName,
   OrderTypeName,
+  RedemptionDirective,
 } from '../domain/ordering.types';
 
 const ORDER_TYPES = new Set<OrderTypeName>([
@@ -122,15 +124,50 @@ export class OrderService {
     }
 
     const taxTotalMinor = input.taxTotalMinor ?? 0n;
-    const discountTotalMinor = input.discountTotalMinor ?? 0n;
     const feeTotalMinor = input.feeTotalMinor ?? 0n;
     const deliveryChargeMinor = input.deliveryChargeMinor ?? 0n;
+
+    // Discount is server-authoritative when an offer/coupon is applied (P1.7.24,
+    // DEC-OFF-1): the client-supplied discountTotalMinor is IGNORED in that case
+    // and the server validates the offer + computes the discount from the
+    // server-priced subtotal. Without a coupon, the existing ad-hoc discount
+    // behavior is preserved.
+    const couponCode = input.couponCode?.trim();
+    let discountTotalMinor: bigint;
+    let redemption: RedemptionDirective | undefined;
+    if (couponCode) {
+      const offer = await this.orders.findAppliedOfferByCouponCode(couponCode);
+      if (!offer) {
+        throw new BadRequestException('Invalid coupon code');
+      }
+      assertOfferEligible(
+        offer,
+        input.restaurantId,
+        restaurant.merchantId,
+        subtotalMinor,
+        input.type,
+        new Date(),
+      );
+      discountTotalMinor = calculateDiscountMinor(offer, subtotalMinor);
+      redemption = {
+        offerId: offer.offerId,
+        couponId: offer.couponId,
+        userId: input.userId ?? null,
+        discountAppliedMinor: discountTotalMinor,
+        maxUsageLimit: offer.maxUsageLimit,
+        perUserLimit: offer.perUserLimit,
+      };
+    } else {
+      discountTotalMinor = input.discountTotalMinor ?? 0n;
+    }
+
     if (
       [taxTotalMinor, discountTotalMinor, feeTotalMinor, deliveryChargeMinor].some((v) => v < 0n)
     ) {
       throw new BadRequestException('money components must be >= 0');
     }
-    // Derived to satisfy the order_total_integrity CHECK.
+    // Derived to satisfy the order_total_integrity CHECK. This is the authoritative
+    // grand total — never a client-supplied value when an offer is involved.
     const grandTotalMinor =
       subtotalMinor - discountTotalMinor + taxTotalMinor + feeTotalMinor + deliveryChargeMinor;
     if (grandTotalMinor < 0n) {
@@ -155,6 +192,7 @@ export class OrderService {
       items,
       actorType: principal.actorType,
       actorId: principal.staffMemberId,
+      redemption,
     });
   }
 

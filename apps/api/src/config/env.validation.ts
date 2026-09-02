@@ -71,6 +71,30 @@ export class EnvironmentVariables {
   @IsBoolean()
   @IsOptional()
   CONSUMER_AUTH_ENABLED: boolean = true;
+
+  // ---- Staff/admin authentication (P1.7.1E) — DEVELOPMENT config only ----
+  // Dedicated secret boundary: staff tokens are NOT signed with the consumer
+  // secret. A dev default is used if unset; a real secret MUST be provided in
+  // staging/production (infra-managed, not in this repo).
+  @IsString()
+  @IsOptional()
+  STAFF_JWT_ACCESS_SECRET: string = 'dev-only-staff-access-secret-change-me';
+
+  @IsInt()
+  @Min(60)
+  @IsOptional()
+  STAFF_JWT_ACCESS_TTL_SECONDS: number = 900; // 15 minutes (proposed default)
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  STAFF_REFRESH_TTL_DAYS: number = 30; // proposed default
+
+  // Feature flag: the new staff/admin auth endpoints are only active when
+  // enabled. Default true for local/dev; never wired to production traffic.
+  @IsBoolean()
+  @IsOptional()
+  STAFF_AUTH_ENABLED: boolean = true;
 }
 
 /** ConfigModule validate() hook. Throws on invalid configuration. */

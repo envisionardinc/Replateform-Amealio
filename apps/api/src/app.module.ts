@@ -17,6 +17,7 @@ import { UserProfileModule } from './modules/user-profile/user-profile.module';
 import { OrderingModule } from './modules/ordering/ordering.module';
 import { SeatingModule } from './modules/seating/seating.module';
 import { ExperienceModule } from './modules/experience/experience.module';
+import { OfferModule } from './modules/offer/offer.module';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { LoggingInterceptor } from './common/logging/logging.interceptor';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
@@ -55,6 +56,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     OrderingModule,
     SeatingModule,
     ExperienceModule,
+    OfferModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

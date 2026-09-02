@@ -1340,18 +1340,35 @@ model DevicePushToken {
 
 model Offer {
   id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId        String?             @unique
   merchantId      String?             @db.Uuid
   merchant        Merchant?           @relation(fields: [merchantId], references: [id])
   restaurantId    String?             @db.Uuid
   restaurant      Restaurant?         @relation(fields: [restaurantId], references: [id])
   title           String
+  description     String? // legacy Offers.description
+  termsAndConditions String? // legacy Offers.terms_and_condition (text only; no media)
   isGlobal        Boolean             @default(false)
-  settlementType  OfferSettlementType @default(MERCHANT)
+  // Publication state (P1.7.22) ← legacy Offers.active. Config only — no cron/
+  // automatic expiry, no redemption. Default false: not usable until activated.
+  active          Boolean             @default(false)
+  settlementType  OfferSettlementType @default(MERCHANT) // legacy VENDOR→MERCHANT; SPLIT stored, NOT calculated
+  // Discount: exactly one of percent (1..100) or fixed minor units (validated in service).
   discountMinor   BigInt?
   discountPercent Int?
-  serviceTypes    Json?
-  validFrom       DateTime?
-  validTo         DateTime?
+  maxDiscountMinor BigInt? // legacy maximum_discount_applied (cap for percentage)
+  // Order-amount gates (config only; NOT enforced at order time in this slice).
+  minOrderMinor   BigInt? // legacy minimum_order_applied
+  maxOrderMinor   BigInt? // legacy maximum_order_applied
+  serviceTypes    Json? // legacy service_type[] (free-form strings; no target enum)
+  validFrom       DateTime? // legacy start_date
+  validTo         DateTime? // legacy end_date
+  // Usage-limit CONFIGURATION only (legacy maximum_usage_limit / maxUsage / useLimit
+  // / useFrequency). NO counters, NO offerUsed/offerUsedBy mutation (redemption slice).
+  maxUsageLimit   Int? // legacy maximum_usage_limit (total)
+  perUserLimit    Int? // legacy maxUsage (per-user lifetime)
+  useLimit        Int? // legacy useLimit (per-period)
+  useFrequency    String? // legacy useFrequency (DAILY|WEEKLY|MONTHLY|YEARLY)
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   deletedAt       DateTime?

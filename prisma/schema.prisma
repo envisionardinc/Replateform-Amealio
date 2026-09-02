@@ -990,6 +990,12 @@ model Order {
   scheduledFor        DateTime?
   placedAt            DateTime?
   cancelReason        String?
+  // Applied offer/coupon (P1.7.24). Server-authoritative discount snapshot lives
+  // in discountTotalMinor; these record WHICH offer/coupon produced it.
+  offerId             String?           @db.Uuid
+  offer               Offer?            @relation(fields: [offerId], references: [id])
+  couponId            String?           @db.Uuid
+  coupon              Coupon?           @relation(fields: [couponId], references: [id])
   createdBy           String?           @db.Uuid
   updatedBy           String?           @db.Uuid
   createdAt           DateTime          @default(now())
@@ -1356,24 +1362,28 @@ model Offer {
   // Discount: exactly one of percent (1..100) or fixed minor units (validated in service).
   discountMinor   BigInt?
   discountPercent Int?
-  maxDiscountMinor BigInt? // legacy maximum_discount_applied (cap for percentage)
-  // Order-amount gates (config only; NOT enforced at order time in this slice).
+  maxDiscountMinor BigInt? // legacy maximum_discount_applied (cap for percentage & fixed)
+  // Order-amount gates. Enforced server-side at order creation (P1.7.24) against
+  // the server-authoritative subtotal.
   minOrderMinor   BigInt? // legacy minimum_order_applied
   maxOrderMinor   BigInt? // legacy maximum_order_applied
-  serviceTypes    Json? // legacy service_type[] (free-form strings; no target enum)
+  serviceTypes    Json? // legacy service_type[]; matched against canonical OrderType tokens (P1.7.24)
   validFrom       DateTime? // legacy start_date
   validTo         DateTime? // legacy end_date
-  // Usage-limit CONFIGURATION only (legacy maximum_usage_limit / maxUsage / useLimit
-  // / useFrequency). NO counters, NO offerUsed/offerUsedBy mutation (redemption slice).
-  maxUsageLimit   Int? // legacy maximum_usage_limit (total)
-  perUserLimit    Int? // legacy maxUsage (per-user lifetime)
-  useLimit        Int? // legacy useLimit (per-period)
-  useFrequency    String? // legacy useFrequency (DAILY|WEEKLY|MONTHLY|YEARLY)
+  // Usage limits. maxUsageLimit (total) + perUserLimit (per-user lifetime) are
+  // ENFORCED at order creation via DERIVED counts of ACTIVE redemptions (P1.7.24).
+  // useLimit/useFrequency (per-period) semantics remain under-specified => deferred
+  // to P1.7.25 (config preserved; NOT enforced). NO offerUsed/offerUsedBy counters.
+  maxUsageLimit   Int? // legacy maximum_usage_limit (total) — ENFORCED
+  perUserLimit    Int? // legacy maxUsage (per-user lifetime) — ENFORCED
+  useLimit        Int? // legacy useLimit (per-period) — deferred (P1.7.25)
+  useFrequency    String? // legacy useFrequency (DAILY|WEEKLY|MONTHLY|YEARLY) — deferred (P1.7.25)
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   deletedAt       DateTime?
 
   coupons Coupon[]
+  orders  Order[] // orders that applied this offer (P1.7.24)
 
   @@index([merchantId])
   @@index([restaurantId])
@@ -1388,21 +1398,37 @@ model Coupon {
   createdAt    DateTime @default(now())
 
   redemptions CouponRedemption[]
+  orders      Order[] // orders that applied this coupon (P1.7.24)
 
   @@index([offerId])
 }
 
-model CouponRedemption {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  couponId  String   @db.Uuid
-  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
-  userId    String?  @db.Uuid
-  user      User?    @relation(fields: [userId], references: [id])
-  orderId   String?  @db.Uuid
-  order     Order?   @relation(fields: [orderId], references: [id])
-  createdAt DateTime @default(now())
+// Redemption ledger (P1.7.24). One ACTIVE redemption per (coupon, order); usage
+// is DERIVED by counting ACTIVE rows (no mutable offerUsed/offerUsedBy). Reversed
+// (order cancel) => status REVERSED + reversedAt, excluded from usage counts.
+enum RedemptionStatus {
+  ACTIVE
+  REVERSED
+}
 
+model CouponRedemption {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  couponId             String           @db.Uuid
+  coupon               Coupon           @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId               String?          @db.Uuid
+  user                 User?            @relation(fields: [userId], references: [id])
+  orderId              String?          @db.Uuid
+  order                Order?           @relation(fields: [orderId], references: [id])
+  status               RedemptionStatus @default(ACTIVE)
+  discountAppliedMinor BigInt? // server-calculated discount snapshot at redemption
+  reversedAt           DateTime?
+  createdAt            DateTime         @default(now())
+
+  // Idempotency: at most one redemption per (coupon, order). Prevents duplicate
+  // redemption for the same order (order idempotency = Order.orderNumber @unique).
+  @@unique([couponId, orderId])
   @@index([couponId])
+  @@index([userId])
 }
 
 model ReferralProgram {

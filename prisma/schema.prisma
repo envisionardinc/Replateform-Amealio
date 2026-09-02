@@ -601,6 +601,25 @@ model Category {
   @@index([type])
 }
 
+// Platform currency reference (admin-defined; legacy `currency`, P1.7.6).
+// Canonical identity = ISO 4217 code (`isoCode @unique`). SUPPLEMENTS the
+// embedded `currencyCode` on money-bearing models (which is NOT changed) — no
+// FK migration, no FX/conversion, no Country coupling (geography is separate).
+// `isActive` mirrors legacy `status` (bool); `deletedAt` mirrors `is_deleted`.
+model Currency {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId    String?   @unique
+  isoCode     String    @unique
+  symbol      String?
+  name        String?
+  countryName String?
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+}
+
 // Platform cuisine reference (admin-defined lookup; legacy `Cusine`). Kept as a
 // dedicated lookup per P1.4 (database/05-ENUM-STATUS-STRATEGY). Icon embedded.
 model Cuisine {

@@ -17,6 +17,23 @@ Amealio is a **multi-repository food platform** centered on a **Feathers.js + Mo
 
 Supporting services: **RAG recommendations** (Python FastAPI), **driver GPS tracking** (NestJS/PostgreSQL).
 
+### AI Discovery (Home Page 2) — Deep Dive Available
+
+The live conversational discovery stack is **`amealio-homepage-v2-rag-server`**, consumed by **`amealio_web_app` `/homepage2`**. Full forensic detail: **[AI-DISCOVERY-DEEP-DIVE.md](./AI-DISCOVERY-DEEP-DIVE.md)**.
+
+| Attribute | Current-state evidence |
+|-----------|------------------------|
+| Production entry | `uvicorn app.main:app` on port 8000 |
+| Primary API | `POST /recommendations` (+ chat history GET routes) |
+| Pipeline | 8-stage: preprocess → understand → embed → parallel vector retrieval → rerank → prompt → LLM → assemble |
+| Data | MongoDB `amealio` — restaurants, vendoritems, reels, exp_events, RecipeItem, users, user_memory |
+| LLM | Remote HTTP (`OPENAI_API_URL` / DeepSeek-compatible); offline template fallback |
+| Embeddings | AWS Bedrock if configured; else deterministic fallback |
+| Frontend contract | `REACT_APP_RECOMMENDATIONS_API_BASE` → no Authorization header; `user_id` in body |
+| Auth on prod API | **NOT FOUND** (JWT middleware only on legacy `main.py`) |
+| AWS Personalize | Offline `/personalize/*` — **not wired into live `/recommendations`** |
+| Streaming | **NOT FOUND** |
+
 ---
 
 ## Status Legend
@@ -203,7 +220,7 @@ Supporting services: **RAG recommendations** (Python FastAPI), **driver GPS trac
 | Platform events | ✓ | — | ✓ | web_app, BE, RAG | /exp_events | exp_events | — | IMPLEMENTED |
 | Wallet | ✓ | ✓ | ✓ | web_app, dashboard, BE | /wallet | wallet | Razorpay | IMPLEMENTED |
 | ONDC | ✓ | — | ✓ | web_app, dashboard, BE | /ondc/* | ondc-* | ONDC network | DEFERRED |
-| AI recommendations | ✓ | — | — | web_app, RAG | POST /recommendations | MongoDB read | LLM, Personalize | IMPLEMENTED |
+| AI chat discovery (HomePage2) | ✓ | — | — | web_app, RAG server | POST /recommendations | MongoDB read/write user_memory | Remote LLM, Bedrock embeddings | IMPLEMENTED |
 | Support tickets | ✓ | ✓ | ✓ | web_app, dashboard, BE | /ticket | ticket | — | PARTIAL |
 
 ---
@@ -382,6 +399,7 @@ Supporting services: **RAG recommendations** (Python FastAPI), **driver GPS trac
 | Document | Contents |
 |----------|----------|
 | REPOSITORY-MAP.md | Repo roles and relationship diagram |
+| AI-DISCOVERY-DEEP-DIVE.md | Home Page 2 RAG/LLM service — full pipeline, API, MongoDB, NestJS constraints |
 | SEATING-DEEP-DIVE.md | Seating domain forensic detail |
 | CELEBRATIONS-DEEP-DIVE.md | Celebrations/experiences/events detail |
 | CROSS-REPOSITORY-FEATURE-MAP.md | End-to-end feature traces |

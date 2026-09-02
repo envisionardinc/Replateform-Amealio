@@ -77,6 +77,10 @@ export interface AppliedOffer {
   validTo: Date | null;
   maxUsageLimit: number | null;
   perUserLimit: number | null;
+  // Per-user, per-calendar-period usage cap (P1.7.26B). Enforced only for global
+  // offers (legacy `isGlobal` gate); `useFrequency` ∈ DAILY|WEEKLY|MONTHLY|YEARLY.
+  useLimit: number | null;
+  useFrequency: string | null;
 }
 
 /** Server-resolved redemption directive persisted atomically with the Order. */
@@ -87,6 +91,11 @@ export interface RedemptionDirective {
   discountAppliedMinor: bigint;
   maxUsageLimit: number | null;
   perUserLimit: number | null;
+  // Global-only usage-frequency gate (P1.7.26B). `useLimit`/`useFrequency` are the
+  // per-user, per-IST-calendar-period cap; only enforced when `isGlobal` is true.
+  isGlobal: boolean;
+  useLimit: number | null;
+  useFrequency: string | null;
 }
 
 export interface RedemptionRecord {

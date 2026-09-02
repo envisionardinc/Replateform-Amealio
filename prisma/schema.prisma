@@ -158,6 +158,17 @@ enum SeatingStatus {
   CANCELLED
 }
 
+// Physical table RUNTIME state (P1.7.16). 1:1 with legacy env-driven
+// `TABLE_STATUS` (AVAILABLE|OCCUPIED|DIRTY|ON_HOLD|UNAVAILABLE). Distinct from
+// merchant configuration and from the booking lifecycle (SeatingStatus).
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  DIRTY
+  ON_HOLD
+  UNAVAILABLE
+}
+
 enum NotificationChannel {
   PUSH
   SMS
@@ -556,27 +567,51 @@ model RestaurantFeature {
   @@index([restaurantId, featureType])
 }
 
+// Normalized seating-area inventory (P1.7.16). Legacy source: the `area`
+// dimension of `subscription…table_setup.floors[]`/`table[].area` — merchant
+// physical layout sections. Hybrid boundary (DEC-2): seating feature gates/
+// timers/rules stay in `Subscription.config`; the physical inventory lives here.
 model SeatingArea {
   id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId     String?           @unique
   restaurantId String            @db.Uuid
   restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   name         String
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
+  deletedAt    DateTime?
   tables       RestaurantTable[]
 
+  @@unique([restaurantId, name])
   @@index([restaurantId])
 }
 
+// Normalized physical table inventory (P1.7.16). Legacy source:
+// `subscription…table_setup.table[]` (code←table_number, capacity←pax_value,
+// name, floor←floor_number, shape, isActive←active). `status` is RUNTIME STATE
+// (legacy `table[].status`), NOT merchant configuration. Legacy fields with no
+// confirmed target consumer (number, location, temporay, reserveDate) and the
+// separate `seat[]` array are intentionally NOT mapped (see doc 45).
 model RestaurantTable {
   id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId        String?          @unique
   seatingAreaId   String           @db.Uuid
   seatingArea     SeatingArea      @relation(fields: [seatingAreaId], references: [id], onDelete: Cascade)
   code            String
+  name            String?
+  floor           String?
+  shape           String?
   capacity        Int              @default(2)
+  isActive        Boolean          @default(true)
+  // RUNTIME STATE (not configuration): seeded AVAILABLE, mutated by seating ops.
+  status          TableStatus      @default(AVAILABLE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
   seatingRequests SeatingRequest[]
 
   @@unique([seatingAreaId, code])
+  @@index([seatingAreaId])
 }
 
 // =====================================================================

@@ -365,6 +365,7 @@ model Merchant {
   settlements     Settlement[]
   deliveryTasks   DeliveryTask[]
   seatingRequests SeatingRequest[]
+  experiences     Experience[]
 
   @@index([organizationId])
 }
@@ -524,6 +525,7 @@ model Restaurant {
   settlements       Settlement[]
   subscriptions     Subscription[]
   seatingRequests   SeatingRequest[]
+  experiences       Experience[]
 
   @@index([merchantId])
   @@index([chainId])
@@ -642,6 +644,10 @@ model Category {
   deletedAt   DateTime?
 
   menuSections MenuSection[]
+  // P1.7.20: an Experience may reference a Category (and, separately, a
+  // sub-category — another Category row) as its taxonomy. Virtual back-relations.
+  experiences             Experience[] @relation("ExperienceCategory")
+  experienceSubCategories Experience[] @relation("ExperienceSubCategory")
 
   @@index([parentId])
   @@index([type])
@@ -703,7 +709,8 @@ model Menu {
   updatedAt    DateTime   @updatedAt
   deletedAt    DateTime?
 
-  sections MenuSection[]
+  sections       MenuSection[]
+  experienceMenus ExperienceMenu[]
 
   @@index([restaurantId])
   @@index([merchantId])
@@ -810,6 +817,114 @@ model AddOn {
   currencyCode String     @default("INR")
 
   @@index([addOnGroupId])
+}
+
+// =====================================================================
+// Experience configuration (P1.7.20) — merchant-owned bookable experiences.
+// Source: legacy `experiences` (Experience.type food|event; expType SPECIAL|
+// CURATED; Category/Sub Category FKs; totalSeats/min/max capacity; active/
+// isDraft; scalar prices; food/menu mode; CustomMenu[] refs). Booking
+// (expRequest), payment/refund, Diner/Order, media, scheduling engine, packages,
+// events, and the ExpEventManagement/scraped catalogs are DEFERRED (doc 48).
+// `seatsLeft`/`seatsBooked` are RUNTIME booking inventory — intentionally NOT
+// modeled here (this is a configuration foundation, not the booking slice).
+// =====================================================================
+
+enum ExperienceType {
+  FOOD
+  EVENT
+}
+
+enum ExperienceKind {
+  SPECIAL
+  CURATED
+}
+
+// Food inclusion (legacy is_food_included / serveFood / isOccasionWithText).
+enum ExperienceFoodMode {
+  NONE
+  INCLUDED
+  SEPARATE
+  OCCASION_TEXT
+}
+
+// Menu strategy (legacy mutually-exclusive isStandardMenu/isCustomMenu/isPackage).
+enum ExperienceMenuMode {
+  NONE
+  STANDARD
+  CUSTOM
+  PACKAGE
+}
+
+model Experience {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId      String?         @unique
+  merchantId    String          @db.Uuid
+  merchant      Merchant        @relation(fields: [merchantId], references: [id])
+  restaurantId  String          @db.Uuid
+  restaurant    Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  // Platform taxonomy (P1.7.4 Category). subCategory is another Category row.
+  categoryId    String?         @db.Uuid
+  category      Category?       @relation("ExperienceCategory", fields: [categoryId], references: [id])
+  subCategoryId String?         @db.Uuid
+  subCategory   Category?       @relation("ExperienceSubCategory", fields: [subCategoryId], references: [id])
+
+  name          String
+  description   String?
+  type          ExperienceType     @default(EVENT) // legacy Experience.type food|event
+  expType       ExperienceKind? // legacy Experience.expType SPECIAL|CURATED
+  foodMode      ExperienceFoodMode @default(NONE)
+  menuMode      ExperienceMenuMode @default(NONE)
+  foodDescription String? // legacy foodItems
+  occasionText    String? // legacy occasionWithText
+
+  // Capacity CONFIGURATION (not runtime inventory).
+  totalSeats Int?
+  minSeats   Int?
+  maxSeats   Int?
+
+  // Money in integer minor units (never float); distinct source price concepts.
+  listingPriceMinor  BigInt? // legacy Listing_price
+  adultPriceMinor    BigInt? // legacy adultPrice
+  kidsPriceMinor     BigInt? // legacy kidsPrice
+  occasionPriceMinor BigInt? // legacy Occasion_price
+  currencyCode       String  @default("INR") // inherited from restaurant unless set
+
+  // Fixed date window (legacy startDate/endDate). Richer timings/recurrence are
+  // preserved verbatim in scheduleConfig — NO scheduling engine in this slice.
+  startAt        DateTime?
+  endAt          DateTime?
+  scheduleConfig Json?
+
+  // Publication/draft (legacy active/isDraft). No workflow engine.
+  active   Boolean @default(false)
+  isDraft  Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  menus ExperienceMenu[]
+
+  @@index([restaurantId])
+  @@index([merchantId])
+  @@index([restaurantId, active])
+}
+
+// Experience → Custom Menu reference (legacy Experience.CustomMenu[] + default).
+// One experience references many CUSTOM menus of the SAME restaurant; exactly
+// one may be marked default (legacy defaultCustomId). Reference, not snapshot.
+model ExperienceMenu {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  experienceId String     @db.Uuid
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  menuId       String     @db.Uuid
+  menu         Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  isDefault    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  @@unique([experienceId, menuId])
+  @@index([menuId])
 }
 
 // =====================================================================

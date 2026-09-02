@@ -31,6 +31,20 @@ enum StaffRole {
   SUPER_ADMIN
 }
 
+// Staff/admin account lifecycle status (P1.7.1D). Blocked staff must later be
+// prevented from login/refresh (enforcement is out of scope for this phase).
+// DELETED is represented via the deletedAt soft-delete convention, not a value.
+enum StaffAccountStatus {
+  ACTIVE
+  BLOCKED
+}
+
+// Staff/admin credential method (P1.7.1D). PASSWORD only for now; the model is
+// extensible to future methods (OTP/SSO/MFA) without redesigning StaffMember.
+enum StaffCredentialType {
+  PASSWORD
+}
+
 enum OrderType {
   DINE_IN
   TAKE_AWAY
@@ -338,20 +352,64 @@ model Merchant {
 }
 
 model StaffMember {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  merchantId String    @db.Uuid
-  merchant   Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId   String?            @unique
+  // Nullable: populated => merchant-scoped staff; NULL => platform-scoped
+  // (e.g. SUPER_ADMIN). onDelete: Restrict so a merchant cannot be hard-deleted
+  // out from under its staff, and staff are never silently promoted to
+  // platform scope via SetNull (merchants use soft-delete via deletedAt).
+  merchantId String?            @db.Uuid
+  merchant   Merchant?          @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  status     StaffAccountStatus @default(ACTIVE)
   name       String
   email      String?
   phone      String?
-  staffRole  StaffRole @default(MERCHANT_STAFF)
-  roleId     String?   @db.Uuid
-  role       Role?     @relation(fields: [roleId], references: [id])
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  staffRole  StaffRole          @default(MERCHANT_STAFF)
+  roleId     String?            @db.Uuid
+  role       Role?              @relation(fields: [roleId], references: [id])
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
   deletedAt  DateTime?
 
+  credentials StaffCredential[]
+  sessions    StaffSession[]
+
   @@index([merchantId])
+  @@index([status])
+}
+
+// Staff/admin authentication secret, kept separate from StaffMember identity
+// data (P1.7.1D). One credential per (staffMember, type). PASSWORD stores a
+// bcrypt hash in secretHash; the generic name keeps future credential types
+// (OTP/SSO/MFA) representable without a StaffMember redesign. No plaintext.
+model StaffCredential {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffMemberId String              @db.Uuid
+  staffMember   StaffMember         @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  type          StaffCredentialType @default(PASSWORD)
+  secretHash    String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([staffMemberId, type])
+  @@index([staffMemberId])
+}
+
+// Server-side staff/admin session boundary for future rotating refresh tokens
+// (P1.7.1D). Intentionally separate from the consumer Session (P1.7.1B), which
+// is not modified. Stores only a hashed refresh secret; revocation = row
+// delete, rotation = update hash + expiry (behavior implemented in a later
+// phase). Act-as-merchant context is deferred (not added in this phase).
+model StaffSession {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffMemberId    String      @db.Uuid
+  staffMember      StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  refreshTokenHash String      @unique
+  expiresAt        DateTime
+  createdAt        DateTime    @default(now())
+
+  @@index([staffMemberId])
+  @@index([expiresAt])
 }
 
 model Role {

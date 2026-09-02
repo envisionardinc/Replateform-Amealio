@@ -272,14 +272,29 @@ export class OrderRepository {
     actorId: string | null,
   ): Promise<OrderRecord> {
     await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({ where: { id }, data: { status: toStatus } });
+      // Compare-and-set (P1.7.25): only transition when the row is STILL in the
+      // expected `fromStatus`. This closes the read-then-write race in the service
+      // (status is read outside the tx): under concurrent transitions exactly one
+      // writer wins, so the status event and the cancellation reversal happen
+      // AT MOST ONCE. A losing/duplicate concurrent transition is an idempotent
+      // no-op (the winner already advanced the status). Sequential transitions —
+      // already validated by OrderService — always affect exactly one row.
+      const changed = await tx.order.updateMany({
+        where: { id, status: fromStatus },
+        data: { status: toStatus },
+      });
+      if (changed.count === 0) {
+        return;
+      }
       await tx.orderStatusEvent.create({
         data: { orderId: id, fromStatus, toStatus, actorType, actorId },
       });
-      // P1.7.24: cancelling an order reverses its ACTIVE redemption(s) so usage is
-      // released (derived counts exclude REVERSED). This is the ONLY reversal path
-      // in this slice — it reuses the EXISTING cancellation transition (P1.7.12).
-      // Refund-driven reversal is deferred (P1.7.25).
+      // Cancelling an order reverses its ACTIVE redemption(s) so usage is released
+      // (derived counts exclude REVERSED). This runs in the SAME transaction as the
+      // status change (atomic: never Order=CANCELLED with an ACTIVE redemption, nor
+      // the reverse). The `status: ACTIVE` predicate makes it exactly-once, so an
+      // already-REVERSED redemption stays REVERSED and no second reversal occurs.
+      // Refund-driven reversal is deferred (payment lifecycle not yet in target).
       if (toStatus === 'CANCELLED') {
         await tx.couponRedemption.updateMany({
           where: { orderId: id, status: 'ACTIVE' },

@@ -696,6 +696,7 @@ model Menu {
   restaurantId String     @db.Uuid
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   name         String
+  description  String?
   type         MenuType   @default(CUSTOM)
   visibility   Boolean    @default(true)
   createdAt    DateTime   @default(now())
@@ -712,12 +713,13 @@ model MenuSection {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   menuId     String    @db.Uuid
   menu       Menu      @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  categoryId String?   @db.Uuid
-  category   Category? @relation(fields: [categoryId], references: [id])
-  name       String
-  sortOrder  Int       @default(0)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  categoryId  String?   @db.Uuid
+  category    Category? @relation(fields: [categoryId], references: [id])
+  name        String
+  description String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   items MenuItem[]
 
@@ -736,6 +738,10 @@ model MenuItem {
   name          String
   description   String?
   availability  ItemAvailability @default(AVAILABLE)
+  // Publication gate (P1.7.18) ← legacy vendorItems.status (Boolean). Distinct
+  // from `availability` (stock). Default false: an item is not customer-visible
+  // until the merchant publishes it. NOT a workflow/schedule.
+  isPublished   Boolean          @default(false)
   posItemId     String?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -760,6 +766,11 @@ model ItemVariant {
   priceMinor   BigInt
   currencyCode String         @default("INR")
   pax          Int?
+  // Source-backed variant flags (P1.7.18) ← legacy vendorItems.size[].isDefault
+  // / .available. isDefault marks the default variant; available is a per-variant
+  // stock flag (distinct from item-level availability).
+  isDefault    Boolean        @default(false)
+  available    Boolean        @default(true)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 

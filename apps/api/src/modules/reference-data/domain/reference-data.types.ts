@@ -32,3 +32,20 @@ export interface CuisineRecord {
   icon: string | null;
   status: string | null;
 }
+
+/**
+ * Platform currency reference (P1.7.6; legacy `currency`). Canonical identity is
+ * `isoCode` (ISO 4217). Supplements the embedded `currencyCode` on money-bearing
+ * models — it does NOT replace it, and there is no FX/conversion or Country FK.
+ */
+export interface CurrencyRecord {
+  id: string;
+  legacyId: string | null;
+  isoCode: string;
+  symbol: string | null;
+  name: string | null;
+  countryName: string | null;
+  description: string | null;
+  isActive: boolean;
+  deletedAt: Date | null;
+}

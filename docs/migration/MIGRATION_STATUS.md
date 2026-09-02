@@ -2,7 +2,7 @@
 
 Single source of truth for the controlled replatforming. Update this file whenever a phase, activity, blocker, decision, or migrated capability changes.
 
-- **Last updated:** 2026-09-02 (P1.7.1A — Authentication Architecture & Migration Decision COMPLETE)
+- **Last updated:** 2026-09-02 (P1.7.1B — Consumer Authentication COMPLETE)
 - **Current phase:** Phase 1 — Target Repository Baseline & Governance
 - **Overall state:** Documentation & governance only. No application code, schema, or scaffolded apps yet.
 
@@ -42,9 +42,11 @@ Single source of truth for the controlled replatforming. Update this file whenev
 
 - **P1.7.1A — Authentication Architecture & Migration Decision: COMPLETE.** Decision/architecture only (no auth implemented). Re-confirmed consumer/merchant/admin auth from source; produced the authentication behavior matrix, legacy-quirk classification, and the recommended target (**Option C — unified canonical Identity with distinct principals**: consumer `User` + staff `StaffMember`), plus target token/session + authorization design, the **merchant/admin boundary**, future user-migration + cutover strategies, PostgreSQL impact, and an owner-decision register. Docs: [domains/24-AUTHENTICATION-ARCHITECTURE.md](./domains/24-AUTHENTICATION-ARCHITECTURE.md). **OD-11 confirmed irrelevant to auth.** Consumer auth is schema-sufficient; **staff/admin auth requires future schema additions (AUTH-D8, reviewed migration)**. Validation: build/lint/format ✓, 54/54 tests, Prisma schema/migrations unchanged.
 
+- **P1.7.1B — Consumer Authentication: COMPLETE** (local/dev only; no cutover). Implemented consumer password authentication on the target platform (`apps/api/src/modules/identity/authentication/`): register/login/refresh/logout/me, **Bearer access JWT** + **rotating server-side refresh sessions** (sha256-hashed, revocable, **replay-detected**), a **JWT consumer guard**, and blocked-status enforcement — reusing the P1.5 `User`+`Session` (**no schema change**). Feature-flagged (`CONSUMER_AUTH_ENABLED`); legacy raw-header rejected; legacy apps untouched. Deferred: OTP/phone-only/social/WhatsApp/reset/verification and staff/admin/merchant auth. Docs: [domains/25-CONSUMER-AUTHENTICATION.md](./domains/25-CONSUMER-AUTHENTICATION.md). Validation: build/lint/format ✓, **75/75 tests** (54 prior + 21 new), live smoke ✓ (register→login→me→refresh-rotate→replay-401→logout→refresh-401), Prisma schema/migrations unchanged.
+
 ## Current activity
 
-- **P1.7.1A complete** — authentication architecture decided (pending owner approvals AUTH-D1..D9). **No authentication implemented; no domain migration.** Recommended next step: implement **consumer authentication** (feature-flagged, no cutover) once AUTH-D1/D2/D3 are approved; defer staff/admin auth until schema additions (AUTH-D8) are approved. Merchant/Location must wait on the merchant/admin boundary (AUTH-D2). OD-11 and owner-decision domains remain blocked.
+- **P1.7.1B complete.** Consumer authentication works and is fully validated. **Overall authentication migration is NOT complete** — staff/admin/merchant authentication, OTP/social, and cutover are still pending. **No domain migration started.** Next: consumer OTP/reset if owner-scoped, then staff/admin auth after AUTH-D8 schema additions; Merchant/Location awaits AUTH-D2 confirmation. OD-11 and owner-decision domains remain blocked.
 
 ## Next activity
 

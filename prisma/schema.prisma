@@ -1132,11 +1132,16 @@ model Refund {
   amountMinor     BigInt
   currencyCode    String         @default("INR")
   status          RefundStatus   @default(INITIATED)
+  // Idempotency (P1.7.29). Legacy refunds had NO idempotency key (doc 56 §16/§25);
+  // this DB-enforced unique key makes refund processing idempotent (a provider
+  // refund id maps onto it once Razorpay refunds are integrated).
+  idempotencyKey  String?        @unique
   gatewayPayload  Json?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   @@index([orderId])
+  @@index([paymentIntentId])
 }
 
 model Wallet {

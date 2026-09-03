@@ -1064,9 +1064,10 @@ model PaymentIntent {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  attempts     PaymentAttempt[]
-  transactions Transaction[]
-  refunds      Refund[]
+  attempts        PaymentAttempt[]
+  transactions    Transaction[]
+  refunds         Refund[]
+  settlementItems SettlementItem[]
 
   @@index([orderId])
 }
@@ -1186,6 +1187,12 @@ model Settlement {
   restaurant   Restaurant?          @relation(fields: [restaurantId], references: [id])
   payoutType   SettlementPayoutType
   status       SettlementStatus     @default(PENDING)
+  // Audit trail (P1.7.31): grossAmountMinor = Σ per-payment net-of-refund
+  // contributions (= Σ items); commissionMinor = floor(gross × commissionBps /
+  // 10000); amountMinor = grossAmountMinor − commissionMinor = net payout amount.
+  grossAmountMinor BigInt           @default(0)
+  commissionMinor  BigInt           @default(0)
+  commissionBps    Int              @default(0)
   amountMinor  BigInt
   currencyCode String               @default("INR")
   createdAt    DateTime             @default(now())
@@ -1198,12 +1205,17 @@ model Settlement {
 }
 
 model SettlementItem {
-  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  settlementId String     @db.Uuid
-  settlement   Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
-  orderId      String?    @db.Uuid
-  order        Order?     @relation(fields: [orderId], references: [id])
-  amountMinor  BigInt
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  settlementId    String         @db.Uuid
+  settlement      Settlement     @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  orderId         String?        @db.Uuid
+  order           Order?         @relation(fields: [orderId], references: [id])
+  // The captured payment this item settles. UNIQUE => a payment contributes to at
+  // most one settlement (idempotency: "settle a payment once"). (P1.7.31)
+  paymentIntentId String?        @unique @db.Uuid
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id])
+  // Net-of-refund contribution for this payment at settlement time (minor units).
+  amountMinor     BigInt
 
   @@index([settlementId])
 }
@@ -1214,6 +1226,9 @@ model Payout {
   settlement       Settlement       @relation(fields: [settlementId], references: [id], onDelete: Cascade)
   provider         PaymentProvider  @default(RAZORPAYX)
   providerPayoutId String?          @unique
+  // Request idempotency (P1.7.31): one payout instruction => at most one provider
+  // payout (mirrors PaymentAttempt/Refund).
+  idempotencyKey   String?          @unique
   amountMinor      BigInt
   status           SettlementStatus @default(PENDING)
   payload          Json?

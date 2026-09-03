@@ -2,22 +2,26 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PaymentRepository } from '../infrastructure/payment.repository';
+import { RefundRepository } from '../infrastructure/refund.repository';
 import { PaymentService } from './payment.service';
 import { verifyWebhookSignature } from '../domain/razorpay-signature';
 import type { WebhookIngestResult } from '../domain/payment.types';
 
 /**
- * Razorpay webhook ingestion (P1.7.28). Closes the legacy no-op-stub gap (doc 56
- * §D): the RAW body HMAC is verified server-side, the event is persisted
- * idempotently (`WebhookEvent.providerEventId @unique`), and a redelivered event
- * is a no-op — it cannot create a second PaymentAttempt/Transaction or move a
- * captured payment backward. Only `payment.captured` / `payment.failed` are
- * processed in this slice; other events are ingested and marked PROCESSED (ignored).
+ * Razorpay webhook ingestion (P1.7.28 + P1.7.30). Closes the legacy no-op-stub gap
+ * (doc 56 §D): the RAW body HMAC is verified server-side, the event is persisted
+ * idempotently (`WebhookEvent.providerEventId @unique`), and a redelivered event is
+ * a no-op. Processes `payment.captured`/`payment.failed` (P1.7.28) and
+ * `refund.processed`/`refund.failed` (P1.7.30) — the AUTHORITATIVE completion point
+ * for an async provider refund; a duplicate refund webhook cannot create a second
+ * WalletEntry/Transaction/coupon reversal (guarded by the INITIATED→PROCESSED
+ * compare-and-set). Other events are ingested and marked PROCESSED (ignored).
  */
 @Injectable()
 export class RazorpayWebhookService {
   constructor(
     private readonly repo: PaymentRepository,
+    private readonly refunds: RefundRepository,
     private readonly payments: PaymentService,
     private readonly config: ConfigService,
   ) {}
@@ -40,9 +44,13 @@ export class RazorpayWebhookService {
     }
 
     const type = payload.event;
-    // Prefer a provider-unique event id; fall back to the payment entity id so a
-    // redelivery of the same logical event is still deduplicated.
-    const providerEventId = payload.id ?? payload.payload?.payment?.entity?.id ?? '';
+    // Prefer a provider-unique event id; fall back to the payment/refund entity id
+    // so a redelivery of the same logical event is still deduplicated.
+    const providerEventId =
+      payload.id ??
+      payload.payload?.payment?.entity?.id ??
+      payload.payload?.refund?.entity?.id ??
+      '';
     if (!type || !providerEventId) {
       throw new BadRequestException('Webhook missing event type or id');
     }
@@ -79,6 +87,19 @@ export class RazorpayWebhookService {
   }
 
   private async process(type: string, payload: RazorpayWebhookPayload): Promise<void> {
+    // Refund lifecycle (P1.7.30): authoritative async completion / failure. Keyed
+    // on the provider refund id; idempotent (compare-and-set INITIATED→PROCESSED).
+    if (type === 'refund.processed' || type === 'refund.failed') {
+      const refundEntity = payload.payload?.refund?.entity;
+      if (!refundEntity?.id) return;
+      if (type === 'refund.processed') {
+        await this.refunds.completeProviderRefund(refundEntity.id);
+      } else {
+        await this.refunds.failProviderRefund(refundEntity.id);
+      }
+      return;
+    }
+
     const entity = payload.payload?.payment?.entity;
     if (!entity) return; // non-payment events: ingested + ignored in this slice
 
@@ -111,6 +132,14 @@ interface RazorpayWebhookPayload {
       entity?: {
         id: string;
         order_id?: string;
+        amount?: number | string;
+        status?: string;
+      };
+    };
+    refund?: {
+      entity?: {
+        id: string;
+        payment_id?: string;
         amount?: number | string;
         status?: string;
       };

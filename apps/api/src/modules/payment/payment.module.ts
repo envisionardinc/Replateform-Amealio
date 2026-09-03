@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
+import { MerchantModule } from '../merchant/merchant.module';
 import { PaymentRepository } from './infrastructure/payment.repository';
 import { RefundRepository } from './infrastructure/refund.repository';
+import { RazorpayRefundGateway } from './infrastructure/razorpay-refund.gateway';
 import { PaymentService } from './application/payment.service';
 import { RefundService } from './application/refund.service';
 import { RazorpayWebhookService } from './application/razorpay-webhook.service';
@@ -18,11 +20,12 @@ import { PaymentsEnabledGuard } from './api/payments-enabled.guard';
  * PAYMENTS_ENABLED; not wired to production.
  */
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, MerchantModule],
   controllers: [PaymentController, RazorpayWebhookController],
   providers: [
     PaymentRepository,
     RefundRepository,
+    RazorpayRefundGateway,
     PaymentService,
     RefundService,
     RazorpayWebhookService,

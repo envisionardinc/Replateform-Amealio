@@ -134,6 +134,16 @@ enum SettlementPayoutType {
   SCAN_AND_PAY
 }
 
+// Merchant-configurable tip beneficiary policy (P1.7.42 approved product policy).
+// Snapshotted onto each collected TipPayment for historical integrity; routing is
+// deferred to P1.7.39 (MERCHANT viable; DELIVERY_PERSON/SHARED_POOLED gated on
+// their own foundations).
+enum TipBeneficiaryPolicy {
+  MERCHANT
+  DELIVERY_PERSON
+  SHARED_POOLED
+}
+
 enum WithdrawalStatus {
   PENDING
   IN_PROGRESS
@@ -364,6 +374,7 @@ model Merchant {
   offers          Offer[]
   settlements     Settlement[]
   deliveryTasks   DeliveryTask[]
+  tipPayments     TipPayment[]
   seatingRequests SeatingRequest[]
   experiences     Experience[]
 
@@ -1022,6 +1033,7 @@ model Order {
   items             OrderItem[]
   statusEvents      OrderStatusEvent[]
   paymentIntents    PaymentIntent[]
+  tipPayments       TipPayment[]
   refunds           Refund[]
   transactions      Transaction[]
   settlementItems   SettlementItem[]
@@ -1088,6 +1100,45 @@ model PaymentIntent {
   settlementItems SettlementItem[]
 
   @@index([orderId])
+}
+
+// Collected customer TIP as a SEPARATE payment component (P1.7.38, per the P1.7.42
+// approved policy). This is DELIBERATELY isolated from the order `PaymentIntent`:
+// tip money never enters `Order.grandTotalMinor`, the order payment amount, the
+// commission basis, or merchant settlement gross. `basisMinor` snapshots
+// `Order.grandTotalMinor` at creation (the approved "total order amount" tip
+// basis). `beneficiaryPolicy` snapshots the merchant-configured policy for
+// historical integrity; routing/settlement of the tip is deferred to P1.7.39.
+model TipPayment {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId             String               @db.Uuid
+  order               Order                @relation(fields: [orderId], references: [id])
+  merchantId          String               @db.Uuid
+  merchant            Merchant             @relation(fields: [merchantId], references: [id])
+  // Server-authoritative tip selection + calculation (basis = grandTotalMinor snapshot)
+  basisMinor          BigInt
+  percentBps          Int? // 1000/1500/2000 for %; null for a custom amount
+  isCustom            Boolean              @default(false)
+  amountMinor         BigInt // server-calculated collected tip amount
+  currencyCode        String               @default("INR")
+  // Separate payment lifecycle (mirrors PaymentIntent but fully isolated)
+  status              PaymentStatus        @default(CREATED)
+  razorpayOrderId     String?              @unique
+  razorpayPaymentId   String?              @unique
+  capturedAt          DateTime?
+  // Refund foundation (state only; the lifecycle rides the order/payment refund flow)
+  refundedAmountMinor BigInt               @default(0)
+  refundStatus        RefundStatus?
+  providerRefundId    String?              @unique
+  refundedAt          DateTime?
+  // Beneficiary policy SNAPSHOT at collection time (routing deferred to P1.7.39)
+  beneficiaryPolicy   TipBeneficiaryPolicy
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([orderId])
+  @@index([merchantId])
+  @@index([status])
 }
 
 model PaymentAttempt {

@@ -10,6 +10,10 @@
 
 export type RefundStatusName = 'INITIATED' | 'PROCESSED' | 'FAILURE';
 
+/** WALLET = internal synchronous wallet credit (P1.7.29). RAZORPAY = provider-
+ *  initiated, asynchronous refund to the original source (P1.7.30). */
+export type RefundMethodName = 'WALLET' | 'RAZORPAY';
+
 export interface RefundInput {
   paymentIntentId: string;
   /** Refund amount in minor units. Omit (or null) for a FULL refund of the
@@ -20,6 +24,27 @@ export interface RefundInput {
   idempotencyKey: string;
 }
 
+/** Authorized live-refund request (P1.7.30). `method` selects the internal
+ *  wallet credit (WALLET) or a provider refund via Razorpay (RAZORPAY). */
+export interface RefundRequestInput extends RefundInput {
+  method?: RefundMethodName; // default WALLET (preserves P1.7.29)
+}
+
+/** Provider boundary contract. `status`: `processed` (instant) or `pending`
+ *  (async → refund.processed webhook). A thrown error = UNKNOWN (see gateway). */
+export interface ProviderRefundRequest {
+  providerPaymentId: string;
+  amountMinor: bigint;
+  idempotencyKey: string;
+  notes?: Record<string, string>;
+}
+
+export interface ProviderRefundResponse {
+  providerRefundId: string;
+  status: 'processed' | 'pending' | 'failed';
+  payload?: unknown;
+}
+
 export interface RefundResult {
   refundId: string;
   paymentIntentId: string;
@@ -28,7 +53,10 @@ export interface RefundResult {
   status: RefundStatusName;
   walletEntryId: string;
   transactionId: string;
-  /** New wallet balance after this credit (minor units). */
+  /** Provider refund id (Razorpay) when the refund was provider-initiated. */
+  providerRefundId: string | null;
+  /** New wallet balance after this credit (minor units). 0 until PROCESSED for an
+   *  async provider refund that has not yet completed. */
   walletBalanceMinor: bigint;
   /** The PaymentIntent status after the refund (PARTIALLY_REFUNDED | REFUNDED). */
   intentStatus: string;

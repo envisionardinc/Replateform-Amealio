@@ -212,6 +212,14 @@ export class SettlementRepository {
     currencyCode: string;
   }): Promise<SettlementResult> {
     const created = await this.prisma.$transaction(async (tx) => {
+      // Lock the tip row and re-verify under the lock (P1.7.40): this serializes
+      // with the tip-refund path's tip lock, closing the route↔refund race — a tip
+      // that was refunded concurrently is no longer CAPTURED and must not settle.
+      await tx.$queryRaw`SELECT id FROM "TipPayment" WHERE id = ${args.tipPaymentId}::uuid FOR UPDATE`;
+      const tip = await tx.tipPayment.findUniqueOrThrow({ where: { id: args.tipPaymentId } });
+      if (tip.status !== 'CAPTURED') {
+        throw new BadRequestException(`Tip is not routable in status ${tip.status}`);
+      }
       const settlement = await tx.settlement.create({
         data: {
           merchantId: args.merchantId,

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import type {
@@ -174,10 +174,27 @@ export class TipRepository {
       const tip = await tx.tipPayment.findUniqueOrThrow({ where: { id: args.tipId } });
       // Idempotency: a redelivered event with the SAME provider refund id is a
       // no-op (never double-applies). A single refund reference is a deliberate
-      // foundation limitation — a full multi-refund ledger is deferred to the
-      // refund-lifecycle slice (P1.7.39+).
+      // foundation limitation — a full multi-refund ledger is deferred.
       if (tip.providerRefundId === args.providerRefundId) {
         return toTip(tip);
+      }
+      // Settlement-awareness (P1.7.40): a tip that has been ROUTED into an ORDER_TIP
+      // settlement cannot be refunded here, because reducing the merchant's already
+      // -settled tip requires a post-settlement clawback/adjustment that DOES NOT
+      // EXIST (no negative settlement / reversal mechanism; owner decision pending —
+      // see doc). Blocking prevents the impossible "refunded-but-settled without
+      // reconciliation" state (invariant #9). This lock serializes with routing's
+      // tip lock, closing the route↔refund race. Pre-settlement refunds proceed.
+      const routed = await tx.settlementItem.findUnique({
+        where: { tipPaymentId: args.tipId },
+        select: { id: true },
+      });
+      if (routed) {
+        throw new BadRequestException(
+          'Tip already routed to an ORDER_TIP settlement; post-settlement tip refund ' +
+            'requires a merchant clawback/adjustment mechanism that does not exist ' +
+            '(OWNER DECISION REQUIRED)',
+        );
       }
       const alreadyRefunded = tip.refundedAmountMinor;
       const newRefunded = alreadyRefunded + args.amountMinor;

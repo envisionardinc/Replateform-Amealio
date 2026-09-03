@@ -111,15 +111,27 @@ describe('Tip collection/capture foundation (P1.7.38)', () => {
     const paySign = (o: string, p: string) =>
       computePaymentSignature({ razorpayOrderId: o, razorpayPaymentId: p, keySecret });
 
+    let userSeq = 0;
+    const seedUser = async () =>
+      prisma.user.create({ data: { phoneCountryCode: '+91', phone: `${Date.now()}${userSeq++}` } });
+
     // Create an order with a known grand total (subtotal only unless overridden).
+    // Always attaches a customer (a tip refund credits the customer's wallet).
     const makeOrder = async (
       merchantId: string,
       restaurantId: string,
-      over: { unitPriceMinor?: bigint; taxTotalMinor?: bigint; deliveryChargeMinor?: bigint } = {},
+      over: {
+        unitPriceMinor?: bigint;
+        taxTotalMinor?: bigint;
+        deliveryChargeMinor?: bigint;
+        userId?: string | null;
+      } = {},
     ) => {
+      const userId = over.userId ?? (await seedUser()).id;
       return orders.createOrder(staffOf(merchantId), {
         orderNumber: uniq('ORD'),
         restaurantId,
+        userId,
         type: 'HOME_DELIVERY',
         items: [
           { nameSnapshot: 'Item', unitPriceMinor: over.unitPriceMinor ?? 10000n, quantity: 1 },

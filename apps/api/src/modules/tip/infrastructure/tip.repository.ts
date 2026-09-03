@@ -158,10 +158,17 @@ export class TipRepository {
   }
 
   /**
-   * Record refund STATE on a captured tip (foundation only — the refund lifecycle
-   * rides the order/payment refund flow, P1.7.39+). Idempotent via
-   * `providerRefundId @unique`; the refunded amount cannot exceed the collected
-   * amount. Sets PARTIALLY_REFUNDED / REFUNDED and the refund audit fields.
+   * Refund a collected (PRE-settlement) tip and RETURN THE MONEY to the customer as
+   * a WALLET credit (P1.7.43), completing the P1.7.38 refund-state foundation. Per
+   * the P1.7.42 approved policy, the tip follows the order/payment refund lifecycle
+   * — which is a wallet credit (P1.7.29) — so this credits the customer `Wallet`,
+   * writes a `WalletEntry` + a REFUND `Transaction` linked to the tip, and advances
+   * the tip's refund state, all in ONE transaction under a per-tip + per-wallet
+   * row lock. Idempotent via the same `providerRefundId`; the cumulative refund can
+   * never exceed the collected amount. A tip already ROUTED into an ORDER_TIP
+   * settlement is REJECTED (post-settlement clawback is OWNER DECISION REQUIRED —
+   * P1.7.40); the tip lock serializes with routing, closing the route↔refund race.
+   * ONLY `PROCESSED` moves money; other statuses record state without a credit.
    */
   async recordRefundState(args: {
     tipId: string;
@@ -173,18 +180,13 @@ export class TipRepository {
       await tx.$queryRaw`SELECT id FROM "TipPayment" WHERE id = ${args.tipId}::uuid FOR UPDATE`;
       const tip = await tx.tipPayment.findUniqueOrThrow({ where: { id: args.tipId } });
       // Idempotency: a redelivered event with the SAME provider refund id is a
-      // no-op (never double-applies). A single refund reference is a deliberate
-      // foundation limitation — a full multi-refund ledger is deferred.
+      // no-op (never double-applies / double-credits).
       if (tip.providerRefundId === args.providerRefundId) {
         return toTip(tip);
       }
-      // Settlement-awareness (P1.7.40): a tip that has been ROUTED into an ORDER_TIP
-      // settlement cannot be refunded here, because reducing the merchant's already
-      // -settled tip requires a post-settlement clawback/adjustment that DOES NOT
-      // EXIST (no negative settlement / reversal mechanism; owner decision pending —
-      // see doc). Blocking prevents the impossible "refunded-but-settled without
-      // reconciliation" state (invariant #9). This lock serializes with routing's
-      // tip lock, closing the route↔refund race. Pre-settlement refunds proceed.
+      // Settlement-awareness (P1.7.40): a ROUTED tip cannot be refunded here —
+      // reducing an already-settled merchant tip needs a clawback mechanism that
+      // does not exist (OWNER DECISION). Prevents a refunded-but-settled state.
       const routed = await tx.settlementItem.findUnique({
         where: { tipPaymentId: args.tipId },
         select: { id: true },
@@ -196,21 +198,71 @@ export class TipRepository {
             '(OWNER DECISION REQUIRED)',
         );
       }
+
       const alreadyRefunded = tip.refundedAmountMinor;
       const newRefunded = alreadyRefunded + args.amountMinor;
-      const status =
-        args.refundStatus === 'PROCESSED'
-          ? newRefunded >= tip.amountMinor
-            ? 'REFUNDED'
-            : 'PARTIALLY_REFUNDED'
-          : tip.status;
+
+      if (args.refundStatus !== 'PROCESSED') {
+        // Non-terminal state (no money moved) — record the reference/status only.
+        const updated = await tx.tipPayment.update({
+          where: { id: args.tipId },
+          data: { refundStatus: args.refundStatus, providerRefundId: args.providerRefundId },
+        });
+        return toTip(updated);
+      }
+
+      // Money-return: credit the customer wallet (the order's customer). A tip
+      // refund NEVER touches the order PaymentIntent, order commission, or the
+      // order settlement — it only moves the tip money back to the customer.
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: tip.orderId },
+        select: { userId: true, merchantId: true },
+      });
+      if (!order.userId) {
+        throw new BadRequestException('Tip refund requires an order with a customer wallet owner');
+      }
+      await tx.wallet.upsert({
+        where: { userId: order.userId },
+        create: { userId: order.userId, balanceMinor: 0n, currencyCode: tip.currencyCode },
+        update: {},
+      });
+      await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${order.userId}::uuid FOR UPDATE`;
+      const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId: order.userId } });
+      const newBalance = wallet.balanceMinor + args.amountMinor;
+      await tx.wallet.update({ where: { id: wallet.id }, data: { balanceMinor: newBalance } });
+      const walletEntry = await tx.walletEntry.create({
+        data: {
+          walletId: wallet.id,
+          direction: 'CREDIT',
+          amountMinor: args.amountMinor,
+          balanceAfterMinor: newBalance,
+          refType: 'TIP_REFUND',
+          refId: tip.id,
+        },
+        select: { id: true },
+      });
+      await tx.transaction.create({
+        data: {
+          type: 'REFUND',
+          direction: 'CREDIT',
+          amountMinor: args.amountMinor,
+          currencyCode: tip.currencyCode,
+          userId: order.userId,
+          merchantId: order.merchantId,
+          orderId: tip.orderId,
+          tipPaymentId: tip.id,
+          walletEntryId: walletEntry.id,
+        },
+      });
+
+      const status = newRefunded >= tip.amountMinor ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
       const updated = await tx.tipPayment.update({
         where: { id: args.tipId },
         data: {
-          refundedAmountMinor: args.refundStatus === 'PROCESSED' ? newRefunded : alreadyRefunded,
-          refundStatus: args.refundStatus,
+          refundedAmountMinor: newRefunded,
+          refundStatus: 'PROCESSED',
           providerRefundId: args.providerRefundId,
-          refundedAt: args.refundStatus === 'PROCESSED' ? new Date() : tip.refundedAt,
+          refundedAt: new Date(),
           status,
         },
       });

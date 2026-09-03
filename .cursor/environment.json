@@ -1,0 +1,28 @@
+{
+  "name": "Amealio Replatforming (multi-repo dev)",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "nestjs-tracking-backend",
+      "command": "cd ../amealio-nestjs-backend && npm run start:dev"
+    },
+    {
+      "name": "feathers-platform-backend",
+      "command": "cd ../amealio-vendordashboard && npm run dev"
+    },
+    {
+      "name": "self-delivery-app",
+      "command": "cd ../amealio-self-delivery-app && PORT=3001 npm run dev"
+    },
+    {
+      "name": "user-web-app",
+      "command": "cd ../amealio_web_app && PORT=3002 BROWSER=none CI=false npm run start-dev"
+    },
+    {
+      "name": "dashboard-mvp",
+      "command": "cd ../amealiodashboardmvp- && PORT=3003 BROWSER=none CI=false npm run dev"
+    }
+  ],
+  "ports": [3000, 3001, 3002, 3003, 5001]
+}

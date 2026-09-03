@@ -117,9 +117,17 @@ describe('Settlement window & commission (P1.7.32)', () => {
     const paySign = (o: string, p: string) =>
       computePaymentSignature({ razorpayOrderId: o, razorpayPaymentId: p, keySecret });
 
-    // Capture a payment; by default backdate the capture so it is past its
-    // settleAfter window (settleable). `settleEligible: false` keeps it fresh
-    // (premature) to test the timing gate.
+    // Advance an order to COMPLETED (P1.7.33 requires it for settlement eligibility).
+    const completeOrderById = async (merchantId: string, orderId: string) => {
+      for (const s of ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED'] as const) {
+        await orders.transitionStatus(staffOf(merchantId), orderId, s);
+      }
+    };
+
+    // Capture a payment. Defaults make it fully settle-eligible: backdate the
+    // capture past its settleAfter window AND complete the order.
+    // - `settleEligible: false` keeps the capture fresh (premature timing).
+    // - `completeOrder: false` leaves the order non-COMPLETED (completion gate).
     const capture = async (
       merchantId: string,
       restaurantId: string,
@@ -128,6 +136,7 @@ describe('Settlement window & commission (P1.7.32)', () => {
         userId?: string | null;
         capture?: boolean;
         settleEligible?: boolean;
+        completeOrder?: boolean;
       } = {},
     ) => {
       const order = await orders.createOrder(staffOf(merchantId), {
@@ -155,6 +164,9 @@ describe('Settlement window & commission (P1.7.32)', () => {
             where: { paymentIntentId: intent.id, status: 'CAPTURED' },
             data: { createdAt: past },
           });
+        }
+        if (opts.completeOrder !== false) {
+          await completeOrderById(merchantId, order.id);
         }
       }
       return { intentId: intent.id, orderId: order.id, amount: intent.amountMinor };
@@ -220,6 +232,25 @@ describe('Settlement window & commission (P1.7.32)', () => {
       const { merchantId, restaurantId } = await seedMR();
       await capture(merchantId, restaurantId, { unitPriceMinor: 10000n }); // eligible
       await capture(merchantId, restaurantId, { unitPriceMinor: 5000n, settleEligible: false }); // premature
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.itemCount).toBe(1);
+      expect(s.grossAmountMinor).toBe(10000n);
+    });
+
+    // ---- ORDER-COMPLETION GATE (P1.7.33) ----
+    it('does NOT settle a payment whose order is not COMPLETED', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      // captured + past settleAfter, but the order was NOT advanced to COMPLETED
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n, completeOrder: false });
+      await expect(
+        settlements.settleMerchant(superAdmin, { merchantId, restaurantId }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('settles only COMPLETED orders, excluding an otherwise-eligible non-completed one', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n }); // completed → eligible
+      await capture(merchantId, restaurantId, { unitPriceMinor: 5000n, completeOrder: false }); // not completed
       const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
       expect(s.itemCount).toBe(1);
       expect(s.grossAmountMinor).toBe(10000n);

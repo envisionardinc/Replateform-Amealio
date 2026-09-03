@@ -36,9 +36,11 @@ export class SettlementRepository {
 
   /**
    * Captured, not-yet-settled payments for a merchant's restaurant, with each
-   * payment's net-of-refund contribution + capture instant. Fully-refunded
-   * (net ≤ 0) payments are excluded. Merchant + restaurant isolated. The
-   * settleAfter window is applied by the service (needs config + `now`).
+   * payment's net-of-refund contribution + capture instant. Only payments whose
+   * ORDER is COMPLETED are eligible (P1.7.33; VERIFIED legacy rule — settlement
+   * requires `order_status = COMPLETED`, doc 61 §4). Fully-refunded (net ≤ 0)
+   * payments are excluded. Merchant + restaurant isolated. The settleAfter window
+   * is applied by the service (needs config + `now`).
    */
   async findEligibleContributions(
     merchantId: string,
@@ -48,7 +50,7 @@ export class SettlementRepository {
       where: {
         status: { in: ['CAPTURED', 'PARTIALLY_REFUNDED'] },
         settlementItems: { none: {} },
-        order: { is: { merchantId, restaurantId } },
+        order: { is: { merchantId, restaurantId, status: 'COMPLETED' } },
       },
       select: {
         id: true,

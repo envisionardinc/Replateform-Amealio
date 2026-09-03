@@ -45,6 +45,10 @@ export interface CreateOrderInput {
   discountTotalMinor?: bigint;
   feeTotalMinor?: bigint;
   deliveryChargeMinor?: bigint;
+  // Customer-funded tip / donation (P1.7.36). Recorded on the Order but held
+  // OUTSIDE grandTotal and the commission basis (not merchant revenue). Default 0.
+  tipMinor?: bigint;
+  donationMinor?: bigint;
   currencyCode?: string;
   // Applied offer identity (client may supply the INTENT only). The server
   // validates the offer/coupon and calculates the discount; client-supplied
@@ -143,6 +147,8 @@ export interface OrderRecord {
   feeTotalMinor: bigint;
   deliveryChargeMinor: bigint;
   grandTotalMinor: bigint;
+  tipMinor: bigint;
+  donationMinor: bigint;
   currencyCode: string;
   offerId: string | null;
   couponId: string | null;

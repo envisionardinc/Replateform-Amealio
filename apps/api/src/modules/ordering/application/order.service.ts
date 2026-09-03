@@ -126,6 +126,13 @@ export class OrderService {
     const taxTotalMinor = input.taxTotalMinor ?? 0n;
     const feeTotalMinor = input.feeTotalMinor ?? 0n;
     const deliveryChargeMinor = input.deliveryChargeMinor ?? 0n;
+    // Customer-funded tip / donation (P1.7.36). Recorded on the Order but
+    // DELIBERATELY excluded from grandTotal (the order_total_integrity CHECK) and
+    // from the commission basis — a tip is not merchant commissionable revenue and
+    // a donation is a charity pass-through, not merchant revenue. Payout/GST
+    // wiring is deferred; this slice only establishes the canonical fields.
+    const tipMinor = input.tipMinor ?? 0n;
+    const donationMinor = input.donationMinor ?? 0n;
 
     // Discount is server-authoritative when an offer/coupon is applied (P1.7.24,
     // DEC-OFF-1): the client-supplied discountTotalMinor is IGNORED in that case
@@ -165,7 +172,14 @@ export class OrderService {
     }
 
     if (
-      [taxTotalMinor, discountTotalMinor, feeTotalMinor, deliveryChargeMinor].some((v) => v < 0n)
+      [
+        taxTotalMinor,
+        discountTotalMinor,
+        feeTotalMinor,
+        deliveryChargeMinor,
+        tipMinor,
+        donationMinor,
+      ].some((v) => v < 0n)
     ) {
       throw new BadRequestException('money components must be >= 0');
     }
@@ -191,6 +205,8 @@ export class OrderService {
       feeTotalMinor,
       deliveryChargeMinor,
       grandTotalMinor,
+      tipMinor,
+      donationMinor,
       currencyCode,
       items,
       actorType: principal.actorType,

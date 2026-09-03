@@ -1,82 +1,72 @@
-# 70 — Tip/Donation Owner Decision Packet & Financial Policy Contract (P1.7.42)
+# 70 — Tip/Donation Product Decision Contract (P1.7.42)
 
-> **Type:** DECISION-RECONCILIATION / CONTRACT-DEFINITION. **No code, schema, migration, API, or DTO change.** Converts the unresolved findings of P1.7.37/38/39/41 into an explicit, auditable owner-decision packet that determines the future implementation path.
-> **Status of this packet:** **BLOCKED — OWNER/DATA.** The packet is *decision-ready* — all evidence, constraints, options, and branching rules are recorded — but **no owner decision has been supplied**, so every policy line is recorded as `BLOCKED — OWNER/DATA (awaiting owner)`. No decision is fabricated, assumed, or inferred from legacy.
-> **Baseline:** P1.7.41 `7153b85`, **401/401** (unchanged — decision/documentation only).
+> **Type:** PRODUCT-DECISION / CONTRACT-DEFINITION — documentation only. **No code, schema, migration, API, or DTO change.** Records the **owner-APPROVED** target financial policy for tips and donations, resolving the blockers from P1.7.37/38/39/41 and defining the canonical contract for the implementation slices that follow.
+> **Status:** **COMPLETE — PRODUCT POLICY APPROVED.** The previously `BLOCKED — OWNER/DATA` decisions are now explicitly resolved by the product owner and are authoritative target policy. Implementation remains out of scope for this slice.
+> **Baseline:** P1.7.41 `7153b85`, **401/401** (unchanged — documentation only).
 
-Tags: **DECIDED**, **REJECTED**, **DEFERRED**, **BLOCKED — OWNER/DATA**, **PROVEN** (target), **HISTORICAL** (legacy).
+Tags: **APPROVED** (owner target policy), **PROVEN** (target facts), **HISTORICAL** (legacy evidence), **DEFERRED** (implementation-slice-owned).
 
 ---
 
-## 1. Executive Decision Summary
+## 1. Approved decision table
 
-**No owner decision has been provided to this slice.** Every row below is therefore `BLOCKED — OWNER/DATA`. The "Options" column is the exact menu the owner must choose from; the "Implementation consequence" states what each choice triggers (see §6 branching rules).
+The following are **explicitly approved by the product owner** and may be treated as authoritative target policy.
 
-| Decision | Owner decision | Options (owner picks one) | Evidence | Implementation consequence |
-|---|---|---|---|---|
-| Tips/donations collected? | **BLOCKED — OWNER/DATA** | A1 not collected · A2 collected | P1.7.37/38 (doc 66/67) | A1 → close chain; A2 → P1.7.38 becomes precursor |
-| Collection architecture (if A2) | **BLOCKED — OWNER/DATA** | bundled-tracked-component · separate payment intent | P1.7.38 (doc 67 §Phase 2) | determines the P1.7.38 model shape |
-| Tip beneficiary (if tips collected) | **BLOCKED — OWNER/DATA** | B1 merchant · B2 delivery person · B3 pooled/other | P1.7.39/41 (doc 68/69) | B1 → reuse settlement path; B2 → P1.7.42A precursor; B3 → STOP (define model) |
-| Tip refundable? | **BLOCKED — OWNER/DATA** | yes · no | P1.7.37/38 (doc 66/67) | defines tip refund model |
-| Tip refund window | **BLOCKED — OWNER/DATA** | e.g. pre-capture / pre-completion / pre-payout / none | doc 66 §G | gates payout timing vs refund risk |
-| Donation collected? | **BLOCKED — OWNER/DATA** | not collected · collected | P1.7.38 (doc 67); P1.7.40 (absent) | independent of tips (§4) |
-| Donation beneficiary/charity | **BLOCKED — OWNER/DATA** | customer-selected · platform-configured · merchant · other | P1.7.40 (not executed) | defines charity-liability model |
-| Donation refund policy | **BLOCKED — OWNER/DATA** | refundable? window? follows-tip? | doc 66 §G | defines donation refund model |
+| Decision | Approved policy | Status |
+|---|---|---|
+| Tips collected | YES | **APPROVED** |
+| Donations collected | YES | **APPROVED** |
+| Collection architecture | Single customer checkout with separately identified financial components | **APPROVED** |
+| Tip beneficiary | MERCHANT/VENDOR | **APPROVED** |
+| Delivery person receives tip | NO — initial baseline | **APPROVED** |
+| Tip refundability | YES, associated order/payment lifecycle | **APPROVED** |
+| Tip independent refund window | NO | **APPROVED** |
+| Donation beneficiary | Customer-selected / platform-configured charity | **APPROVED** |
+| Donation refundability | Until transfer; post-transfer recovery policy applies | **APPROVED** |
 
-## 2. Evidence (file:line)
+## 2. Approved policy detail (canonical target contract)
 
-- **Intent only, not collected:** `Order.tipMinor`/`donationMinor` recorded at creation, never mutated post-creation, NOT NULL default 0 — `apps/api/src/modules/ordering/application/order.service.ts:134-135,180-181`; `order.repository.ts:209-210,312`; `prisma/schema.prisma:1002-1003`.
-- **Charge = grandTotal (excludes tip/donation):** `payment.service.ts:43` (`amountMinor = order.grandTotalMinor`), verified `= intent.amountMinor` at capture `:79` and webhook `razorpay-webhook.service.ts:111`.
-- **Refund ceiling excludes tip/donation:** `refund.repository.ts:318` (`remaining = intent.amountMinor − reserved`).
-- **Settlement excludes tip/donation; `payoutType` hardcoded `'ORDER'`:** `settlement.repository.ts:86-93,130`.
-- **`PaymentIntent` has only `amountMinor`** (no collected-vs-merchant split): `prisma/schema.prisma:1073-1091`.
-- **Legacy `ORDER_TIP` → vendor/merchant settlement account:** `amealio-vendordashboard/src/models/settlement.model.ts:77-87`; `settlement.class.ts:166-171,248-266`; `settlement-process.class.ts:89,172`; `settlement-process-cron.class.ts:68,99`.
-- **Legacy self-delivery assignment (HISTORICAL):** `Order.selfDeliveryPerson` assigned at READYTOPICK + socket `assign_delivery_person` — `ordering.class.ts:509-541,561,3485-3561`; `order-completion-cron.class.ts:41-51,92-103`.
-- **Target delivery domain schema-only/unimplemented:** `prisma/schema.prisma:209-228,1505-1548`; no delivery module in `apps/api/src/modules/`.
+1. **Tips are collected** — when a customer chooses a tip, amealio collects it as actual money; the tip must remain a **separately identifiable financial component** (not folded into merchant revenue). `Order.tipMinor` graduates from intent-only to a collected component.
+2. **Donations are collected** — collected as actual money; **NOT merchant revenue**; donation money has its **own accounting/liability lifecycle** and must never be silently incorporated into merchant settlement economics.
+3. **Collection architecture** — a **single customer checkout/payment** where practical, while **separately representing** order amount, collected tip, and collected donation. The customer needs no separate payment interaction for a tip/donation. Governing rule: **one payment does NOT mean one financial component** — component-level financial identity is preserved. **`grandTotalMinor` is NOT changed** to make tips/donations appear collected. P1.7.38 owns the payment/capture design.
+4. **Tip beneficiary = MERCHANT/VENDOR** (initial India baseline). Consistent with (not blindly copied from) the legacy evidence `legacy ORDER_TIP → vendor/merchant settlement`. **Delivery persons are NOT tip beneficiaries** in the initial baseline ⇒ `DeliveryPerson` is not a financial beneficiary; delivery assignment is **not** a prerequisite for tip routing; **no delivery assignment/history foundation is required** for this path. A future "tip your delivery person" capability requires a separate product decision + delivery financial foundation.
+5. **Tip refunds** — refundable as part of the **associated order/payment refund lifecycle** (no independent tip-refund timer). Implementation (P1.7.38/P1.7.39) must guarantee: order refund correctly handles the collected tip; partial refunds never create money; a tip cannot be refunded twice; already-refunded amounts cannot be refunded again; settlement/payout state reconciles correctly.
+6. **Donation beneficiary** — **NOT the merchant**; donation funds belong to a **separate donation/charity liability flow**; direction = **customer-selected or platform-configured charity**. Charity selection/transfer/onboarding are **not** implemented here — P1.7.40 owns donation liability + charity transfer.
+7. **Donation refunds** — refundable **until the donation has been transferred out of amealio's control**; after transfer, refund/recovery requires the appropriate transfer/recovery mechanism. The exact state machine belongs to P1.7.40.
 
-## 3. Historical Behavior (isolate from target policy)
+## 3. Financial invariants (unchanged — these decisions do NOT authorize changing order economics)
 
-**`legacy ORDER_TIP → vendor/merchant settlement`** (VERIFIED, §2). Legacy also ran self-delivery (`Order.selfDeliveryPerson`) + Porter/Dunzo logistics. **This is HISTORICAL evidence only.** Per the hard constraints, it is **NOT** the target rule unless the owner explicitly selects merchant as the tip beneficiary (B1). Legacy is surfaced here solely to inform the owner's B-decision; it does not pre-decide it.
+Preserve exactly: `Order.grandTotalMinor`; the `order_total_integrity` CHECK; the commission basis (`subtotal − vendor discount`); merchant settlement economics; existing order-amount semantics. **`grandTotalMinor` must NOT be redefined** as a combined customer-charge field. The architecture must distinguish four concepts:
 
-## 4. Target Constraints (PROVEN facts)
+| Concept | Meaning |
+|---|---|
+| **Customer charge** | what the customer actually pays (order + tip + donation) |
+| **Order/merchant economics** | what belongs to the merchant/order settlement (`grandTotalMinor`, commission basis) — unchanged |
+| **Tip component** | collected customer money designated as a **merchant** tip (separate identity; excluded from commission basis) |
+| **Donation component** | collected customer money **held for eventual charity transfer** (platform liability; never merchant revenue) |
 
-- Payment intent amount is anchored to `grandTotalMinor` (server-authoritative; excludes tip/donation).
-- **No canonical collected-tip amount** and **no canonical collected-donation amount** exist.
-- **No delivery-assignment implementation** and **no assignment history** exist; `DeliveryTask.deliveryPersonId` is a nullable, mutable FK with no timestamp; `DeliveryTask` is 1:1 with `Order`.
-- Existing settlement architecture: `Settlement`/`SettlementItem`/`Payout`, commission on `subtotal − vendor discount`, `payoutType = 'ORDER'`.
-- Refund architecture is bounded by `intent.amountMinor` (= grandTotal); refunds cannot currently touch tip/donation.
-- `order_total_integrity` CHECK fixes `grand = subtotal − discount + tax + fee + delivery` (tip/donation outside it).
+The target payment model therefore needs a customer-charge total (order + tip + donation) that is **distinct from** `PaymentIntent.amountMinor`-as-merchant-gross today — P1.7.38 owns that design (e.g. separate collected components / transactions), without altering `grandTotalMinor` or the commission basis.
 
-## 5. Owner Decisions (register)
+## 4. Evidence & historical context (isolated)
 
-No `DECIDED`/`REJECTED`/`DEFERRED` values can be recorded because **no owner input was supplied to this slice**. All decisions are:
+- **Approved decisions** above are the **authoritative source**; the items below are supporting context only.
+- **Legacy (HISTORICAL):** `ORDER_TIP` payout settled to the vendor/merchant account (`amealio-vendordashboard/src/models/settlement.model.ts:77-87`, `settlement.class.ts:166-266`, `settlement-process*.ts`). This is **consistent with** the approved MERCHANT/VENDOR tip beneficiary — cited as corroboration, not as the reason.
+- **Target (PROVEN):** tip/donation are currently intent-only, excluded from the charge/commission/settlement (`payment.service.ts:43,79`; `refund.repository.ts:318`; `settlement.repository.ts:86-93,130`; `prisma/schema.prisma:1002-1003,1073-1091`); the delivery domain is schema-only/unimplemented (`prisma/schema.prisma:1505-1548`) — **now irrelevant to tips** because delivery-person tipping is excluded from the baseline.
 
-- **A. Collection (tips):** `BLOCKED — OWNER/DATA`
-- **A. Collection architecture:** `BLOCKED — OWNER/DATA`
-- **A. Collection (donations):** `BLOCKED — OWNER/DATA`
-- **B. Tip beneficiary:** `BLOCKED — OWNER/DATA` (legacy evidence = vendor/merchant, not auto-adopted)
-- **C. Tip refundability / window / partial / cancellation-auto-refund / failure interaction / merchant-refund interaction / post-settlement / post-transfer / authoritative-refund-event:** `BLOCKED — OWNER/DATA` (all 10 Phase-3 questions unanswered)
-- **D. Donation beneficiary/charity identity source / platform-liability / sync-vs-async transfer / charity-selection authority / donation-refund-vs-tip-refund:** `BLOCKED — OWNER/DATA` (Phase-4; independent of tips)
+## 5. Unblocked migration path
 
-No ambiguous language ("probably/likely/assume/TBD-without-owner") is used; each is an explicit `BLOCKED — OWNER/DATA` awaiting a named owner decision.
+- **P1.7.38 — Tip/Donation Collection/Capture Foundation: UNBLOCKED.** Collection policy is established (tips + donations collected; single checkout, separate components; `grandTotalMinor` unchanged). This is the **next implementation slice**.
+- **P1.7.39 — Tip Payout/Settlement Routing: UNBLOCKED IN PRINCIPLE** — beneficiary = **MERCHANT/VENDOR**, **no delivery-person assignment dependency**; depends only on P1.7.38 establishing the canonical collected-tip representation. Merchant routing should evaluate reuse of the existing settlement/payout path.
+- **P1.7.40 — Donation Liability + Charity Transfer: UNBLOCKED IN PRINCIPLE** — requires its own donation-liability/charity-transfer implementation design (customer-selected/platform-configured charity; refundable-until-transfer). Independent of the tip path.
+- **Delivery Assignment + Assignment-History foundation: NOT REQUIRED** for the approved initial tip model.
 
-## 6. Implementation Branch (pre-wired; selected once the owner decides)
+## 6. Sequencing correction
 
-The branch is **not yet selected** (decisions BLOCKED). The rules below apply deterministically once the owner answers:
+**Do NOT** create "P1.7.42A — Delivery Assignment + Assignment History" as the next slice — it was only required under the **rejected** alternative (tip beneficiary = delivery person). The approved policy removes that dependency. **The next implementation slice returns to P1.7.38 — Tip/Donation Collection/Capture Foundation**, using this approved contract.
 
-- **Branch 1 — NOT collected (A1):** P1.7.38 → CLOSED BY POLICY; P1.7.39 → CLOSED BY POLICY; P1.7.40 → CLOSED BY POLICY if donations also not collected. No payment/settlement change. `Order.tipMinor`/`donationMinor` stay recorded intent.
-- **Branch 2 — Collected (A2) + merchant beneficiary (B1):** next = **P1.7.38 Collection/Capture Foundation**, then **P1.7.39 Merchant Tip Settlement/Routing** (evaluate reuse of the existing merchant settlement/payout path). No delivery-assignment foundation required for tip routing.
-- **Branch 3 — Collected (A2) + delivery-person beneficiary (B2):** next = **P1.7.38**, then **P1.7.42A — Delivery Assignment + Immutable Assignment-History Foundation** (mandatory precursor), then **P1.7.39 Delivery-Person Tip Routing**. P1.7.39 must not precede P1.7.42A.
-- **Branch 4 — Collected (A2) + pooled/other (B3):** STOP — architecture/owner blocker until beneficiary identity, allocation formula, eligibility, settlement destination, timing, refund, and reconciliation are fully owner-defined.
+## 7. Implementation boundaries (DEFERRED to owning slices)
 
-Donation policy (Phase 4) branches **independently**; a tip decision does not resolve it. If donation policy is undecided, **P1.7.40 remains independently BLOCKED** regardless of the tip branch.
-
-## 7. Dependency status after this slice
-
-- **P1.7.38 (collection):** BLOCKED — OWNER/DATA (unchanged; awaiting Decision A).
-- **P1.7.39 (tip payout):** BLOCKED (awaiting A + B, and B2 additionally requires P1.7.42A).
-- **P1.7.40 (donation liability/charity):** BLOCKED — OWNER/DATA (awaiting the independent Phase-4 decisions).
-- **P1.7.41 (delivery reconciliation):** FORENSIC COMPLETE (doc 69) — facts established; no decision here changes it.
+Not designed here (implementation-slice-owned): the exact collected-tip/collected-donation persistence model, the customer-charge total representation, capture/webhook idempotency for the tip/donation components, the merchant tip routing/settlement mechanics, the donation liability ledger + charity transfer state machine, and refund reconciliation mechanics. P1.7.38 (collection), P1.7.39 (merchant tip routing), and P1.7.40 (donation liability/charity) own these respectively.
 
 ## 8. Validation
 No code/schema/API/DTO/migration change. Verified: `tsc --noEmit` clean, lint/format clean, **full suite 401/401**, `git diff` limited to documentation.
@@ -85,22 +75,28 @@ No code/schema/API/DTO/migration change. Verified: `tsc --noEmit` clean, lint/fo
 
 ## P1.7.42 Result
 
-- **Status:** BLOCKED — OWNER/DATA (decision-ready packet produced; **no owner decision supplied**, so none recorded as DECIDED)
-- **Tips collected:** UNRESOLVED
-- **Donations collected:** UNRESOLVED
-- **Collection architecture:** UNRESOLVED (options: bundled-tracked-component | separate payment intent)
-- **Tip beneficiary:** UNRESOLVED (options: MERCHANT | DELIVERY PERSON | POOLED/OTHER; legacy evidence = merchant, not auto-adopted)
-- **Tip refund policy:** UNRESOLVED (all 10 Phase-3 questions unanswered)
-- **Donation refund policy:** UNRESOLVED (independent of tips)
-- **Delivery assignment foundation required:** CONDITIONAL — YES only if the owner selects a delivery-person beneficiary (B2); otherwise NO
-- **P1.7.38:** BLOCKED
-- **P1.7.39:** BLOCKED
-- **P1.7.40:** BLOCKED
-- **Code changes:** NO · **Schema changes:** NO
-- **Tests:** 401/401 · **TypeScript:** clean · **Lint/format:** clean
+- **Status:** COMPLETE — PRODUCT POLICY APPROVED
+- **Tips collected:** YES
+- **Donations collected:** YES
+- **Collection architecture:** SINGLE CHECKOUT / SEPARATE FINANCIAL COMPONENTS
+- **Tip beneficiary:** MERCHANT/VENDOR
+- **Delivery-person tip:** NO — INITIAL BASELINE
+- **Tip refundability:** YES
+- **Tip refund window:** ASSOCIATED ORDER/PAYMENT LIFECYCLE
+- **Donation beneficiary:** CUSTOMER-SELECTED / PLATFORM-CONFIGURED CHARITY
+- **Donation refundability:** UNTIL TRANSFER
+- **P1.7.38:** UNBLOCKED
+- **P1.7.39:** UNBLOCKED IN PRINCIPLE (depends on P1.7.38; beneficiary MERCHANT/VENDOR; no delivery dependency)
+- **P1.7.40:** UNBLOCKED IN PRINCIPLE (own donation-liability/charity design)
+- **Delivery assignment foundation required for tips:** NO
+- **Code changes:** NO
+- **Schema changes:** NO
+- **Tests:** 401/401
+- **TypeScript:** `tsc --noEmit` clean
+- **Lint/format:** clean
 
 ### Critical conclusion
-No owner financial-policy decision has been established. This slice cannot manufacture one: the governing principle is that the owner decides policy, and the prompt supplies the decision *framework* but no actual selections. The packet is therefore produced as a **decision-ready contract** — full evidence, isolated legacy behavior (`legacy ORDER_TIP → vendor/merchant`, not adopted), target constraints, an explicit decision register (all `BLOCKED — OWNER/DATA`), and four pre-wired branching rules — so the migration path resolves deterministically the instant the owner answers the three questions (collect? beneficiary? refund policy?), with donation policy branching independently. No decision, beneficiary, or legacy-as-policy conversion was assumed.
+The previously owner-blocked financial-policy questions are now **explicitly resolved**. The approved India baseline is **merchant tips** (collected as money, separately identified, beneficiary = merchant/vendor, refundable via the order/payment lifecycle) **plus separately accounted charity donations** (collected as a platform liability, never merchant revenue, routed to a customer-selected/platform-configured charity, refundable until transfer). **Delivery-person tipping is intentionally excluded from the initial India baseline**, which removes any delivery-assignment/history prerequisite from the tip implementation path. `grandTotalMinor`, order-total integrity, commission basis, and merchant settlement economics are explicitly preserved.
 
 ### Required next action
-**Obtain the owner's answers to the §1 decision table** (specifically: A — are tips/donations collected and, if so, the collection architecture; B — the tip beneficiary; C — tip and donation refund policy). No implementation slice may proceed until these are recorded. Do not speculatively implement collection, routing, or delivery assignment before the owner decision is captured.
+Return to **P1.7.38 — Tip/Donation Collection/Capture Foundation** and implement the smallest canonical collection foundation consistent with this approved policy: a customer-charge total (order + tip + donation) captured in a single checkout with **separately identified, server-authoritative collected-tip and collected-donation components**, idempotent and webhook-safe, **without** changing `grandTotalMinor`, the order-total CHECK, the commission basis, or merchant settlement economics.

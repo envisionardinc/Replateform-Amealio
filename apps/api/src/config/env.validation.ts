@@ -95,6 +95,29 @@ export class EnvironmentVariables {
   @IsBoolean()
   @IsOptional()
   STAFF_AUTH_ENABLED: boolean = true;
+
+  // ---- Payment / Razorpay (P1.7.28) — DEVELOPMENT config only ----
+  // Provider credentials are CONFIGURATION ONLY. Dev defaults are used if unset so
+  // local/dev + tests can run; real credentials MUST be infra-managed in staging/
+  // production (never committed). key_secret verifies the client handoff signature;
+  // the webhook secret verifies the Razorpay webhook body HMAC.
+  @IsString()
+  @IsOptional()
+  RAZORPAY_KEY_ID: string = 'rzp_test_dev_key_id';
+
+  @IsString()
+  @IsOptional()
+  RAZORPAY_KEY_SECRET: string = 'dev-only-razorpay-key-secret-change-me';
+
+  @IsString()
+  @IsOptional()
+  RAZORPAY_WEBHOOK_SECRET: string = 'dev-only-razorpay-webhook-secret-change-me';
+
+  // Feature flag: the new payment endpoints are only active when enabled. Default
+  // true for local/dev; never wired to production traffic (no cutover in P1.7.28).
+  @IsBoolean()
+  @IsOptional()
+  PAYMENTS_ENABLED: boolean = true;
 }
 
 /** ConfigModule validate() hook. Throws on invalid configuration. */

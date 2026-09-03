@@ -3,12 +3,15 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { isSuperAdmin } from '../../identity/staff-authentication/authorization/merchant-scope';
 import type { StaffPrincipal } from '../../identity/staff-authentication/staff-principal';
 import { SettlementRepository, isUniqueViolation } from '../infrastructure/settlement.repository';
 import { RazorpayxPayoutGateway } from '../infrastructure/razorpayx-payout.gateway';
+import { isSettleable } from '../domain/settlement-window';
 import type {
   PayoutRequestInput,
   PayoutResult,
@@ -29,6 +32,7 @@ export class SettlementService {
   constructor(
     private readonly repo: SettlementRepository,
     private readonly gateway: RazorpayxPayoutGateway,
+    private readonly config: ConfigService,
   ) {}
 
   async settleMerchant(
@@ -39,17 +43,34 @@ export class SettlementService {
       throw new ForbiddenException('Only SUPER_ADMIN may run merchant settlement');
     }
     if (!input.merchantId) throw new BadRequestException('merchantId is required');
-    const commissionBps = input.commissionBps ?? 0;
+    if (!input.restaurantId) throw new BadRequestException('restaurantId is required');
+
+    // Commission rate is resolved from AUTHORITATIVE config (Restaurant.commissionBps)
+    // — never a caller-supplied value. Snapshotted onto the Settlement below so the
+    // economics stay stable if the rate changes later.
+    const restaurant = await this.repo.getRestaurantForSettlement(input.restaurantId);
+    if (!restaurant) throw new NotFoundException('Restaurant not found');
+    if (restaurant.merchantId !== input.merchantId) {
+      throw new BadRequestException('Restaurant does not belong to the merchant');
+    }
+    const commissionBps = restaurant.commissionBps ?? 0; // null ⇒ platform default 0
     if (!Number.isInteger(commissionBps) || commissionBps < 0 || commissionBps > 10000) {
-      throw new BadRequestException('commissionBps must be an integer in [0, 10000]');
+      throw new BadRequestException('Configured commissionBps must be an integer in [0, 10000]');
     }
 
-    const contributions = await this.repo.findEligibleContributions(
-      input.merchantId,
-      input.restaurantId ?? null,
+    // Server-derived settlement window: only payments past their settleAfter
+    // (end-of-day IST of capture + SETTLEMENT_DELAY_DAYS) are eligible. No client
+    // date, no override; premature payments are deterministically excluded.
+    const delayDays = this.config.get<number>('SETTLEMENT_DELAY_DAYS') ?? 2;
+    const now = new Date();
+    const all = await this.repo.findEligibleContributions(input.merchantId, input.restaurantId);
+    const contributions = all.filter(
+      (c) => c.capturedAt !== null && isSettleable(c.capturedAt, delayDays, now),
     );
     if (contributions.length === 0) {
-      throw new BadRequestException('No eligible captured payments to settle');
+      throw new BadRequestException(
+        'No settleable captured payments (none past their settlement window)',
+      );
     }
 
     // Exact monetary arithmetic (no floating point). Commission is floored.
@@ -61,7 +82,7 @@ export class SettlementService {
     try {
       return await this.repo.createSettlement({
         merchantId: input.merchantId,
-        restaurantId: input.restaurantId ?? null,
+        restaurantId: input.restaurantId,
         currencyCode,
         commissionBps,
         commissionMinor: commission,

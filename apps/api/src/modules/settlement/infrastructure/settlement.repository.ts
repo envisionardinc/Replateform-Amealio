@@ -9,6 +9,8 @@ export interface EligibleContribution {
   orderId: string | null;
   netMinor: bigint;
   currencyCode: string;
+  /** Capture instant (earliest CAPTURED attempt) — drives the settleAfter window. */
+  capturedAt: Date | null;
 }
 
 /**
@@ -22,20 +24,31 @@ export interface EligibleContribution {
 export class SettlementRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** The authoritative commission rate + owning merchant for a restaurant. */
+  async getRestaurantForSettlement(
+    restaurantId: string,
+  ): Promise<{ merchantId: string; commissionBps: number | null } | null> {
+    return this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { merchantId: true, commissionBps: true },
+    });
+  }
+
   /**
-   * Captured payments for a merchant (optionally a restaurant) that are NOT yet
-   * settled, with each payment's net-of-refund contribution. Fully-refunded (net
-   * ≤ 0) payments are excluded (nothing to settle). Merchant-isolated.
+   * Captured, not-yet-settled payments for a merchant's restaurant, with each
+   * payment's net-of-refund contribution + capture instant. Fully-refunded
+   * (net ≤ 0) payments are excluded. Merchant + restaurant isolated. The
+   * settleAfter window is applied by the service (needs config + `now`).
    */
   async findEligibleContributions(
     merchantId: string,
-    restaurantId?: string | null,
+    restaurantId: string,
   ): Promise<EligibleContribution[]> {
     const intents = await this.prisma.paymentIntent.findMany({
       where: {
         status: { in: ['CAPTURED', 'PARTIALLY_REFUNDED'] },
         settlementItems: { none: {} },
-        order: { is: { merchantId, ...(restaurantId ? { restaurantId } : {}) } },
+        order: { is: { merchantId, restaurantId } },
       },
       select: {
         id: true,
@@ -43,6 +56,12 @@ export class SettlementRepository {
         amountMinor: true,
         currencyCode: true,
         refunds: { where: { status: 'PROCESSED' }, select: { amountMinor: true } },
+        attempts: {
+          where: { status: 'CAPTURED' },
+          select: { createdAt: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
       },
     });
 
@@ -56,6 +75,7 @@ export class SettlementRepository {
           orderId: i.orderId,
           netMinor: net,
           currencyCode: i.currencyCode,
+          capturedAt: i.attempts[0]?.createdAt ?? null,
         });
       }
     }

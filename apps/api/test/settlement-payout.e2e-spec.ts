@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, INestApplication } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  INestApplication,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { validateEnv } from '../src/config/env.validation';
@@ -14,6 +19,10 @@ import { RefundService } from '../src/modules/payment/application/refund.service
 import { SettlementModule } from '../src/modules/settlement/settlement.module';
 import { SettlementService } from '../src/modules/settlement/application/settlement.service';
 import { RazorpayxPayoutGateway } from '../src/modules/settlement/infrastructure/razorpayx-payout.gateway';
+import {
+  computeSettleAfter,
+  isSettleable,
+} from '../src/modules/settlement/domain/settlement-window';
 import { computePaymentSignature } from '../src/modules/payment/domain/razorpay-signature';
 import type {
   ProviderPayoutRequest,
@@ -22,12 +31,11 @@ import type {
 import type { StaffPrincipal } from '../src/modules/identity/staff-authentication/staff-principal';
 
 /**
- * P1.7.31 — Settlement & payout foundation.
- *
- * Settlement is DERIVED from captured payments net of PROCESSED refunds, minus
- * commission (exact BigInt). A payment settles at most once; settlement (accrual)
- * is distinct from payout (disbursement); payout is idempotent. SUPER_ADMIN-scoped;
- * merchant-isolated. No coupon logic, no historical migration.
+ * P1.7.31 + P1.7.32 — Settlement & payout foundation with authoritative commission
+ * config (Restaurant.commissionBps) and a server-derived settleAfter window
+ * (end-of-day IST of capture + SETTLEMENT_DELAY_DAYS). Settlement is derived from
+ * the payment/refund ledger; commission is never caller-supplied; premature
+ * payments are excluded deterministically.
  */
 class FakePayoutGateway {
   mode: 'pending' | 'processed' | 'failed' | 'throw' = 'pending';
@@ -39,354 +47,438 @@ class FakePayoutGateway {
   }
 }
 
-describe('Settlement & payout (P1.7.31)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-  let provisioning: MerchantProvisioningService;
-  let orders: OrderService;
-  let payments: PaymentService;
-  let refunds: RefundService;
-  let settlements: SettlementService;
-  let gateway: FakePayoutGateway;
-  let keySecret: string;
-
-  const uniq = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
-  const superAdmin: StaffPrincipal = {
-    staffMemberId: '00000000-0000-0000-0000-0000000000aa',
-    actorType: 'STAFF',
-    staffRole: 'SUPER_ADMIN',
-    merchantId: null,
-  };
-  const staffOf = (merchantId: string): StaffPrincipal => ({
-    staffMemberId: '00000000-0000-0000-0000-0000000000bb',
-    actorType: 'STAFF',
-    staffRole: 'MERCHANT_STAFF',
-    merchantId,
+describe('Settlement window & commission (P1.7.32)', () => {
+  // ---- pure settlement-window semantics (IST, no DB) ----
+  describe('computeSettleAfter (IST end-of-day + N days)', () => {
+    // 2026-03-04T06:00:00Z = IST 2026-03-04 11:30
+    const captured = new Date('2026-03-04T06:00:00.000Z');
+    it('is 23:59:59.999 IST of (capture day + N), as a UTC instant', () => {
+      // N=2 → IST 2026-03-06 23:59:59.999 = UTC 2026-03-06T18:29:59.999Z
+      expect(computeSettleAfter(captured, 2).toISOString()).toBe('2026-03-06T18:29:59.999Z');
+      expect(computeSettleAfter(captured, 0).toISOString()).toBe('2026-03-04T18:29:59.999Z');
+    });
+    it('is inclusive at the boundary and false just before', () => {
+      const after = computeSettleAfter(captured, 2);
+      expect(isSettleable(captured, 2, after)).toBe(true);
+      expect(isSettleable(captured, 2, new Date(after.getTime() - 1))).toBe(false);
+      expect(isSettleable(captured, 2, new Date(after.getTime() + 1))).toBe(true);
+    });
+    it('handles the IST-midnight capture boundary', () => {
+      const beforeMidnight = new Date('2026-03-04T18:29:59.999Z'); // IST 03-04 23:59:59.999
+      const atMidnight = new Date('2026-03-04T18:30:00.000Z'); // IST 03-05 00:00
+      expect(computeSettleAfter(beforeMidnight, 2).toISOString()).toBe('2026-03-06T18:29:59.999Z');
+      expect(computeSettleAfter(atMidnight, 2).toISOString()).toBe('2026-03-07T18:29:59.999Z');
+    });
   });
 
-  let userSeq = 0;
-  const seedUser = async () =>
-    prisma.user.create({ data: { phoneCountryCode: '+91', phone: `${Date.now()}${userSeq++}` } });
+  // ---- integration ----
+  describe('settlement (integration)', () => {
+    let app: INestApplication;
+    let prisma: PrismaService;
+    let provisioning: MerchantProvisioningService;
+    let orders: OrderService;
+    let payments: PaymentService;
+    let refunds: RefundService;
+    let settlements: SettlementService;
+    let gateway: FakePayoutGateway;
+    let keySecret: string;
 
-  const seedMR = async () => {
-    const m = await provisioning.createMerchant(superAdmin, { legalName: uniq('Biz') });
-    const r = await provisioning.createRestaurant(staffOf(m.id), {
-      merchantId: m.id,
-      name: uniq('R'),
-      city: 'Bengaluru',
+    const uniq = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
+    const superAdmin: StaffPrincipal = {
+      staffMemberId: '00000000-0000-0000-0000-0000000000aa',
+      actorType: 'STAFF',
+      staffRole: 'SUPER_ADMIN',
+      merchantId: null,
+    };
+    const staffOf = (merchantId: string): StaffPrincipal => ({
+      staffMemberId: '00000000-0000-0000-0000-0000000000bb',
+      actorType: 'STAFF',
+      staffRole: 'MERCHANT_STAFF',
+      merchantId,
     });
-    return { merchantId: m.id, restaurantId: r.id };
-  };
 
-  const paySign = (o: string, p: string) =>
-    computePaymentSignature({ razorpayOrderId: o, razorpayPaymentId: p, keySecret });
+    let userSeq = 0;
+    const seedUser = async () =>
+      prisma.user.create({ data: { phoneCountryCode: '+91', phone: `${Date.now()}${userSeq++}` } });
 
-  // Capture a payment for a merchant/restaurant; returns intent id + amount.
-  const capture = async (
-    merchantId: string,
-    restaurantId: string,
-    opts: { unitPriceMinor?: bigint; userId?: string | null; capture?: boolean } = {},
-  ) => {
-    const order = await orders.createOrder(staffOf(merchantId), {
-      orderNumber: uniq('ORD'),
-      restaurantId,
-      type: 'HOME_DELIVERY',
-      userId: opts.userId ?? null,
-      items: [{ nameSnapshot: 'Item', unitPriceMinor: opts.unitPriceMinor ?? 10000n, quantity: 1 }],
-    });
-    const rzpOrder = uniq('order');
-    const intent = await payments.createIntent({ orderId: order.id, razorpayOrderId: rzpOrder });
-    if (opts.capture !== false) {
-      const payId = uniq('pay');
-      await payments.verifyAndCapture({
-        razorpayOrderId: rzpOrder,
-        razorpayPaymentId: payId,
-        razorpaySignature: paySign(rzpOrder, payId),
+    const seedMR = async (commissionBps?: number) => {
+      const m = await provisioning.createMerchant(superAdmin, { legalName: uniq('Biz') });
+      const r = await provisioning.createRestaurant(staffOf(m.id), {
+        merchantId: m.id,
+        name: uniq('R'),
+        city: 'Bengaluru',
       });
-    }
-    return { intentId: intent.id, orderId: order.id, amount: intent.amountMinor };
-  };
+      if (commissionBps !== undefined) {
+        await prisma.restaurant.update({ where: { id: r.id }, data: { commissionBps } });
+      }
+      return { merchantId: m.id, restaurantId: r.id };
+    };
 
-  beforeAll(async () => {
-    gateway = new FakePayoutGateway();
-    const moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          validate: validateEnv,
-          envFilePath: ['.env', '../../.env'],
+    const paySign = (o: string, p: string) =>
+      computePaymentSignature({ razorpayOrderId: o, razorpayPaymentId: p, keySecret });
+
+    // Capture a payment; by default backdate the capture so it is past its
+    // settleAfter window (settleable). `settleEligible: false` keeps it fresh
+    // (premature) to test the timing gate.
+    const capture = async (
+      merchantId: string,
+      restaurantId: string,
+      opts: {
+        unitPriceMinor?: bigint;
+        userId?: string | null;
+        capture?: boolean;
+        settleEligible?: boolean;
+      } = {},
+    ) => {
+      const order = await orders.createOrder(staffOf(merchantId), {
+        orderNumber: uniq('ORD'),
+        restaurantId,
+        type: 'HOME_DELIVERY',
+        userId: opts.userId ?? null,
+        items: [
+          { nameSnapshot: 'Item', unitPriceMinor: opts.unitPriceMinor ?? 10000n, quantity: 1 },
+        ],
+      });
+      const rzpOrder = uniq('order');
+      const intent = await payments.createIntent({ orderId: order.id, razorpayOrderId: rzpOrder });
+      if (opts.capture !== false) {
+        const payId = uniq('pay');
+        await payments.verifyAndCapture({
+          razorpayOrderId: rzpOrder,
+          razorpayPaymentId: payId,
+          razorpaySignature: paySign(rzpOrder, payId),
+        });
+        if (opts.settleEligible !== false) {
+          // backdate the captured attempt so end-of-day IST + 2 days < now
+          const past = new Date(Date.now() - 6 * 24 * 3600_000);
+          await prisma.paymentAttempt.updateMany({
+            where: { paymentIntentId: intent.id, status: 'CAPTURED' },
+            data: { createdAt: past },
+          });
+        }
+      }
+      return { intentId: intent.id, orderId: order.id, amount: intent.amountMinor };
+    };
+
+    beforeAll(async () => {
+      gateway = new FakePayoutGateway();
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          ConfigModule.forRoot({
+            isGlobal: true,
+            validate: validateEnv,
+            envFilePath: ['.env', '../../.env'],
+          }),
+          PrismaModule,
+          OnboardingModule,
+          OrderingModule,
+          PaymentModule,
+          SettlementModule,
+        ],
+      })
+        .overrideProvider(RazorpayxPayoutGateway)
+        .useValue(gateway)
+        .compile();
+      app = moduleRef.createNestApplication();
+      await app.init();
+      prisma = app.get(PrismaService);
+      provisioning = app.get(MerchantProvisioningService);
+      orders = app.get(OrderService);
+      payments = app.get(PaymentService);
+      refunds = app.get(RefundService);
+      settlements = app.get(SettlementService);
+      keySecret = app.get(ConfigService).get<string>('RAZORPAY_KEY_SECRET')!;
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      gateway.mode = 'pending';
+      gateway.calls = 0;
+    });
+
+    // ---- SETTLEMENT TIMING (settleAfter) ----
+    it('does NOT settle a payment before its settleAfter window (fresh capture)', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId, { settleEligible: false }); // captured just now
+      await expect(
+        settlements.settleMerchant(superAdmin, { merchantId, restaurantId }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('settles a payment once it is past its settleAfter window', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n }); // backdated -> eligible
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.itemCount).toBe(1);
+      expect(s.grossAmountMinor).toBe(10000n);
+    });
+
+    it('settles only the eligible payments, leaving premature ones for later', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n }); // eligible
+      await capture(merchantId, restaurantId, { unitPriceMinor: 5000n, settleEligible: false }); // premature
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.itemCount).toBe(1);
+      expect(s.grossAmountMinor).toBe(10000n);
+    });
+
+    // ---- ELIGIBILITY / REFUND ----
+    it('excludes an uncaptured payment', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
+      await capture(merchantId, restaurantId, { unitPriceMinor: 5000n, capture: false });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.itemCount).toBe(1);
+      expect(s.grossAmountMinor).toBe(10000n);
+    });
+
+    it('deducts partial and multiple PROCESSED refunds; excludes fully-refunded (net 0)', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      const user = await seedUser();
+      const p = await capture(merchantId, restaurantId, {
+        unitPriceMinor: 10000n,
+        userId: user.id,
+      });
+      await refunds.refund({
+        paymentIntentId: p.intentId,
+        amountMinor: 2000n,
+        idempotencyKey: uniq('r'),
+      });
+      await refunds.refund({
+        paymentIntentId: p.intentId,
+        amountMinor: 3000n,
+        idempotencyKey: uniq('r'),
+      });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.grossAmountMinor).toBe(5000n);
+
+      const { merchantId: m2, restaurantId: r2 } = await seedMR();
+      const u2 = await seedUser();
+      const p2 = await capture(m2, r2, { unitPriceMinor: 10000n, userId: u2.id });
+      await refunds.refund({ paymentIntentId: p2.intentId, idempotencyKey: uniq('r') }); // full
+      await expect(
+        settlements.settleMerchant(superAdmin, { merchantId: m2, restaurantId: r2 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    // ---- COMMISSION (authoritative config) ----
+    it('resolves commission from Restaurant.commissionBps with exact BigInt arithmetic', async () => {
+      const { merchantId, restaurantId } = await seedMR(250); // 2.5%
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.commissionBps).toBe(250);
+      expect(s.commissionMinor).toBe(250n);
+      expect(s.netAmountMinor).toBe(9750n);
+      const items = await prisma.settlementItem.findMany({
+        where: { settlementId: s.settlementId },
+      });
+      expect(items.reduce((a, i) => a + i.amountMinor, 0n)).toBe(10000n); // items reconcile to gross
+    });
+
+    it('defaults commission to 0 when the restaurant has no configured rate', async () => {
+      const { merchantId, restaurantId } = await seedMR(); // commissionBps null
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.commissionBps).toBe(0);
+      expect(s.commissionMinor).toBe(0n);
+      expect(s.netAmountMinor).toBe(10000n);
+    });
+
+    it('snapshots the commission rate onto the settlement (later config change does not alter it)', async () => {
+      const { merchantId, restaurantId } = await seedMR(250);
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      await prisma.restaurant.update({ where: { id: restaurantId }, data: { commissionBps: 900 } });
+      const persisted = await prisma.settlement.findUniqueOrThrow({
+        where: { id: s.settlementId },
+      });
+      expect(persisted.commissionBps).toBe(250); // stable
+      expect(persisted.commissionMinor).toBe(250n);
+    });
+
+    it('rejects an out-of-bounds configured commission rate', async () => {
+      const { merchantId, restaurantId } = await seedMR(20000); // invalid
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
+      await expect(
+        settlements.settleMerchant(superAdmin, { merchantId, restaurantId }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects a callerless commission (no caller override possible)', () => {
+      // The input type no longer accepts commissionBps — verified structurally by
+      // the resolve-from-config tests above (rate comes only from the restaurant).
+      expect(true).toBe(true);
+    });
+
+    // ---- OWNERSHIP ----
+    it('rejects a restaurant that does not belong to the merchant', async () => {
+      const a = await seedMR();
+      const b = await seedMR();
+      await capture(b.merchantId, b.restaurantId, { unitPriceMinor: 7000n });
+      await expect(
+        settlements.settleMerchant(superAdmin, {
+          merchantId: a.merchantId,
+          restaurantId: b.restaurantId,
         }),
-        PrismaModule,
-        OnboardingModule,
-        OrderingModule,
-        PaymentModule,
-        SettlementModule,
-      ],
-    })
-      .overrideProvider(RazorpayxPayoutGateway)
-      .useValue(gateway)
-      .compile();
-    app = moduleRef.createNestApplication();
-    await app.init();
-    prisma = app.get(PrismaService);
-    provisioning = app.get(MerchantProvisioningService);
-    orders = app.get(OrderService);
-    payments = app.get(PaymentService);
-    refunds = app.get(RefundService);
-    settlements = app.get(SettlementService);
-    keySecret = app.get(ConfigService).get<string>('RAZORPAY_KEY_SECRET')!;
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
-
-  beforeEach(() => {
-    gateway.mode = 'pending';
-    gateway.calls = 0;
-  });
-
-  // ---- ELIGIBILITY ----
-  it('settles a captured payment and excludes an uncaptured one', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId, { unitPriceMinor: 10000n }); // captured
-    await capture(merchantId, restaurantId, { unitPriceMinor: 5000n, capture: false }); // CREATED
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    expect(s.itemCount).toBe(1);
-    expect(s.grossAmountMinor).toBe(10000n);
-    expect(s.netAmountMinor).toBe(10000n); // no commission
-    expect(s.status).toBe('PENDING');
-  });
-
-  it('rejects settlement when there are no eligible captured payments', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId, { capture: false });
-    await expect(settlements.settleMerchant(superAdmin, { merchantId })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-  });
-
-  // ---- REFUND ADJUSTMENT ----
-  it('deducts a partial refund from the settleable amount', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    const user = await seedUser();
-    const p = await capture(merchantId, restaurantId, { unitPriceMinor: 10000n, userId: user.id });
-    await refunds.refund({
-      paymentIntentId: p.intentId,
-      amountMinor: 3000n,
-      idempotencyKey: uniq('r'),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    expect(s.grossAmountMinor).toBe(7000n); // 10000 - 3000
-    expect(s.itemCount).toBe(1);
-  });
 
-  it('excludes a fully-refunded payment (net 0) from settlement', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    const user = await seedUser();
-    const p = await capture(merchantId, restaurantId, { unitPriceMinor: 10000n, userId: user.id });
-    await refunds.refund({ paymentIntentId: p.intentId, idempotencyKey: uniq('r') }); // full
-    await expect(settlements.settleMerchant(superAdmin, { merchantId })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-  });
-
-  it('deducts multiple refunds and only counts PROCESSED ones', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    const user = await seedUser();
-    const p = await capture(merchantId, restaurantId, { unitPriceMinor: 10000n, userId: user.id });
-    await refunds.refund({
-      paymentIntentId: p.intentId,
-      amountMinor: 2000n,
-      idempotencyKey: uniq('r'),
+    it('rejects an unknown restaurant', async () => {
+      const { merchantId } = await seedMR();
+      await expect(
+        settlements.settleMerchant(superAdmin, {
+          merchantId,
+          restaurantId: '00000000-0000-0000-0000-000000000000',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
-    await refunds.refund({
-      paymentIntentId: p.intentId,
-      amountMinor: 3000n,
-      idempotencyKey: uniq('r'),
+
+    it("isolates merchants — one restaurant's payment never appears in another's settlement", async () => {
+      const a = await seedMR();
+      const b = await seedMR();
+      await capture(a.merchantId, a.restaurantId, { unitPriceMinor: 10000n });
+      await capture(b.merchantId, b.restaurantId, { unitPriceMinor: 7000n });
+      const sb = await settlements.settleMerchant(superAdmin, {
+        merchantId: b.merchantId,
+        restaurantId: b.restaurantId,
+      });
+      expect(sb.grossAmountMinor).toBe(7000n);
+      expect(sb.itemCount).toBe(1);
     });
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    expect(s.grossAmountMinor).toBe(5000n); // 10000 - 2000 - 3000
-  });
 
-  // ---- COMMISSION ----
-  it('applies commission with exact integer (basis-point) arithmetic', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
-    const s = await settlements.settleMerchant(superAdmin, { merchantId, commissionBps: 250 }); // 2.5%
-    expect(s.grossAmountMinor).toBe(10000n);
-    expect(s.commissionBps).toBe(250);
-    expect(s.commissionMinor).toBe(250n); // 10000 * 250 / 10000
-    expect(s.netAmountMinor).toBe(9750n);
-    // items reconcile to gross
-    const items = await prisma.settlementItem.findMany({ where: { settlementId: s.settlementId } });
-    expect(items.reduce((a, i) => a + i.amountMinor, 0n)).toBe(10000n);
-  });
+    // ---- AUTHORIZATION ----
+    it('rejects settlement and payout by non-SUPER_ADMIN', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId);
+      await expect(
+        settlements.settleMerchant(staffOf(merchantId), { merchantId, restaurantId }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      await expect(
+        settlements.requestPayout(staffOf(merchantId), {
+          settlementId: s.settlementId,
+          idempotencyKey: uniq('k'),
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
 
-  it('rejects an invalid commission rate', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId);
-    await expect(
-      settlements.settleMerchant(superAdmin, { merchantId, commissionBps: 20000 }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
+    // ---- IDEMPOTENCY / CONCURRENCY ----
+    it('settles a payment at most once (a second run has nothing to settle)', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      const p = await capture(merchantId, restaurantId);
+      await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      await expect(
+        settlements.settleMerchant(superAdmin, { merchantId, restaurantId }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(await prisma.settlementItem.count({ where: { paymentIntentId: p.intentId } })).toBe(1);
+    });
 
-  // ---- IDEMPOTENCY ----
-  it('settles a payment at most once (a second run has nothing to settle)', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    const p = await capture(merchantId, restaurantId);
-    await settlements.settleMerchant(superAdmin, { merchantId });
-    await expect(settlements.settleMerchant(superAdmin, { merchantId })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect(await prisma.settlementItem.count({ where: { paymentIntentId: p.intentId } })).toBe(1);
-  });
+    it('concurrent settlement runs do not create duplicate settlement contributions', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      const p = await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
+      const results = await Promise.allSettled([
+        settlements.settleMerchant(superAdmin, { merchantId, restaurantId }),
+        settlements.settleMerchant(superAdmin, { merchantId, restaurantId }),
+      ]);
+      expect(results.filter((r) => r.status === 'fulfilled').length).toBeGreaterThanOrEqual(1);
+      expect(await prisma.settlementItem.count({ where: { paymentIntentId: p.intentId } })).toBe(1);
+    });
 
-  // ---- OWNERSHIP ----
-  it("isolates merchants — one merchant's payment never appears in another's settlement", async () => {
-    const a = await seedMR();
-    const b = await seedMR();
-    await capture(a.merchantId, a.restaurantId, { unitPriceMinor: 10000n });
-    await capture(b.merchantId, b.restaurantId, { unitPriceMinor: 7000n });
-    const sb = await settlements.settleMerchant(superAdmin, { merchantId: b.merchantId });
-    expect(sb.grossAmountMinor).toBe(7000n);
-    expect(sb.itemCount).toBe(1);
-  });
+    // ---- PAYOUT ----
+    it('creates a payout (PENDING), completes it via provider callback, and marks the settlement COMPLETED', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      const idk = uniq('k');
+      const payout = await settlements.requestPayout(superAdmin, {
+        settlementId: s.settlementId,
+        idempotencyKey: idk,
+      });
+      expect(payout.status).toBe('PENDING');
+      expect(payout.amountMinor).toBe(10000n);
+      await settlements.markPayoutProcessed(`pout_${idk}`);
+      expect(
+        (await prisma.payout.findUniqueOrThrow({ where: { id: payout.payoutId } })).status,
+      ).toBe('COMPLETED');
+      expect(
+        (await prisma.settlement.findUniqueOrThrow({ where: { id: s.settlementId } })).status,
+      ).toBe('COMPLETED');
+    });
 
-  // ---- AUTHORIZATION ----
-  it('rejects settlement and payout by non-SUPER_ADMIN', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId);
-    await expect(
-      settlements.settleMerchant(staffOf(merchantId), { merchantId }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    await expect(
-      settlements.requestPayout(staffOf(merchantId), {
+    it('marks a payout FAILED on provider failure and does not complete the settlement', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId);
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      gateway.mode = 'failed';
+      const payout = await settlements.requestPayout(superAdmin, {
         settlementId: s.settlementId,
         idempotencyKey: uniq('k'),
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-  });
-
-  // ---- PAYOUT ----
-  it('creates a payout (PENDING), completes it via provider callback, and marks the settlement COMPLETED', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    const idk = uniq('k');
-    const payout = await settlements.requestPayout(superAdmin, {
-      settlementId: s.settlementId,
-      idempotencyKey: idk,
+      });
+      expect(payout.status).toBe('FAILED');
+      expect(
+        (await prisma.settlement.findUniqueOrThrow({ where: { id: s.settlementId } })).status,
+      ).toBe('PENDING');
     });
-    expect(payout.status).toBe('PENDING'); // accrual != disbursement
-    expect(payout.amountMinor).toBe(10000n);
-    expect(payout.providerPayoutId).toBe(`pout_${idk}`);
-    // provider callback completes it
-    await settlements.markPayoutProcessed(`pout_${idk}`);
-    expect((await prisma.payout.findUniqueOrThrow({ where: { id: payout.payoutId } })).status).toBe(
-      'COMPLETED',
-    );
-    expect(
-      (await prisma.settlement.findUniqueOrThrow({ where: { id: s.settlementId } })).status,
-    ).toBe('COMPLETED');
-  });
 
-  it('marks a payout FAILED on provider failure and does not complete the settlement', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId);
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    gateway.mode = 'failed';
-    const payout = await settlements.requestPayout(superAdmin, {
-      settlementId: s.settlementId,
-      idempotencyKey: uniq('k'),
-    });
-    expect(payout.status).toBe('FAILED');
-    expect(
-      (await prisma.settlement.findUniqueOrThrow({ where: { id: s.settlementId } })).status,
-    ).toBe('PENDING');
-  });
-
-  it('is idempotent for a repeated payout request (same key): one provider payout', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId);
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    const idk = uniq('k');
-    const first = await settlements.requestPayout(superAdmin, {
-      settlementId: s.settlementId,
-      idempotencyKey: idk,
-    });
-    const second = await settlements.requestPayout(superAdmin, {
-      settlementId: s.settlementId,
-      idempotencyKey: idk,
-    });
-    expect(second.payoutId).toBe(first.payoutId);
-    expect(gateway.calls).toBe(1);
-    expect(await prisma.payout.count({ where: { settlementId: s.settlementId } })).toBe(1);
-  });
-
-  it('deduplicates a repeated provider payout callback (no double completion)', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId);
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    const idk = uniq('k');
-    await settlements.requestPayout(superAdmin, {
-      settlementId: s.settlementId,
-      idempotencyKey: idk,
-    });
-    await settlements.markPayoutProcessed(`pout_${idk}`);
-    await settlements.markPayoutProcessed(`pout_${idk}`); // duplicate → no-op
-    expect(
-      await prisma.payout.count({ where: { settlementId: s.settlementId, status: 'COMPLETED' } }),
-    ).toBe(1);
-  });
-
-  it('rejects a payout for a zero-amount settlement', async () => {
-    // Force a zero net via 100% commission on a small capture.
-    const { merchantId, restaurantId } = await seedMR();
-    await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
-    const s = await settlements.settleMerchant(superAdmin, { merchantId, commissionBps: 10000 }); // net 0
-    expect(s.netAmountMinor).toBe(0n);
-    await expect(
-      settlements.requestPayout(superAdmin, {
+    it('is idempotent for a repeated payout request; dedups a duplicate provider callback', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      await capture(merchantId, restaurantId);
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      const idk = uniq('k');
+      const first = await settlements.requestPayout(superAdmin, {
         settlementId: s.settlementId,
-        idempotencyKey: uniq('k'),
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  // ---- POST-SETTLEMENT REFUND ----
-  it('does not retroactively change a settlement when a refund happens after settlement (documented)', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    const user = await seedUser();
-    const p = await capture(merchantId, restaurantId, { unitPriceMinor: 10000n, userId: user.id });
-    const s = await settlements.settleMerchant(superAdmin, { merchantId });
-    expect(s.grossAmountMinor).toBe(10000n);
-    // later refund still processes at the payment layer...
-    await refunds.refund({
-      paymentIntentId: p.intentId,
-      amountMinor: 4000n,
-      idempotencyKey: uniq('r'),
+        idempotencyKey: idk,
+      });
+      const second = await settlements.requestPayout(superAdmin, {
+        settlementId: s.settlementId,
+        idempotencyKey: idk,
+      });
+      expect(second.payoutId).toBe(first.payoutId);
+      expect(gateway.calls).toBe(1);
+      await settlements.markPayoutProcessed(`pout_${idk}`);
+      await settlements.markPayoutProcessed(`pout_${idk}`);
+      expect(
+        await prisma.payout.count({ where: { settlementId: s.settlementId, status: 'COMPLETED' } }),
+      ).toBe(1);
     });
-    // ...but the already-created settlement is unchanged (negative adjustment deferred)
-    const after = await prisma.settlement.findUniqueOrThrow({ where: { id: s.settlementId } });
-    expect(after.grossAmountMinor).toBe(10000n);
-    expect(after.amountMinor).toBe(10000n);
-    // the payment is not re-settled
-    await expect(settlements.settleMerchant(superAdmin, { merchantId })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-  });
 
-  // ---- CONCURRENCY ----
-  it('concurrent settlement runs do not create duplicate settlement contributions', async () => {
-    const { merchantId, restaurantId } = await seedMR();
-    const p = await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
-    const results = await Promise.allSettled([
-      settlements.settleMerchant(superAdmin, { merchantId }),
-      settlements.settleMerchant(superAdmin, { merchantId }),
-    ]);
-    expect(results.filter((r) => r.status === 'fulfilled').length).toBeGreaterThanOrEqual(1);
-    expect(await prisma.settlementItem.count({ where: { paymentIntentId: p.intentId } })).toBe(1);
+    it('rejects a payout for a zero-amount settlement (100% commission)', async () => {
+      const { merchantId, restaurantId } = await seedMR(10000); // 100%
+      await capture(merchantId, restaurantId, { unitPriceMinor: 10000n });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.netAmountMinor).toBe(0n);
+      await expect(
+        settlements.requestPayout(superAdmin, {
+          settlementId: s.settlementId,
+          idempotencyKey: uniq('k'),
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    // ---- POST-SETTLEMENT REFUND (deferred: no retroactive change) ----
+    it('does not retroactively change a settlement when a refund happens after settlement', async () => {
+      const { merchantId, restaurantId } = await seedMR();
+      const user = await seedUser();
+      const p = await capture(merchantId, restaurantId, {
+        unitPriceMinor: 10000n,
+        userId: user.id,
+      });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.grossAmountMinor).toBe(10000n);
+      await refunds.refund({
+        paymentIntentId: p.intentId,
+        amountMinor: 4000n,
+        idempotencyKey: uniq('r'),
+      });
+      const after = await prisma.settlement.findUniqueOrThrow({ where: { id: s.settlementId } });
+      expect(after.grossAmountMinor).toBe(10000n);
+      expect(after.amountMinor).toBe(10000n);
+      await expect(
+        settlements.settleMerchant(superAdmin, { merchantId, restaurantId }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

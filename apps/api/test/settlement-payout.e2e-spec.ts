@@ -128,6 +128,22 @@ describe('Settlement window & commission (P1.7.32)', () => {
     // capture past its settleAfter window AND complete the order.
     // - `settleEligible: false` keeps the capture fresh (premature timing).
     // - `completeOrder: false` leaves the order non-COMPLETED (completion gate).
+    // Seed a global offer (+ coupon) with a given funding party (P1.7.34 basis).
+    const seedOffer = async (settlementType: 'MERCHANT' | 'ADMIN', discountPercent: number) => {
+      const code = uniq('SAVE').toUpperCase();
+      await prisma.offer.create({
+        data: {
+          title: uniq('Offer'),
+          active: true,
+          isGlobal: true,
+          discountPercent,
+          settlementType,
+          coupons: { create: [{ code }] },
+        },
+      });
+      return code;
+    };
+
     const capture = async (
       merchantId: string,
       restaurantId: string,
@@ -137,6 +153,10 @@ describe('Settlement window & commission (P1.7.32)', () => {
         capture?: boolean;
         settleEligible?: boolean;
         completeOrder?: boolean;
+        taxTotalMinor?: bigint;
+        feeTotalMinor?: bigint;
+        deliveryChargeMinor?: bigint;
+        couponCode?: string;
       } = {},
     ) => {
       const order = await orders.createOrder(staffOf(merchantId), {
@@ -147,6 +167,10 @@ describe('Settlement window & commission (P1.7.32)', () => {
         items: [
           { nameSnapshot: 'Item', unitPriceMinor: opts.unitPriceMinor ?? 10000n, quantity: 1 },
         ],
+        taxTotalMinor: opts.taxTotalMinor,
+        feeTotalMinor: opts.feeTotalMinor,
+        deliveryChargeMinor: opts.deliveryChargeMinor,
+        couponCode: opts.couponCode,
       });
       const rzpOrder = uniq('order');
       const intent = await payments.createIntent({ orderId: order.id, razorpayOrderId: rzpOrder });
@@ -328,6 +352,75 @@ describe('Settlement window & commission (P1.7.32)', () => {
       });
       expect(persisted.commissionBps).toBe(250); // stable
       expect(persisted.commissionMinor).toBe(250n);
+    });
+
+    // ---- COMMISSION BASIS (P1.7.34) ----
+    it('charges commission on the subtotal only, EXCLUDING tax/delivery/fees', async () => {
+      const { merchantId, restaurantId } = await seedMR(1000); // 10%
+      // subtotal 10000; captured = 10000 + tax 2000 + delivery 1000 + fee 500 = 13500
+      await capture(merchantId, restaurantId, {
+        unitPriceMinor: 10000n,
+        taxTotalMinor: 2000n,
+        deliveryChargeMinor: 1000n,
+        feeTotalMinor: 500n,
+      });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.grossAmountMinor).toBe(13500n); // payout pool = captured
+      expect(s.commissionBasisMinor).toBe(10000n); // subtotal only
+      expect(s.commissionMinor).toBe(1000n); // 10% of 10000, NOT 13500
+      expect(s.netAmountMinor).toBe(12500n);
+    });
+
+    it('subtracts a VENDOR/MERCHANT-funded discount from the commission basis', async () => {
+      const { merchantId, restaurantId } = await seedMR(1000); // 10%
+      const user = await seedUser();
+      const code = await seedOffer('MERCHANT', 10); // 10% off subtotal
+      // subtotal 10000, discount 1000 → captured grand 9000
+      await capture(merchantId, restaurantId, {
+        unitPriceMinor: 10000n,
+        userId: user.id,
+        couponCode: code,
+      });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.grossAmountMinor).toBe(9000n); // captured (discounted)
+      expect(s.commissionBasisMinor).toBe(9000n); // subtotal 10000 − vendor discount 1000
+      expect(s.commissionMinor).toBe(900n);
+      expect(s.netAmountMinor).toBe(8100n);
+    });
+
+    it('does NOT subtract an ADMIN-funded discount from the commission basis', async () => {
+      const { merchantId, restaurantId } = await seedMR(1000); // 10%
+      const user = await seedUser();
+      const code = await seedOffer('ADMIN', 10);
+      await capture(merchantId, restaurantId, {
+        unitPriceMinor: 10000n,
+        userId: user.id,
+        couponCode: code,
+      });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.grossAmountMinor).toBe(9000n); // captured (discounted)
+      expect(s.commissionBasisMinor).toBe(10000n); // full subtotal (ADMIN discount NOT subtracted)
+      expect(s.commissionMinor).toBe(1000n);
+      expect(s.netAmountMinor).toBe(8000n);
+    });
+
+    it('keeps the commission basis FROZEN under a partial refund (only the payout pool shrinks)', async () => {
+      const { merchantId, restaurantId } = await seedMR(1000); // 10%
+      const user = await seedUser();
+      const p = await capture(merchantId, restaurantId, {
+        unitPriceMinor: 10000n,
+        userId: user.id,
+      });
+      await refunds.refund({
+        paymentIntentId: p.intentId,
+        amountMinor: 4000n,
+        idempotencyKey: uniq('r'),
+      });
+      const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
+      expect(s.grossAmountMinor).toBe(6000n); // payout pool = captured 10000 − refund 4000
+      expect(s.commissionBasisMinor).toBe(10000n); // frozen (refund-independent)
+      expect(s.commissionMinor).toBe(1000n); // 10% of 10000, not of 6000
+      expect(s.netAmountMinor).toBe(5000n);
     });
 
     it('rejects an out-of-bounds configured commission rate', async () => {

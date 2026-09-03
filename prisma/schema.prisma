@@ -506,6 +506,14 @@ model Restaurant {
   lat            Float?
   lon            Float?
   status         String           @default("ACTIVE")
+  // Authoritative platform commission rate in basis points (1% = 100 bps),
+  // restaurant-scoped (P1.7.32). Legacy stored this as restaurant.comissionCode →
+  // SubCategory.description (a percentage string) and looked it up live at
+  // settlement (mutable, no snapshot); the target normalizes it to an explicit
+  // integer bps here and SNAPSHOTS it onto each Settlement (historical settlements
+  // are stable). Null ⇒ platform default (0). GST-on-commission + the precise
+  // commissionable basis are deferred owner decisions (DR-03a / DR-COMM-BASIS).
+  commissionBps  Int?
   // Restaurant onboarding progress (P1.7.8): onboardingStep ← legacy
   // restaurant.page_completed_till (integer step counter); softOnboarding ← same.
   onboardingStep Int              @default(0)

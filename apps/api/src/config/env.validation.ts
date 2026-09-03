@@ -118,6 +118,17 @@ export class EnvironmentVariables {
   @IsBoolean()
   @IsOptional()
   PAYMENTS_ENABLED: boolean = true;
+
+  // ---- Settlement (P1.7.32) ----
+  // Deferred-settlement window in whole calendar days after payment capture. A
+  // payment becomes settleable at end-of-day (Asia/Kolkata) of its capture day plus
+  // this many days. Default 2 mirrors the VERIFIED legacy `moment().endOf('day')
+  // .add(2,'days')` rule. A per-merchant/restaurant override is a deferred owner
+  // decision (legacy had none).
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  SETTLEMENT_DELAY_DAYS: number = 2;
 }
 
 /** ConfigModule validate() hook. Throws on invalid configuration. */

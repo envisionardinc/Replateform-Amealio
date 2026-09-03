@@ -9,14 +9,12 @@
 
 export type SettlementStatusName = 'PENDING' | 'PARTIAL' | 'FAILED' | 'COMPLETED';
 
-/** Initiate a merchant settlement run (SUPER_ADMIN only). */
+/** Initiate a restaurant settlement run (SUPER_ADMIN only). The commission rate is
+ *  resolved from authoritative config (`Restaurant.commissionBps`) — callers can
+ *  NOT supply it. `restaurantId` is required (commission is restaurant-scoped). */
 export interface SettleMerchantInput {
   merchantId: string;
-  restaurantId?: string | null;
-  /** Commission rate in basis points (1% = 100 bps). Default 0 (no commission).
-   *  The authoritative rate SOURCE (per-merchant/restaurant config) is a deferred
-   *  owner decision — this is an explicit input, never a hardcoded rate. */
-  commissionBps?: number;
+  restaurantId: string;
 }
 
 export interface SettlementResult {

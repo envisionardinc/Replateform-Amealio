@@ -1,92 +1,104 @@
-# 68 — ORDER_TIP Payout Routing Foundation (P1.7.39) — **BLOCKED**
+# 68 — Config-Driven Tip Beneficiary Routing (P1.7.39)
 
-> **Type:** FORENSIC — Phase 0 GO GATE. **Outcome: BLOCKED at the GO GATE.** No code, schema, migration, API, or DTO change.
-> **Governing context:** [65-TIP-DONATION-ORDER-MODEL-FOUNDATION.md](./65-TIP-DONATION-ORDER-MODEL-FOUNDATION.md) (P1.7.36 intent) + [66-TIP-DONATION-LIFECYCLE-ECONOMIC-CONTRACT.md](./66-TIP-DONATION-LIFECYCLE-ECONOMIC-CONTRACT.md) (P1.7.37 lifecycle).
-> **Baseline:** P1.7.37 `0b87c02`, **401/401** (unchanged — no implementation).
+> **Type:** IMPLEMENTATION — deterministic routing of collected tips using the P1.7.38 beneficiary-policy snapshot, per the P1.7.42 approved policy. **MERCHANT routing only**; DELIVERY_PERSON and SHARED_POOLED are explicitly BLOCKED (no foundation), never silently routed.
+> **Migration:** `20260903070000_p1_7_39_tip_settlement_routing` (additive only).
+> **Governing contract:** [70-TIP-DONATION-OWNER-DECISION-PACKET.md](./70-TIP-DONATION-OWNER-DECISION-PACKET.md) (P1.7.42); depends on [71-TIP-COLLECTION-CAPTURE-FOUNDATION.md](./71-TIP-COLLECTION-CAPTURE-FOUNDATION.md) (P1.7.38).
+> **Baseline:** P1.7.38 `0534549`, **414/414 → 422/422** (+8 routing tests).
 
-Tags: **VERIFIED** (code file:line), **BLOCKED — OWNER/DATA**, **DEFERRED**.
+> **Supersession note:** this document previously recorded P1.7.39 as **BLOCKED at the GO GATE** (no collected tip; beneficiary not resolvable). P1.7.38 (collection) and P1.7.42 (approved MERCHANT-configurable policy) resolved both blockers for the MERCHANT branch, which is now implemented.
 
----
-
-## Central question
-
-*"What exact, server-authoritative economic event converts a collected customer tip into one and only one payable `ORDER_TIP` obligation for the correct beneficiary, without changing existing order, commission, or settlement economics?"*
-
-**It cannot be answered today: there is no collected customer tip, and no deterministically resolvable beneficiary. P1.7.39 is BLOCKED.**
-
-## Phase 0 — GO GATE result: **FAIL**
-
-P1.7.39 requires P1.7.38 to have ended with a validated collection foundation. It did **not** — **P1.7.38 was never executed**. Evidence:
-
-- **No P1.7.38 slice / no doc 67.** The latest tip work is P1.7.36 (`6c1c0e7`, data foundation) and P1.7.37 (`0b87c02`, lifecycle contract). P1.7.37 explicitly recommended P1.7.38 as the collection foundation and **gated it on an owner decision** that has not been made.
-- **No canonical collected-tip representation.** The only tip fields are `Order.tipMinor` (intent) — `schema.prisma:1002`. There is no captured-tip amount, no tip `Transaction`, no tip `PaymentIntent` line, no tip collection status, and no tip provider/payment reference anywhere in schema or code.
-- **No provider/payment reference for a tip.** Capture is anchored on `grandTotalMinor`: `createIntent` amount = `order.grandTotalMinor` (`payment.service.ts:43`), verified `= intent.amountMinor` at capture/webhook (`payment.service.ts:79`, `razorpay-webhook.service.ts:111`). Tips are **never collected** (P1.7.37 §A/critical conclusion).
-- **No collection status / idempotency semantics** for tips exist.
-
-Required GO-GATE preconditions vs reality:
-
-| Precondition | Status |
-|---|---|
-| Collection foundation implemented & validated | **MISSING** (P1.7.38 not executed) |
-| Canonical collected-tip representation | **MISSING** |
-| Provider/payment reference | **MISSING** (capture excludes tip) |
-| Collection status | **MISSING** |
-| Idempotency semantics for collection | **MISSING** |
-
-Per the P1.7.39 Phase 0 instruction ("If P1.7.38 ended BLOCKED, STOP and report BLOCKED. Do not invent missing collection semantics."), the slice stops here. Phase 4's own floor invariant — **"NO collected tip → NO tip payout; a tip intent must never create a payout"** — is dispositive: with no collected-tip concept, no `ORDER_TIP` payout may be created.
-
-## Second, independent blocker — Phase 6 beneficiary safety: **FAIL**
-
-Even if collection existed, the tip beneficiary is **not deterministically server-resolvable** today:
-
-- The schema models `DeliveryPerson` (`schema.prisma:1516`) and `DeliveryTask.deliveryPersonId` (**nullable**, `:1541-1542`), but **no delivery module exists** in the target API (`apps/api/src/modules/`: catalog, experience, identity, merchant, offer, onboarding, ordering, payment, reference-data, seating, settlement, subscription, user-profile — **no delivery**). Nothing assigns `deliveryPersonId`; it is never populated.
-- The **legacy beneficiary rule** for a tip (restaurant vs delivery person vs pooled staff vs platform) is **not established in the target** — the delivery domain has been deferred throughout the program. Determining it is an **owner decision + delivery-domain migration** dependency, not something to infer.
-- Phase 6 mandates: "If the current data model cannot deterministically resolve the beneficiary, STOP and mark the slice BLOCKED rather than implementing speculative routing." → **BLOCKED.**
-
-## Forensic decision record
-
-### A. Tip intent — **EXISTS (VERIFIED)**
-`Order.tipMinor` (BigInt, NOT NULL default 0), recorded at order creation only; never mutated post-creation; never null/negative (P1.7.36/37).
-
-### B. Tip collection — **DOES NOT EXIST**
-No collected-money representation. The customer is not charged for the tip (capture = `grandTotalMinor`, which excludes it). P1.7.38 (collection) is the missing predecessor.
-
-### C. Tip eligibility — **UNDEFINED (cannot be established)**
-Eligibility (collection success + completion/settlement + no-refund + beneficiary resolution) cannot be defined because its first term (collection) does not exist. No timing may be invented.
-
-### D. Beneficiary resolution — **BLOCKED (not resolvable)**
-No server-authoritative beneficiary is derivable: delivery domain unmigrated, `deliveryPersonId` nullable/unassigned, legacy rule not established, owner decision required. Client-supplied/mutable-state beneficiaries are prohibited.
-
-### E. ORDER_TIP payout — **NOT IMPLEMENTED**
-`SettlementPayoutType.ORDER_TIP` exists (`schema.prisma:133`) but is never produced; `Settlement.payoutType` is hardcoded `'ORDER'` (`settlement.repository.ts:130`). `ORDER_TIP` remains the plausible canonical representation for a **future** separate tip economic component, but must not be created without collection + beneficiary.
-
-### F. Idempotency — **PATTERN AVAILABLE, not applicable yet**
-Established target patterns exist and would be reused: unique `SettlementItem.paymentIntentId`, unique `Payout.idempotencyKey`/`providerPayoutId`, unique webhook `providerEventId`, compare-and-set status transitions. A future canonical key would be deterministic per `(sourceCollection/order, ORDER_TIP)`. Not usable now (no collection to key on).
-
-### G. Refund dependency — **UNRESOLVED**
-Current refunds are bounded by `intent.amountMinor` (= grandTotal), which excludes tips (`refund.repository.ts:318`); tips are not refundable via the current path (P1.7.37). Whether a tip payout may occur before the refund-risk window closes cannot be answered until collection + tip-refund semantics exist. No prorating/apportionment invented.
-
-### H. What remains deferred
-Tip collection (P1.7.38), tip beneficiary resolution + delivery-domain migration, tip eligibility/timing, `ORDER_TIP` payout creation, tip refund interaction; donation liability + charity transfer (P1.7.40); GST (DR-03a).
-
-### I. Exact P1.7.40 boundary
-Per the directive, **P1.7.40 = Donation Liability + Charity Transfer Foundation**, kept **completely separate** from ORDER_TIP payout routing. Note it shares the **same unmet predecessor** (collection foundation) and is therefore also gated on P1.7.38 + an owner decision; it must not be started as routing until donation *collection* + a charity-liability model exist.
-
-## Phase 3 — settlement isolation (unchanged, VERIFIED)
-No change was made. Commission basis (`subtotal − vendor discount`), commission, `grandTotalMinor`, `order_total_integrity`, restaurant gross, and marketplace deductions are untouched; `Settlement.payoutType` remains `'ORDER'`. No `ORDER_TIP` record is created.
-
-## Validation (BLOCKED / docs-only slice)
-No code/schema/API/DTO/migration change. Verified regardless: `tsc --noEmit` clean, lint/format clean, **full suite 401/401**, `git diff` limited to documentation.
+Tags: **IMPLEMENTED** (MERCHANT), **BLOCKED** (DELIVERY_PERSON / SHARED_POOLED), **DEFERRED** (refund lifecycle).
 
 ---
 
-## P1.7.39 Go/No-Go
+## 1. Approved policy (P1.7.42) & dependency (P1.7.38)
 
-**BLOCKED — No-Go.** Two independent, dispositive dependencies are unmet:
+Tip beneficiary is **merchant-configurable** (`MERCHANT` / `DELIVERY_PERSON` / `SHARED_POOLED`), **snapshotted** onto each `TipPayment` at collection (P1.7.38). Routing consumes that snapshot. Only MERCHANT is supportable today (P1.7.41: delivery assignment/history absent; no pool foundation). Tip commission = **0%**. A collected tip is a separate `TipPayment` (CAPTURED, server-verified, `razorpayPaymentId` = provider evidence), financially isolated from order economics.
 
-1. **No collected tip exists** — P1.7.38 (Tip/Donation Collection/Capture Foundation) was never executed and is itself gated on an owner decision on whether/how the India baseline collects tips. GO-GATE precondition fails; Phase 4 floor invariant ("no collected tip → no tip payout") forbids any `ORDER_TIP` payout.
-2. **Beneficiary is not deterministically resolvable** — the delivery domain is unmigrated, `deliveryPersonId` is nullable/unassigned, and the legacy beneficiary rule is not established (owner + delivery-domain dependency). Phase 6 mandates BLOCKED over speculative routing.
+## 2. Merchant routing implementation
 
-**Exact missing contract/data dependencies:** (a) a canonical collected-tip representation with provider reference, collection status, and idempotency (P1.7.38); (b) a server-authoritative tip beneficiary (owner decision + delivery-domain migration); (c) tip refund-window semantics (dependent on collection).
+`SettlementService.routeTip(principal, { tipPaymentId })` (SUPER_ADMIN-only):
+1. Loads the tip via `SettlementRepository.findRoutableTip` (reads `TipPayment` + its order's `restaurantId` + any existing routing).
+2. **Idempotent replay:** if the tip already has an ORDER_TIP settlement item, returns it (`created:false`).
+3. **State gate:** only a `CAPTURED` tip is routable (CREATED/FAILED = uncollected; REFUNDED/PARTIALLY_REFUNDED = money returned → rejected; routing never manufactures money).
+4. **Beneficiary branch (from the SNAPSHOT):** `MERCHANT` → route; `DELIVERY_PERSON` / `SHARED_POOLED` → deterministic `BadRequestException` (BLOCKED); unknown → reject. Blocked branches **never** fall through to merchant.
+5. MERCHANT: `createTipSettlement` creates a dedicated `Settlement(payoutType='ORDER_TIP')` — `grossAmountMinor = amountMinor = tip`, `commissionBps=0`, `commissionBasisMinor=0`, `commissionMinor=0` — plus one `SettlementItem { tipPaymentId, orderId, amountMinor=tip }`.
+6. **Idempotency:** `SettlementItem.tipPaymentId @unique` → concurrent/duplicate routing throws P2002, rolls back, and returns the existing settlement.
 
-**Required predecessors before P1.7.39 can proceed:** execute **P1.7.38 — Tip/Donation Collection (Capture) Foundation**, and obtain the **owner decision** on tip collection *and* tip beneficiary (with the delivery domain migrated far enough to assign/resolve the beneficiary). No `ORDER_TIP` routing, no beneficiary inference, and no collection semantics were invented in this slice.
+The `merchantId` on the settlement is taken from the **tip's own record** (server-derived), so cross-merchant routing is impossible by construction.
+
+## 3. Settlement architecture decision (Phase 4)
+
+**Option A (chosen):** a distinct `SettlementItem` representing the tip, inside a dedicated **`ORDER_TIP`** `Settlement`, reusing the entire existing `Settlement`/`SettlementItem`/`Payout` architecture (no parallel payout system). The `SettlementPayoutType.ORDER_TIP` enum value already existed for exactly this (legacy `tipSettledId` settled tips separately to the vendor account — corroborating, not the basis). The reconciliation question is answered: **`SettlementItem.tipPaymentId` → `settlementId`** tells how much tip was collected, which merchant was entitled, and which settlement/payout transferred it. Payout reuses the unchanged `requestPayout` path (an ORDER_TIP settlement is a `Settlement`).
+
+## 4. Beneficiary snapshot integrity (Phase 8, TESTED)
+
+Routing reads `TipPayment.beneficiaryPolicy` (the collection-time snapshot), **never** the merchant's current config. A tip collected under MERCHANT routes to the merchant even if the merchant later reconfigures; a tip whose snapshot is DELIVERY_PERSON is blocked regardless of current config. Historical financial behavior cannot change because configuration changed later.
+
+## 5. State-machine integrity (Phase 9, TESTED)
+
+`CREATED → CAPTURED` (P1.7.38) → **routable** (CAPTURED + MERCHANT + not-yet-routed) → **routed** (an ORDER_TIP `SettlementItem` exists; the `Settlement` then follows the normal `PENDING → COMPLETED` payout lifecycle). No new enum states invented — "routed" is the DB-enforced settlement-item link; the `Settlement`/`Payout` reuse existing statuses. Rejected: uncaptured/failed/refunded → settlement; duplicate settlement (unique); blocked-branch → merchant; cross-merchant (server-derived merchantId).
+
+## 6. Idempotency (Phase 10, TESTED)
+
+DB-enforced boundary: `SettlementItem.tipPaymentId @unique` — the same collected tip can never become two merchant settlement amounts. Duplicate request → idempotent replay; concurrent routing → exactly one settlement (P2002 rollback + replay). Not application-level only.
+
+## 7. Financial isolation (Phase 2/7, TESTED)
+
+Tip routing does not touch `Order.grandTotalMinor`, the order `PaymentIntent`, the commission basis, order commission, or the order settlement. The ORDER_TIP settlement is a separate record; the order settlement (`settleMerchant`) still derives its gross/commission from the order payment only (a tip item carries `tipPaymentId`, not `paymentIntentId`, so it is invisible to the order-settlement eligibility query). Tested: routing a large tip leaves the order settlement gross/basis/commission/net and `grandTotalMinor` identical.
+
+## 8. Zero commission (Phase 6)
+
+The ORDER_TIP settlement is created with `commissionBps=0`, `commissionBasisMinor=0`, `commissionMinor=0`; the merchant nets the full tip. No platform fee, no gateway-fee deduction, no tax/commission manipulation; unrelated order commission is untouched.
+
+## 9. Blocked branches (Phase 7)
+
+- **DELIVERY_PERSON — BLOCKED — DELIVERY ASSIGNMENT FOUNDATION.** Requires an authoritative delivery assignment + immutable assignment-history foundation (P1.7.41 confirmed absent). Routing returns a deterministic blocked error; no `DeliveryTask`/`deliveryPersonId` inference, no assignment/history/payout created.
+- **SHARED_POOLED — BLOCKED — POOL ALLOCATION FOUNDATION.** Requires pool membership/allocation/accounting. Deterministic blocked error; no pool/split/allocation created.
+
+## 10. Refund interaction (Phase 11)
+
+Routing requires `CAPTURED`. After routing, the tip stays `CAPTURED`; a later tip refund (P1.7.38 `recordTipRefundState`) flips it to REFUNDED/PARTIALLY_REFUNDED **without** reversing or deleting settlement history — the `CAPTURED → SETTLED → REFUNDED` sequence remains representable. **Dependency for the refund-lifecycle slice:** a post-settlement tip refund needs a merchant clawback/adjustment mechanism against the ORDER_TIP settlement, which does not exist yet. The full refund ledger is out of scope here.
+
+## 11. Authorization (Phase 12)
+
+`routeTip` is SUPER_ADMIN-only (server-authoritative process). The beneficiary comes from the tip snapshot (not a client input); customers cannot select/modify the beneficiary, force any branch, or modify the settlement amount. Merchant config → snapshot at collection → routing consumes the snapshot.
+
+## 12. Migration / rollback
+
+`20260903070000_p1_7_39_tip_settlement_routing` — additive only: `SettlementItem.tipPaymentId UUID` (nullable) + unique index + FK to `TipPayment`. No existing column/constraint/data change; order-settlement items keep using `paymentIntentId`. Rollback: drop the FK + unique index + column. Applied to dev+test.
+
+## 13. Evidence index (file:line)
+
+- Routing: `settlement.service.ts` (`routeTip`); `settlement.repository.ts` (`findRoutableTip`, `createTipSettlement`).
+- Reused settlement: `Settlement`/`SettlementItem`/`Payout` (`prisma/schema.prisma:1251-1313`); `SettlementPayoutType.ORDER_TIP` (`:132`).
+- Isolation anchors (unchanged): order settlement `settlement.repository.ts:53-105` (filters `paymentIntentId`; tip items excluded); order payment `payment.service.ts:43`.
+- Tip snapshot dependency: `TipPayment.beneficiaryPolicy` (P1.7.38, doc 71).
+
+## 14. Validation
+
+`prisma generate` + `migrate deploy` ✓; `tsc --noEmit` clean; lint + format clean; new `tip-routing.e2e-spec.ts` (8: merchant routing + 0% commission + full tip + correct destination + ORDER_TIP identifiable; payout via existing path; idempotent replay + concurrency; **snapshot integrity**; **DELIVERY_PERSON/SHARED_POOLED blocked, no settlement created**; uncaptured/refunded rejected; non-SUPER_ADMIN forbidden; **order-settlement isolation**); **full suite 414/414 → 422/422**; `git diff` scoped to P1.7.39.
+
+---
+
+## P1.7.39 Result
+
+- **Status:** COMPLETE (MERCHANT branch)
+- **Merchant routing:** IMPLEMENTED
+- **Delivery-person routing:** BLOCKED — DELIVERY ASSIGNMENT FOUNDATION
+- **Shared-pooled routing:** BLOCKED — POOL ALLOCATION FOUNDATION
+- **Tip beneficiary source:** SNAPSHOTTED POLICY (`TipPayment.beneficiaryPolicy`)
+- **Merchant settlement path:** dedicated `Settlement(payoutType=ORDER_TIP)` + `SettlementItem(tipPaymentId)`, reusing the existing settlement/payout architecture
+- **Tip settlement component:** `SettlementItem.tipPaymentId @unique` (Option A)
+- **Tip commission:** 0%
+- **Duplicate routing prevented:** YES (`SettlementItem.tipPaymentId @unique`, DB-enforced)
+- **Policy snapshot integrity:** YES
+- **Refund interaction:** representable; post-settlement clawback deferred to the refund-lifecycle slice
+- **`grandTotalMinor` changed:** NO · **Order PaymentIntent changed:** NO · **Order commission changed:** NO · **Existing order settlement economics changed:** NO
+- **Tests:** 422/422 · **TypeScript:** clean · **Lint/format:** clean
+
+### Critical conclusion
+A successfully collected **MERCHANT-configured** tip can now be **deterministically routed** into a dedicated `ORDER_TIP` merchant settlement (0% commission, full tip) through the **existing** merchant settlement/payout architecture, driven strictly by the tip's collection-time **snapshot** and idempotent via a DB-enforced unique boundary — while **DELIVERY_PERSON and SHARED_POOLED are explicitly blocked** (deterministic errors, no settlement created) rather than silently redirected. Order economics (`grandTotalMinor`, order payment, commission, order settlement) are provably unchanged.
+
+### Required next action
+Do **not** immediately implement DELIVERY_PERSON or SHARED_POOLED routing. Given the MERCHANT branch is complete and no delivery-person/pooled merchant configuration is enabled (the resolver baseline is MERCHANT), the highest-value remaining dependency is the **tip refund lifecycle & reconciliation** — specifically a post-settlement tip clawback/adjustment against the ORDER_TIP settlement (surfaced as a dependency in §10). Select the next slice only after reviewing this result.

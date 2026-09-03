@@ -150,6 +150,97 @@ export class SettlementRepository {
     return this.getSettlement(created);
   }
 
+  // ---- tip routing (P1.7.39) ----
+
+  /**
+   * Load a collected tip for routing, joining the owning restaurant (for the
+   * settlement record) and any existing ORDER_TIP settlement it was already routed
+   * to (idempotent replay). Reads `TipPayment` directly — order economics untouched.
+   */
+  async findRoutableTip(tipPaymentId: string): Promise<{
+    id: string;
+    orderId: string;
+    merchantId: string;
+    restaurantId: string | null;
+    amountMinor: bigint;
+    currencyCode: string;
+    status: string;
+    beneficiaryPolicy: string;
+    existingSettlementId: string | null;
+  } | null> {
+    const tip = await this.prisma.tipPayment.findUnique({
+      where: { id: tipPaymentId },
+      select: {
+        id: true,
+        orderId: true,
+        merchantId: true,
+        amountMinor: true,
+        currencyCode: true,
+        status: true,
+        beneficiaryPolicy: true,
+        order: { select: { restaurantId: true } },
+        settlementItem: { select: { settlementId: true } },
+      },
+    });
+    if (!tip) return null;
+    return {
+      id: tip.id,
+      orderId: tip.orderId,
+      merchantId: tip.merchantId,
+      restaurantId: tip.order?.restaurantId ?? null,
+      amountMinor: tip.amountMinor,
+      currencyCode: tip.currencyCode,
+      status: tip.status,
+      beneficiaryPolicy: tip.beneficiaryPolicy,
+      existingSettlementId: tip.settlementItem?.settlementId ?? null,
+    };
+  }
+
+  /**
+   * Create a dedicated ORDER_TIP settlement for a single collected tip + its
+   * SettlementItem (linked via `tipPaymentId`) atomically. Commission is ZERO
+   * (amealio charges no commission on tips); gross = net = the collected tip. The
+   * `SettlementItem.tipPaymentId @unique` guarantees a tip routes at most once —
+   * a concurrent/duplicate routing throws P2002 and rolls back.
+   */
+  async createTipSettlement(args: {
+    merchantId: string;
+    restaurantId: string | null;
+    orderId: string;
+    tipPaymentId: string;
+    amountMinor: bigint;
+    currencyCode: string;
+  }): Promise<SettlementResult> {
+    const created = await this.prisma.$transaction(async (tx) => {
+      const settlement = await tx.settlement.create({
+        data: {
+          merchantId: args.merchantId,
+          restaurantId: args.restaurantId,
+          payoutType: 'ORDER_TIP',
+          status: 'PENDING',
+          grossAmountMinor: args.amountMinor,
+          commissionBasisMinor: 0n,
+          commissionMinor: 0n,
+          commissionBps: 0,
+          amountMinor: args.amountMinor,
+          currencyCode: args.currencyCode,
+          items: {
+            create: [
+              {
+                orderId: args.orderId,
+                tipPaymentId: args.tipPaymentId,
+                amountMinor: args.amountMinor,
+              },
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      return settlement.id;
+    });
+    return this.getSettlement(created);
+  }
+
   async getSettlement(settlementId: string): Promise<SettlementResult> {
     const s = await this.prisma.settlement.findUniqueOrThrow({
       where: { id: settlementId },

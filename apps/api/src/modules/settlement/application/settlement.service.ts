@@ -15,8 +15,11 @@ import { isSettleable } from '../domain/settlement-window';
 import type {
   PayoutRequestInput,
   PayoutResult,
+  RouteTipInput,
   SettleMerchantInput,
   SettlementResult,
+  TipBeneficiaryPolicyName,
+  TipRoutingResult,
 } from '../domain/settlement.types';
 
 /**
@@ -104,6 +107,82 @@ export class SettlementService {
       // SettlementItem.paymentIntentId) — this settlement rolled back.
       if (isUniqueViolation(e)) {
         throw new BadRequestException('Payments already being settled concurrently; retry');
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Route a collected tip to its beneficiary (P1.7.39), SUPER_ADMIN-only. The
+   * beneficiary is read from the tip's SNAPSHOT (never caller-supplied, never the
+   * merchant's *current* config), so a later config change cannot alter how an
+   * already-collected tip routes. Only a CAPTURED tip is routable. A MERCHANT tip
+   * becomes a dedicated ORDER_TIP settlement (0% commission; gross=net=tip) reusing
+   * the existing settlement/payout architecture; the tip's order economics,
+   * grandTotal, commission, and order settlement are untouched. DELIVERY_PERSON and
+   * SHARED_POOLED are explicitly BLOCKED (no foundation) and NEVER routed to the
+   * merchant. Idempotent: a tip routes to at most one settlement
+   * (`SettlementItem.tipPaymentId @unique`).
+   */
+  async routeTip(principal: StaffPrincipal, input: RouteTipInput): Promise<TipRoutingResult> {
+    if (!isSuperAdmin(principal)) {
+      throw new ForbiddenException('Only SUPER_ADMIN may route a collected tip');
+    }
+    if (!input.tipPaymentId) throw new BadRequestException('tipPaymentId is required');
+
+    const tip = await this.repo.findRoutableTip(input.tipPaymentId);
+    if (!tip) throw new NotFoundException('Tip payment not found');
+    const policy = tip.beneficiaryPolicy as TipBeneficiaryPolicyName;
+
+    // Idempotent replay: the tip was already routed to an ORDER_TIP settlement.
+    if (tip.existingSettlementId) {
+      const settlement = await this.repo.getSettlement(tip.existingSettlementId);
+      return { tipPaymentId: tip.id, beneficiaryPolicy: policy, settlement, created: false };
+    }
+
+    // Only a CAPTURED tip carries collected money that can be routed. FAILED /
+    // CREATED (uncollected) and REFUNDED / PARTIALLY_REFUNDED (money returned) are
+    // rejected — routing must never manufacture money.
+    if (tip.status !== 'CAPTURED') {
+      throw new BadRequestException(`Tip is not routable in status ${tip.status}`);
+    }
+
+    // Beneficiary branching from the SNAPSHOT — blocked branches never fall through
+    // to merchant routing.
+    if (policy === 'DELIVERY_PERSON') {
+      throw new BadRequestException(
+        'DELIVERY_PERSON tip routing is BLOCKED — requires a delivery assignment + ' +
+          'immutable assignment-history foundation (P1.7.41); tip left unrouted',
+      );
+    }
+    if (policy === 'SHARED_POOLED') {
+      throw new BadRequestException(
+        'SHARED_POOLED tip routing is BLOCKED — requires a pool membership/allocation ' +
+          'foundation; tip left unrouted',
+      );
+    }
+    if (policy !== 'MERCHANT') {
+      throw new BadRequestException(`Unknown tip beneficiary policy ${policy}`);
+    }
+
+    try {
+      const settlement = await this.repo.createTipSettlement({
+        merchantId: tip.merchantId,
+        restaurantId: tip.restaurantId,
+        orderId: tip.orderId,
+        tipPaymentId: tip.id,
+        amountMinor: tip.amountMinor,
+        currencyCode: tip.currencyCode,
+      });
+      return { tipPaymentId: tip.id, beneficiaryPolicy: policy, settlement, created: true };
+    } catch (e) {
+      // Concurrency: another writer routed this tip first (unique tipPaymentId).
+      if (isUniqueViolation(e)) {
+        const reloaded = await this.repo.findRoutableTip(tip.id);
+        if (reloaded?.existingSettlementId) {
+          const settlement = await this.repo.getSettlement(reloaded.existingSettlementId);
+          return { tipPaymentId: tip.id, beneficiaryPolicy: policy, settlement, created: false };
+        }
       }
       throw e;
     }

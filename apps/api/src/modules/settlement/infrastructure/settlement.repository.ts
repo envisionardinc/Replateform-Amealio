@@ -7,7 +7,11 @@ import type { PayoutResult, SettlementResult } from '../domain/settlement.types'
 export interface EligibleContribution {
   paymentIntentId: string;
   orderId: string | null;
+  /** Net-of-refund captured amount — the merchant payout-pool contribution. */
   netMinor: bigint;
+  /** Commissionable basis (subtotal − vendor-funded discount; ADMIN discount not
+   *  subtracted; refund-independent) — VERIFIED legacy commission basis. */
+  commissionBasisMinor: bigint;
   currencyCode: string;
   /** Capture instant (earliest CAPTURED attempt) — drives the settleAfter window. */
   capturedAt: Date | null;
@@ -64,6 +68,16 @@ export class SettlementRepository {
           orderBy: { createdAt: 'asc' },
           take: 1,
         },
+        // For the commissionable basis (P1.7.34): pre-discount item subtotal, the
+        // discount, and the offer's funding party (ADMIN-funded discount is NOT
+        // subtracted from the basis; VERIFIED legacy `totalComission`).
+        order: {
+          select: {
+            subtotalMinor: true,
+            discountTotalMinor: true,
+            offer: { select: { settlementType: true } },
+          },
+        },
       },
     });
 
@@ -71,15 +85,22 @@ export class SettlementRepository {
     for (const i of intents) {
       const refunded = i.refunds.reduce((a, r) => a + r.amountMinor, 0n);
       const net = i.amountMinor - refunded;
-      if (net > 0n) {
-        out.push({
-          paymentIntentId: i.id,
-          orderId: i.orderId,
-          netMinor: net,
-          currencyCode: i.currencyCode,
-          capturedAt: i.attempts[0]?.createdAt ?? null,
-        });
-      }
+      if (net <= 0n) continue; // fully refunded / no payout contribution
+
+      const subtotal = i.order?.subtotalMinor ?? 0n;
+      const discount = i.order?.discountTotalMinor ?? 0n;
+      const adminFunded = i.order?.offer?.settlementType === 'ADMIN';
+      let basis = subtotal - (adminFunded ? 0n : discount);
+      if (basis < 0n) basis = 0n; // never negative
+
+      out.push({
+        paymentIntentId: i.id,
+        orderId: i.orderId,
+        netMinor: net,
+        commissionBasisMinor: basis,
+        currencyCode: i.currencyCode,
+        capturedAt: i.attempts[0]?.createdAt ?? null,
+      });
     }
     return out;
   }
@@ -95,6 +116,7 @@ export class SettlementRepository {
     restaurantId: string | null;
     currencyCode: string;
     commissionBps: number;
+    commissionBasisMinor: bigint;
     commissionMinor: bigint;
     grossAmountMinor: bigint;
     netAmountMinor: bigint;
@@ -108,6 +130,7 @@ export class SettlementRepository {
           payoutType: 'ORDER',
           status: 'PENDING',
           grossAmountMinor: args.grossAmountMinor,
+          commissionBasisMinor: args.commissionBasisMinor,
           commissionMinor: args.commissionMinor,
           commissionBps: args.commissionBps,
           amountMinor: args.netAmountMinor,
@@ -137,6 +160,7 @@ export class SettlementRepository {
       merchantId: s.merchantId,
       restaurantId: s.restaurantId,
       grossAmountMinor: s.grossAmountMinor,
+      commissionBasisMinor: s.commissionBasisMinor,
       commissionMinor: s.commissionMinor,
       commissionBps: s.commissionBps,
       netAmountMinor: s.amountMinor,

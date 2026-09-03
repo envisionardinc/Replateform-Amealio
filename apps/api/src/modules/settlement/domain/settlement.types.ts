@@ -21,8 +21,9 @@ export interface SettlementResult {
   settlementId: string;
   merchantId: string;
   restaurantId: string | null;
-  grossAmountMinor: bigint; // Σ per-payment net-of-refund contributions (= Σ items)
-  commissionMinor: bigint;
+  grossAmountMinor: bigint; // Σ per-payment net-of-refund contributions (= Σ items = payout pool)
+  commissionBasisMinor: bigint; // Σ per-order (subtotal − vendor discount) — commissionable basis
+  commissionMinor: bigint; // floor(commissionBasisMinor × commissionBps / 10000)
   commissionBps: number;
   netAmountMinor: bigint; // gross − commission = payout amount
   currencyCode: string;

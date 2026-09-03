@@ -73,9 +73,13 @@ export class SettlementService {
       );
     }
 
-    // Exact monetary arithmetic (no floating point). Commission is floored.
+    // Exact monetary arithmetic (no floating point). Commission is charged on the
+    // COMMISSIONABLE BASIS (Σ subtotal − vendor discount; VERIFIED legacy), NOT on
+    // the tax/delivery-inclusive captured amount. `gross` is the net-of-refund
+    // payout pool. GST-on-commission is DEFERRED (DR-03a).
     const gross = contributions.reduce((a, c) => a + c.netMinor, 0n);
-    const commission = (gross * BigInt(commissionBps)) / 10000n;
+    const commissionBasis = contributions.reduce((a, c) => a + c.commissionBasisMinor, 0n);
+    const commission = (commissionBasis * BigInt(commissionBps)) / 10000n;
     const net = gross - commission;
     const currencyCode = contributions[0].currencyCode;
 
@@ -85,6 +89,7 @@ export class SettlementService {
         restaurantId: input.restaurantId,
         currencyCode,
         commissionBps,
+        commissionBasisMinor: commissionBasis,
         commissionMinor: commission,
         grossAmountMinor: gross,
         netAmountMinor: net,

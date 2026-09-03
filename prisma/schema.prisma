@@ -1195,12 +1195,18 @@ model Settlement {
   restaurant   Restaurant?          @relation(fields: [restaurantId], references: [id])
   payoutType   SettlementPayoutType
   status       SettlementStatus     @default(PENDING)
-  // Audit trail (P1.7.31): grossAmountMinor = Σ per-payment net-of-refund
-  // contributions (= Σ items); commissionMinor = floor(gross × commissionBps /
-  // 10000); amountMinor = grossAmountMinor − commissionMinor = net payout amount.
-  grossAmountMinor BigInt           @default(0)
-  commissionMinor  BigInt           @default(0)
-  commissionBps    Int              @default(0)
+  // Audit trail. grossAmountMinor = Σ per-payment net-of-refund contributions
+  // (= Σ items = merchant payout pool). commissionBasisMinor (P1.7.34) = Σ per-order
+  // commissionable basis = subtotal − vendor-funded discount (VERIFIED legacy
+  // `totalComission`: base_amount − vendor discount; excludes tax/delivery/tips;
+  // ADMIN-funded discount NOT subtracted; refund-independent). commissionMinor =
+  // floor(commissionBasisMinor × commissionBps / 10000). amountMinor =
+  // grossAmountMinor − commissionMinor = net payout. GST-on-commission DEFERRED
+  // (DR-03a).
+  grossAmountMinor     BigInt          @default(0)
+  commissionBasisMinor BigInt          @default(0)
+  commissionMinor      BigInt          @default(0)
+  commissionBps        Int             @default(0)
   amountMinor  BigInt
   currencyCode String               @default("INR")
   createdAt    DateTime             @default(now())

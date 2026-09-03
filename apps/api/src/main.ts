@@ -6,7 +6,9 @@ import { AppModule } from './app.module';
 
 /** Application bootstrap (P1.6). No business endpoints — foundation only. */
 export async function createApp() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  // rawBody: true exposes req.rawBody so the Razorpay webhook (P1.7.28) can verify
+  // the body HMAC byte-for-byte. Harmless for other routes.
+  const app = await NestFactory.create(AppModule, { bufferLogs: false, rawBody: true });
   const config = app.get(ConfigService);
 
   // Global API prefix + URI versioning: routes are served under /api/v1/*

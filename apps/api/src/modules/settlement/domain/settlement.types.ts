@@ -31,6 +31,24 @@ export interface SettlementResult {
   status: SettlementStatusName;
 }
 
+export type TipBeneficiaryPolicyName = 'MERCHANT' | 'DELIVERY_PERSON' | 'SHARED_POOLED';
+
+/** Route a collected tip to its beneficiary (SUPER_ADMIN only). The beneficiary is
+ *  read from the tip's SNAPSHOT (never caller-supplied); only MERCHANT is routable
+ *  today (DELIVERY_PERSON / SHARED_POOLED are BLOCKED — no foundation). */
+export interface RouteTipInput {
+  tipPaymentId: string;
+}
+
+/** Result of routing a collected tip into an ORDER_TIP merchant settlement. */
+export interface TipRoutingResult {
+  tipPaymentId: string;
+  beneficiaryPolicy: TipBeneficiaryPolicyName;
+  settlement: SettlementResult; // payoutType=ORDER_TIP; commission 0; gross=net=tip
+  /** true when this call created the routing; false on idempotent replay. */
+  created: boolean;
+}
+
 /** Request a payout for an approved settlement (SUPER_ADMIN only). */
 export interface PayoutRequestInput {
   settlementId: string;

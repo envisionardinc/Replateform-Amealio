@@ -1131,8 +1131,10 @@ model TipPayment {
   refundStatus        RefundStatus?
   providerRefundId    String?              @unique
   refundedAt          DateTime?
-  // Beneficiary policy SNAPSHOT at collection time (routing deferred to P1.7.39)
+  // Beneficiary policy SNAPSHOT at collection time (governs routing in P1.7.39)
   beneficiaryPolicy   TipBeneficiaryPolicy
+  // Settle-once link (P1.7.39): the ORDER_TIP settlement item that routed this tip.
+  settlementItem      SettlementItem?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -1289,6 +1291,12 @@ model SettlementItem {
   // most one settlement (idempotency: "settle a payment once"). (P1.7.31)
   paymentIntentId String?        @unique @db.Uuid
   paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id])
+  // The collected TIP this item settles (P1.7.39, ORDER_TIP settlements). UNIQUE =>
+  // a tip is routed to at most one settlement (idempotency: "route a tip once").
+  // A tip settlement item carries `tipPaymentId` (with `paymentIntentId` null); an
+  // order settlement item carries `paymentIntentId` (with `tipPaymentId` null).
+  tipPaymentId    String?        @unique @db.Uuid
+  tipPayment      TipPayment?    @relation(fields: [tipPaymentId], references: [id])
   // Net-of-refund contribution for this payment at settlement time (minor units).
   amountMinor     BigInt
 

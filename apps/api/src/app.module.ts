@@ -19,6 +19,7 @@ import { SeatingModule } from './modules/seating/seating.module';
 import { ExperienceModule } from './modules/experience/experience.module';
 import { OfferModule } from './modules/offer/offer.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { TipModule } from './modules/tip/tip.module';
 import { SettlementModule } from './modules/settlement/settlement.module';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { LoggingInterceptor } from './common/logging/logging.interceptor';
@@ -60,6 +61,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     ExperienceModule,
     OfferModule,
     PaymentModule,
+    TipModule,
     SettlementModule,
   ],
   providers: [

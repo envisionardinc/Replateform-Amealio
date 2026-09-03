@@ -53,6 +53,8 @@ interface CreateArgs {
   feeTotalMinor: bigint;
   deliveryChargeMinor: bigint;
   grandTotalMinor: bigint;
+  tipMinor: bigint;
+  donationMinor: bigint;
   currencyCode: string;
   items: Array<{
     menuItemId: string | null;
@@ -204,6 +206,8 @@ export class OrderRepository {
           feeTotalMinor: args.feeTotalMinor,
           deliveryChargeMinor: args.deliveryChargeMinor,
           grandTotalMinor: args.grandTotalMinor,
+          tipMinor: args.tipMinor,
+          donationMinor: args.donationMinor,
           currencyCode: args.currencyCode,
           offerId: r?.offerId ?? null,
           couponId: r?.couponId ?? null,
@@ -345,6 +349,8 @@ export class OrderRepository {
     feeTotalMinor: bigint;
     deliveryChargeMinor: bigint;
     grandTotalMinor: bigint;
+    tipMinor: bigint;
+    donationMinor: bigint;
     currencyCode: string;
     offerId: string | null;
     couponId: string | null;
@@ -372,6 +378,8 @@ export class OrderRepository {
       feeTotalMinor: row.feeTotalMinor,
       deliveryChargeMinor: row.deliveryChargeMinor,
       grandTotalMinor: row.grandTotalMinor,
+      tipMinor: row.tipMinor,
+      donationMinor: row.donationMinor,
       currencyCode: row.currencyCode,
       offerId: row.offerId,
       couponId: row.couponId,

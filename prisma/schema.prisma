@@ -994,6 +994,16 @@ model Order {
   feeTotalMinor       BigInt            @default(0)
   deliveryChargeMinor BigInt            @default(0)
   grandTotalMinor     BigInt            @default(0)
+  // Customer-funded tip (P1.7.36). Recorded canonically on the Order but held
+  // OUTSIDE the order_total_integrity equation (grand = subtotal − discount + tax
+  // + fee + delivery) and OUTSIDE the commissionable basis: a tip is not merchant
+  // commissionable revenue and is conceptually separately disbursable (legacy
+  // ORDER_TIP). No payout/GST wiring in this slice.
+  tipMinor            BigInt            @default(0)
+  // Customer-funded donation / charity pass-through (P1.7.36). Like tipMinor it is
+  // held outside grand-total and commission: it is not merchant revenue and is
+  // conceptually payable to the charity destination (legacy UDBHAV_ACCOUNT).
+  donationMinor       BigInt            @default(0)
   currencyCode        String            @default("INR")
   scheduledFor        DateTime?
   placedAt            DateTime?

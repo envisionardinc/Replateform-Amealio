@@ -70,13 +70,20 @@ describe('Tip refund lifecycle (P1.7.40)', () => {
   const paySign = (o: string, p: string) =>
     computePaymentSignature({ razorpayOrderId: o, razorpayPaymentId: p, keySecret });
 
-  const makeOrder = (merchantId: string, restaurantId: string) =>
-    orders.createOrder(staffOf(merchantId), {
+  let userSeq = 0;
+  const seedUser = async () =>
+    prisma.user.create({ data: { phoneCountryCode: '+91', phone: `${Date.now()}${userSeq++}` } });
+
+  const makeOrder = async (merchantId: string, restaurantId: string) => {
+    const user = await seedUser();
+    return orders.createOrder(staffOf(merchantId), {
       orderNumber: uniq('ORD'),
       restaurantId,
+      userId: user.id,
       type: 'HOME_DELIVERY',
       items: [{ nameSnapshot: 'Item', unitPriceMinor: 10000n, quantity: 1 }],
     });
+  };
 
   const collectTip = async (orderId: string, amount: bigint) => {
     const rzp = uniq('torder');
@@ -232,6 +239,73 @@ describe('Tip refund lifecycle (P1.7.40)', () => {
         refundStatus: 'PROCESSED',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  // ---- money-return: tip refund credits the customer wallet (P1.7.43) ----
+  it('credits the customer wallet by the tip amount and writes a tip-linked REFUND transaction', async () => {
+    const { merchantId, restaurantId } = await seedMR();
+    const order = await makeOrder(merchantId, restaurantId);
+    const userId = order.userId!;
+    const tipId = await collectTip(order.id, 3000n);
+
+    const before = await prisma.wallet.findUnique({ where: { userId } });
+    const beforeBal = before?.balanceMinor ?? 0n;
+
+    await tips.recordTipRefundState({
+      tipId,
+      amountMinor: 3000n,
+      providerRefundId: uniq('rfnd'),
+      refundStatus: 'PROCESSED',
+    });
+
+    const after = await prisma.wallet.findUniqueOrThrow({ where: { userId } });
+    expect(after.balanceMinor).toBe(beforeBal + 3000n); // customer got the tip back
+
+    // a tip-linked REFUND transaction exists (distinguishable from order refunds)
+    const txns = await prisma.transaction.findMany({ where: { tipPaymentId: tipId } });
+    expect(txns).toHaveLength(1);
+    expect(txns[0].type).toBe('REFUND');
+    expect(txns[0].amountMinor).toBe(3000n);
+    expect(txns[0].paymentIntentId).toBeNull(); // not an order-payment transaction
+    const entries = await prisma.walletEntry.findMany({
+      where: { refType: 'TIP_REFUND', refId: tipId },
+    });
+    expect(entries).toHaveLength(1);
+  });
+
+  it('credits the wallet cumulatively across partial then full tip refunds, idempotently', async () => {
+    const { merchantId, restaurantId } = await seedMR();
+    const order = await makeOrder(merchantId, restaurantId);
+    const userId = order.userId!;
+    const tipId = await collectTip(order.id, 10000n);
+    const beforeBal = (await prisma.wallet.findUnique({ where: { userId } }))?.balanceMinor ?? 0n;
+
+    const key = uniq('rfnd');
+    await tips.recordTipRefundState({
+      tipId,
+      amountMinor: 4000n,
+      providerRefundId: key,
+      refundStatus: 'PROCESSED',
+    });
+    // duplicate of the same provider refund id must not double-credit
+    await tips.recordTipRefundState({
+      tipId,
+      amountMinor: 4000n,
+      providerRefundId: key,
+      refundStatus: 'PROCESSED',
+    });
+    await tips.recordTipRefundState({
+      tipId,
+      amountMinor: 6000n,
+      providerRefundId: uniq('rfnd'),
+      refundStatus: 'PROCESSED',
+    });
+
+    const after = await prisma.wallet.findUniqueOrThrow({ where: { userId } });
+    expect(after.balanceMinor).toBe(beforeBal + 10000n); // 4000 + 6000 (dup ignored)
+    const tip = await prisma.tipPayment.findUniqueOrThrow({ where: { id: tipId } });
+    expect(tip.status).toBe('REFUNDED');
+    expect(tip.refundedAmountMinor).toBe(10000n);
   });
 
   // ---- financial isolation: tip refund never touches order economics ----

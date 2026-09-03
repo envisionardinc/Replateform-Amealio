@@ -68,13 +68,20 @@ describe('Config-driven tip beneficiary routing (P1.7.39)', () => {
   const paySign = (o: string, p: string) =>
     computePaymentSignature({ razorpayOrderId: o, razorpayPaymentId: p, keySecret });
 
-  const makeOrder = (merchantId: string, restaurantId: string, unitPriceMinor = 10000n) =>
-    orders.createOrder(staffOf(merchantId), {
+  let userSeq = 0;
+  const seedUser = async () =>
+    prisma.user.create({ data: { phoneCountryCode: '+91', phone: `${Date.now()}${userSeq++}` } });
+
+  const makeOrder = async (merchantId: string, restaurantId: string, unitPriceMinor = 10000n) => {
+    const user = await seedUser();
+    return orders.createOrder(staffOf(merchantId), {
       orderNumber: uniq('ORD'),
       restaurantId,
+      userId: user.id,
       type: 'HOME_DELIVERY',
       items: [{ nameSnapshot: 'Item', unitPriceMinor, quantity: 1 }],
     });
+  };
 
   // Collect + capture a tip; returns the captured TipPayment id.
   const collectTip = async (orderId: string, customAmountMinor: bigint) => {

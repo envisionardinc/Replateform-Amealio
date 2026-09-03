@@ -1135,6 +1135,8 @@ model TipPayment {
   beneficiaryPolicy   TipBeneficiaryPolicy
   // Settle-once link (P1.7.39): the ORDER_TIP settlement item that routed this tip.
   settlementItem      SettlementItem?
+  // Tip-refund ledger transactions (P1.7.43): wallet-credit REFUND transactions.
+  transactions        Transaction[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -1184,6 +1186,11 @@ model Transaction {
   order           Order?               @relation(fields: [orderId], references: [id])
   paymentIntentId String?              @db.Uuid
   paymentIntent   PaymentIntent?       @relation(fields: [paymentIntentId], references: [id])
+  // Tip-refund ledger link (P1.7.43): a tip refund's REFUND transaction references
+  // the TipPayment (not a PaymentIntent), keeping tip money distinguishable from
+  // order money in the ledger.
+  tipPaymentId    String?              @db.Uuid
+  tipPayment      TipPayment?          @relation(fields: [tipPaymentId], references: [id])
   walletEntryId   String?              @db.Uuid
   walletEntry     WalletEntry?         @relation(fields: [walletEntryId], references: [id])
   createdAt       DateTime             @default(now())
@@ -1191,6 +1198,7 @@ model Transaction {
   @@index([userId])
   @@index([merchantId])
   @@index([orderId])
+  @@index([tipPaymentId])
   @@index([type, createdAt])
 }
 

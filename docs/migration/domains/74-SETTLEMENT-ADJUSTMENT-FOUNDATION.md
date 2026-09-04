@@ -31,6 +31,14 @@ The database enforces:
 - one adjustment per `TipPayment`
 - foreign-key preservation of settlement and source records
 
+The repository additionally validates source integrity before insertion:
+
+- `ORDER_REFUND` requires a `PROCESSED` `Refund`, matching `orderId` and `paymentIntentId`, matching currency, and an adjustment amount no greater than the refund amount
+- the referenced `PaymentIntent` must belong to the supplied order and use the same currency
+- the referenced `Order` must belong to the supplied merchant
+- `TIP_REFUND` requires a positive processed-refund amount already recorded on the `TipPayment`, matching merchant and currency, and the adjustment cannot exceed that refunded amount
+- source rows are locked during validation so the adjustment decision is serialized against concurrent refund-state changes
+
 The repository is idempotent: replaying the same idempotency key with the same economics returns the original adjustment; reusing it for different economics is rejected.
 
 ## Persistence boundary

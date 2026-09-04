@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, SettlementAdjustmentDirection, SettlementAdjustmentType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import type {
   CreateSettlementAdjustmentInput,
@@ -7,12 +7,30 @@ import type {
   SettlementAdjustmentResult,
 } from '../domain/settlement-adjustment.types';
 
+type AdjustmentRow = {
+  id: string;
+  settlementId: string;
+  merchantId: string;
+  type: 'ORDER_REFUND' | 'TIP_REFUND';
+  direction: 'DEBIT' | 'CREDIT';
+  amountMinor: bigint;
+  currencyCode: string;
+  idempotencyKey: string;
+  orderId: string | null;
+  paymentIntentId: string | null;
+  tipPaymentId: string | null;
+  refundId: string | null;
+  reason: string | null;
+  createdAt: Date;
+};
+
 /**
  * Append-only settlement adjustment ledger (P1.7.44).
  *
- * Historical Settlement rows are never rewritten. Each adjustment is an
- * independent, immutable debit/credit against that historical settlement.
- * Idempotency is DB-enforced by SettlementAdjustment.idempotencyKey @unique.
+ * The P1.5 Prisma schema is intentionally left untouched in this phase: the
+ * adjustment table is introduced by SQL migration and accessed through
+ * parameterized SQL until the next deliberate Prisma schema/client regeneration.
+ * Historical Settlement/Payout rows are never rewritten.
  */
 @Injectable()
 export class SettlementAdjustmentRepository {
@@ -25,12 +43,17 @@ export class SettlementAdjustmentRepository {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Serialize creation against the historical settlement so a caller cannot
-        // attach an adjustment to a concurrently deleted/changed settlement.
-        const settlement = await tx.settlement.findUnique({
-          where: { id: args.settlementId },
-          select: { id: true, merchantId: true, currencyCode: true },
-        });
+        const settlements = await tx.$queryRaw<Array<{
+          id: string;
+          merchantId: string;
+          currencyCode: string;
+        }>>`
+          SELECT "id", "merchantId", "currencyCode"
+          FROM "Settlement"
+          WHERE "id" = ${args.settlementId}::uuid
+          FOR UPDATE
+        `;
+        const settlement = settlements[0];
         if (!settlement) throw new NotFoundException('Settlement not found');
         if (settlement.merchantId !== args.merchantId) {
           throw new BadRequestException('Settlement does not belong to the merchant');
@@ -39,40 +62,62 @@ export class SettlementAdjustmentRepository {
           throw new BadRequestException('Adjustment currency must match the settlement currency');
         }
 
-        const existing = await tx.settlementAdjustment.findUnique({
-          where: { idempotencyKey: args.idempotencyKey },
-        });
-        if (existing) {
-          this.assertSameRequest(existing, args);
-          return { ...this.toResult(existing), created: false };
+        const existing = await tx.$queryRaw<AdjustmentRow[]>`
+          SELECT
+            "id", "settlementId", "merchantId", "type", "direction", "amountMinor",
+            "currencyCode", "idempotencyKey", "orderId", "paymentIntentId",
+            "tipPaymentId", "refundId", "reason", "createdAt"
+          FROM "SettlementAdjustment"
+          WHERE "idempotencyKey" = ${args.idempotencyKey}
+          LIMIT 1
+        `;
+        if (existing[0]) {
+          this.assertSameRequest(existing[0], args);
+          return { ...this.toResult(existing[0]), created: false };
         }
 
-        const created = await tx.settlementAdjustment.create({
-          data: {
-            settlementId: args.settlementId,
-            merchantId: args.merchantId,
-            orderId: args.orderId ?? null,
-            paymentIntentId: args.paymentIntentId ?? null,
-            tipPaymentId: args.tipPaymentId ?? null,
-            refundId: args.refundId ?? null,
-            type: args.type as SettlementAdjustmentType,
-            direction: args.direction as SettlementAdjustmentDirection,
-            amountMinor: args.amountMinor,
-            currencyCode: args.currencyCode,
-            idempotencyKey: args.idempotencyKey,
-            reason: args.reason ?? null,
-          },
-        });
-        return { ...this.toResult(created), created: true };
+        const created = await tx.$queryRaw<AdjustmentRow[]>`
+          INSERT INTO "SettlementAdjustment" (
+            "settlementId", "merchantId", "orderId", "paymentIntentId",
+            "tipPaymentId", "refundId", "type", "direction", "amountMinor",
+            "currencyCode", "idempotencyKey", "reason"
+          ) VALUES (
+            ${args.settlementId}::uuid,
+            ${args.merchantId}::uuid,
+            ${args.orderId ?? null}::uuid,
+            ${args.paymentIntentId ?? null}::uuid,
+            ${args.tipPaymentId ?? null}::uuid,
+            ${args.refundId ?? null}::uuid,
+            ${args.type}::"SettlementAdjustmentType",
+            ${args.direction}::"SettlementAdjustmentDirection",
+            ${args.amountMinor},
+            ${args.currencyCode},
+            ${args.idempotencyKey},
+            ${args.reason ?? null}
+          )
+          RETURNING
+            "id", "settlementId", "merchantId", "type", "direction", "amountMinor",
+            "currencyCode", "idempotencyKey", "orderId", "paymentIntentId",
+            "tipPaymentId", "refundId", "reason", "createdAt"
+        `;
+
+        if (!created[0]) throw new Error('Settlement adjustment insert returned no row');
+        return { ...this.toResult(created[0]), created: true };
       });
     } catch (error) {
       if (this.isUniqueViolation(error)) {
-        const existing = await this.prisma.settlementAdjustment.findUnique({
-          where: { idempotencyKey: args.idempotencyKey },
-        });
-        if (existing) {
-          this.assertSameRequest(existing, args);
-          return { ...this.toResult(existing), created: false };
+        const existing = await this.prisma.$queryRaw<AdjustmentRow[]>`
+          SELECT
+            "id", "settlementId", "merchantId", "type", "direction", "amountMinor",
+            "currencyCode", "idempotencyKey", "orderId", "paymentIntentId",
+            "tipPaymentId", "refundId", "reason", "createdAt"
+          FROM "SettlementAdjustment"
+          WHERE "idempotencyKey" = ${args.idempotencyKey}
+          LIMIT 1
+        `;
+        if (existing[0]) {
+          this.assertSameRequest(existing[0], args);
+          return { ...this.toResult(existing[0]), created: false };
         }
       }
       throw error;
@@ -80,25 +125,34 @@ export class SettlementAdjustmentRepository {
   }
 
   async getPosition(settlementId: string): Promise<SettlementAdjustmentPosition> {
-    const settlement = await this.prisma.settlement.findUnique({
-      where: { id: settlementId },
-      select: { id: true, amountMinor: true, status: true },
-    });
+    const settlements = await this.prisma.$queryRaw<Array<{
+      id: string;
+      amountMinor: bigint;
+      status: string;
+    }>>`
+      SELECT "id", "amountMinor", "status"
+      FROM "Settlement"
+      WHERE "id" = ${settlementId}::uuid
+      LIMIT 1
+    `;
+    const settlement = settlements[0];
     if (!settlement) throw new NotFoundException('Settlement not found');
 
-    const [debits, credits] = await Promise.all([
-      this.prisma.settlementAdjustment.aggregate({
-        where: { settlementId, direction: 'DEBIT' },
-        _sum: { amountMinor: true },
-      }),
-      this.prisma.settlementAdjustment.aggregate({
-        where: { settlementId, direction: 'CREDIT' },
-        _sum: { amountMinor: true },
-      }),
-    ]);
+    const totals = await this.prisma.$queryRaw<Array<{
+      debitAmountMinor: bigint | null;
+      creditAmountMinor: bigint | null;
+    }>>`
+      SELECT
+        COALESCE(SUM(CASE WHEN "direction" = 'DEBIT' THEN "amountMinor" ELSE 0 END), 0)::bigint
+          AS "debitAmountMinor",
+        COALESCE(SUM(CASE WHEN "direction" = 'CREDIT' THEN "amountMinor" ELSE 0 END), 0)::bigint
+          AS "creditAmountMinor"
+      FROM "SettlementAdjustment"
+      WHERE "settlementId" = ${settlementId}::uuid
+    `;
 
-    const debitAmountMinor = debits._sum.amountMinor ?? 0n;
-    const creditAmountMinor = credits._sum.amountMinor ?? 0n;
+    const debitAmountMinor = totals[0]?.debitAmountMinor ?? 0n;
+    const creditAmountMinor = totals[0]?.creditAmountMinor ?? 0n;
     const adjustedAmountMinor = settlement.amountMinor + creditAmountMinor - debitAmountMinor;
 
     return {
@@ -114,16 +168,22 @@ export class SettlementAdjustmentRepository {
   }
 
   async findByIdempotencyKey(idempotencyKey: string): Promise<SettlementAdjustmentResult | null> {
-    const adjustment = await this.prisma.settlementAdjustment.findUnique({
-      where: { idempotencyKey },
-    });
-    return adjustment ? { ...this.toResult(adjustment), created: false } : null;
+    const rows = await this.prisma.$queryRaw<AdjustmentRow[]>`
+      SELECT
+        "id", "settlementId", "merchantId", "type", "direction", "amountMinor",
+        "currencyCode", "idempotencyKey", "orderId", "paymentIntentId",
+        "tipPaymentId", "refundId", "reason", "createdAt"
+      FROM "SettlementAdjustment"
+      WHERE "idempotencyKey" = ${idempotencyKey}
+      LIMIT 1
+    `;
+    return rows[0] ? { ...this.toResult(rows[0]), created: false } : null;
   }
 
   private validateInput(args: CreateSettlementAdjustmentInput): void {
     if (!args.settlementId) throw new BadRequestException('settlementId is required');
     if (!args.merchantId) throw new BadRequestException('merchantId is required');
-    if (!args.currencyCode) throw new BadRequestException('currencyCode is required');
+    if (!args.currencyCode?.trim()) throw new BadRequestException('currencyCode is required');
     if (!args.idempotencyKey?.trim()) throw new BadRequestException('idempotencyKey is required');
     if (args.amountMinor <= 0n) {
       throw new BadRequestException('Adjustment amount must be greater than zero');
@@ -131,26 +191,18 @@ export class SettlementAdjustmentRepository {
     if (!['ORDER_REFUND', 'TIP_REFUND'].includes(args.type)) {
       throw new BadRequestException(`Unsupported settlement adjustment type ${args.type}`);
     }
-    if (!['DEBIT', 'CREDIT'].includes(args.direction)) {
-      throw new BadRequestException(`Unsupported settlement adjustment direction ${args.direction}`);
+    if (args.direction !== 'DEBIT') {
+      throw new BadRequestException('Refund settlement adjustments must use DEBIT direction');
+    }
+    if (args.type === 'ORDER_REFUND' && !args.refundId) {
+      throw new BadRequestException('ORDER_REFUND requires refundId');
+    }
+    if (args.type === 'TIP_REFUND' && !args.tipPaymentId) {
+      throw new BadRequestException('TIP_REFUND requires tipPaymentId');
     }
   }
 
-  private assertSameRequest(
-    existing: {
-      settlementId: string;
-      merchantId: string;
-      type: SettlementAdjustmentType;
-      direction: SettlementAdjustmentDirection;
-      amountMinor: bigint;
-      currencyCode: string;
-      orderId: string | null;
-      paymentIntentId: string | null;
-      tipPaymentId: string | null;
-      refundId: string | null;
-    },
-    requested: CreateSettlementAdjustmentInput,
-  ): void {
+  private assertSameRequest(existing: AdjustmentRow, requested: CreateSettlementAdjustmentInput): void {
     const same =
       existing.settlementId === requested.settlementId &&
       existing.merchantId === requested.merchantId &&
@@ -167,22 +219,7 @@ export class SettlementAdjustmentRepository {
     }
   }
 
-  private toResult(row: {
-    id: string;
-    settlementId: string;
-    merchantId: string;
-    type: SettlementAdjustmentType;
-    direction: SettlementAdjustmentDirection;
-    amountMinor: bigint;
-    currencyCode: string;
-    idempotencyKey: string;
-    orderId: string | null;
-    paymentIntentId: string | null;
-    tipPaymentId: string | null;
-    refundId: string | null;
-    reason: string | null;
-    createdAt: Date;
-  }): SettlementAdjustmentResult {
+  private toResult(row: AdjustmentRow): SettlementAdjustmentResult {
     return {
       adjustmentId: row.id,
       settlementId: row.settlementId,

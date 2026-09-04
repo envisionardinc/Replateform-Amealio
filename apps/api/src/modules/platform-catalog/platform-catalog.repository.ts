@@ -124,6 +124,16 @@ export class PlatformCatalogRepository {
     return rows[0] ?? null;
   }
 
+  async sectionRestaurant(sectionId: string): Promise<{ restaurantId: string } | null> {
+    const rows = await this.prisma.$queryRaw<Array<{ restaurantId: string }>>`
+      SELECT m."restaurantId" AS "restaurantId"
+      FROM "MenuSection" s
+      JOIN "Menu" m ON m."id" = s."menuId"
+      WHERE s."id" = ${sectionId}::uuid
+    `;
+    return rows[0] ?? null;
+  }
+
   async materializeItem(input: {
     sourceItemId: string;
     merchantId: string;

@@ -1,12 +1,15 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtStaffGuard } from '../identity/staff-authentication/guards/jwt-staff.guard';
 import {
   PlatformOnly,
   RequireStaffRoles,
 } from '../identity/staff-authentication/authorization/staff-authorization.decorators';
 import { StaffAuthorizationGuard } from '../identity/staff-authentication/authorization/staff-authorization.guard';
-import type { StaffPrincipal } from '../identity/staff-authentication/staff-principal';
-import { StaffPrincipal as StaffPrincipalDecorator } from '../identity/staff-authentication/staff-principal.decorator';
+import type {
+  RequestWithStaffPrincipal,
+  StaffPrincipal,
+} from '../identity/staff-authentication/staff-principal';
 import { MerchantProvisioningService } from './application/merchant-provisioning.service';
 import { MerchantOwnerService } from './application/merchant-owner.service';
 import type {
@@ -40,72 +43,79 @@ export class OnboardingController {
     private readonly owner: MerchantOwnerService,
   ) {}
 
+  private principal(req: Request & RequestWithStaffPrincipal): StaffPrincipal {
+    if (!req.staffPrincipal) {
+      throw new Error('Authenticated staff principal missing');
+    }
+    return req.staffPrincipal;
+  }
+
   @Post('merchants')
   @PlatformOnly()
   async createMerchant(
-    @StaffPrincipalDecorator() principal: StaffPrincipal,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Body() input: CreateMerchantInput,
   ) {
-    return this.provisioning.createMerchant(principal, input);
+    return this.provisioning.createMerchant(this.principal(req), input);
   }
 
   @Post('merchants/:merchantId/owner')
   @PlatformOnly()
   async provisionOwner(
-    @StaffPrincipalDecorator() principal: StaffPrincipal,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('merchantId') merchantId: string,
     @Body() input: Omit<ProvisionOwnerInput, 'merchantId'>,
   ) {
-    return this.owner.provisionOwner(principal, { ...input, merchantId });
+    return this.owner.provisionOwner(this.principal(req), { ...input, merchantId });
   }
 
   @Patch('merchants/:merchantId/activation')
   @PlatformOnly()
   async setActivation(
-    @StaffPrincipalDecorator() principal: StaffPrincipal,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('merchantId') merchantId: string,
     @Body() input: { active: boolean },
   ) {
     return input.active
-      ? this.owner.activateMerchant(principal, merchantId)
-      : this.owner.deactivateMerchant(principal, merchantId);
+      ? this.owner.activateMerchant(this.principal(req), merchantId)
+      : this.owner.deactivateMerchant(this.principal(req), merchantId);
   }
 
   @Post('restaurants')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   async createRestaurant(
-    @StaffPrincipalDecorator() principal: StaffPrincipal,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Body() input: CreateRestaurantInput,
   ) {
-    return this.provisioning.createRestaurant(principal, input);
+    return this.provisioning.createRestaurant(this.principal(req), input);
   }
 
   @Post('subscriptions')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   async createSubscription(
-    @StaffPrincipalDecorator() principal: StaffPrincipal,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Body() input: CreateSubscriptionInput,
   ) {
-    return this.provisioning.createSubscription(principal, input);
+    return this.provisioning.createSubscription(this.principal(req), input);
   }
 
   @Patch('restaurants/:restaurantId/profile')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   async updateRestaurantProfile(
-    @StaffPrincipalDecorator() principal: StaffPrincipal,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('restaurantId') restaurantId: string,
     @Body() input: UpdateRestaurantProfileInput,
   ) {
-    return this.owner.updateRestaurantProfile(principal, restaurantId, input);
+    return this.owner.updateRestaurantProfile(this.principal(req), restaurantId, input);
   }
 
   @Patch('subscriptions/:subscriptionId/config')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   async updateSubscriptionConfig(
-    @StaffPrincipalDecorator() principal: StaffPrincipal,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('subscriptionId') subscriptionId: string,
     @Body() input: UpdateSubscriptionConfigInput,
   ) {
-    return this.owner.updateSubscriptionConfig(principal, subscriptionId, input);
+    return this.owner.updateSubscriptionConfig(this.principal(req), subscriptionId, input);
   }
 }

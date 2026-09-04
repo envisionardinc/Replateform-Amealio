@@ -1,0 +1,1645 @@
+// Amealio target platform — PostgreSQL data model (P1.5 foundation).
+// Implements the APPROVED P1.4 baseline model. Design references:
+//   docs/migration/database/01..18 and docs/architecture/*.
+// Baseline = CORE + OPTIONAL domains only. Deferred/owner-decision domains
+// (Celebrations/Events/Ticketing, ONDC, Loyalty points) are NOT implemented.
+//
+// Conventions (P1.4):
+//   - UUID PKs generated in-DB via gen_random_uuid() (Postgres 13+ core).
+//   - Money = integer minor units (BigInt) + currencyCode; NEVER floating point.
+//   - Audit: createdAt/updatedAt; createdBy/updatedBy where an actor is known.
+//   - Soft delete: deletedAt where approved; immutable append-only for ledgers.
+//   - Named target enums only. Legacy numeric->value mapping is BLOCKED (OD-11);
+//     NO legacy enum mappings are encoded here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================================
+// Enums (named target states; NOT legacy numeric mappings — OD-11 blocked)
+// =====================================================================
+
+enum StaffRole {
+  MERCHANT_OWNER
+  MERCHANT_STAFF
+  SUPER_ADMIN
+}
+
+// Staff/admin account lifecycle status (P1.7.1D). Blocked staff must later be
+// prevented from login/refresh (enforcement is out of scope for this phase).
+// DELETED is represented via the deletedAt soft-delete convention, not a value.
+enum StaffAccountStatus {
+  ACTIVE
+  BLOCKED
+}
+
+// Staff/admin credential method (P1.7.1D). PASSWORD only for now; the model is
+// extensible to future methods (OTP/SSO/MFA) without redesigning StaffMember.
+enum StaffCredentialType {
+  PASSWORD
+}
+
+enum OrderType {
+  DINE_IN
+  TAKE_AWAY
+  CURB_SIDE
+  SKIP_LINE
+  HOME_DELIVERY
+  CATERING
+}
+
+enum OrderStatus {
+  INITIAL
+  PENDING
+  CONFIRMED
+  PREPARING
+  PACKING
+  READY
+  ON_THE_WAY
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  IN_PROGRESS
+  FULFILLED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  WALLET
+  SCAN_AND_PAY
+  DIRECT_MERCHANT
+}
+
+enum PaymentProvider {
+  RAZORPAY
+  RAZORPAYX
+}
+
+enum TransactionType {
+  PAYMENT
+  REFUND
+  WALLET_CREDIT
+  WALLET_DEBIT
+  PAYOUT
+  SETTLEMENT
+}
+
+enum TransactionDirection {
+  CREDIT
+  DEBIT
+}
+
+enum RefundMethod {
+  WALLET
+  RAZORPAY
+}
+
+enum RefundStatus {
+  INITIATED
+  PROCESSED
+  FAILURE
+}
+
+enum SettlementStatus {
+  PENDING
+  PARTIAL
+  FAILED
+  COMPLETED
+}
+
+enum SettlementPayoutType {
+  ORDER
+  ORDER_TIP
+  SCAN_AND_PAY
+}
+
+// Merchant-configurable tip beneficiary policy (P1.7.42 approved product policy).
+// Snapshotted onto each collected TipPayment for historical integrity; routing is
+// deferred to P1.7.39 (MERCHANT viable; DELIVERY_PERSON/SHARED_POOLED gated on
+// their own foundations).
+enum TipBeneficiaryPolicy {
+  MERCHANT
+  DELIVERY_PERSON
+  SHARED_POOLED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  REJECTED
+  HOLD
+}
+
+enum SeatingType {
+  WALK_IN
+  WAITLIST
+  RESERVATION
+}
+
+enum SeatingStatus {
+  PENDING
+  NOT_SEATED
+  SEATED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+// Physical table RUNTIME state (P1.7.16). 1:1 with legacy env-driven
+// `TABLE_STATUS` (AVAILABLE|OCCUPIED|DIRTY|ON_HOLD|UNAVAILABLE). Distinct from
+// merchant configuration and from the booking lifecycle (SeatingStatus).
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  DIRTY
+  ON_HOLD
+  UNAVAILABLE
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  WHATSAPP
+  IN_APP
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum RecipientType {
+  USER
+  VENDOR
+}
+
+enum ItemAvailability {
+  AVAILABLE
+  SOLDOUT
+  NOTAVAILABLE
+}
+
+enum MenuType {
+  STANDARD
+  CUSTOM
+}
+
+enum OfferSettlementType {
+  MERCHANT
+  ADMIN
+  SPLIT
+}
+
+enum DeliveryMethod {
+  SELF_DELIVERY
+  THIRD_PARTY
+  AGENT
+}
+
+enum DeliveryPartnerCode {
+  DUNZO
+  PORTER
+  SELF
+}
+
+enum DeliveryTaskStatus {
+  PENDING
+  ASSIGNED
+  PICKED_UP
+  ON_THE_WAY
+  DELIVERED
+  CANCELLED
+}
+
+enum WebhookProvider {
+  RAZORPAY
+  DUNZO
+  PETPOOJA
+}
+
+enum WebhookProcessingStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+enum FavouriteTargetType {
+  RESTAURANT
+  OFFER
+  MENU_ITEM
+}
+
+// =====================================================================
+// Identity & Access
+// =====================================================================
+
+model User {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId         String?   @unique
+  phoneCountryCode String
+  phone            String
+  email            String?   @unique
+  passwordHash     String?
+  isVerified       Boolean   @default(false)
+  isBlocked        Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  profile            UserProfile?
+  addresses          Address[]
+  sessions           Session[]
+  wallet             Wallet?
+  carts              Cart[]
+  orders             Order[]
+  seatingRequests    SeatingRequest[]
+  favourites         Favourite[]
+  devicePushTokens   DevicePushToken[]
+  couponRedemptions  CouponRedemption[]
+  withdrawalRequests WithdrawalRequest[]
+
+  @@unique([phoneCountryCode, phone])
+  @@index([isBlocked])
+}
+
+model UserProfile {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String   @unique @db.Uuid
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Profile/onboarding state (P1.7.8) ← legacy User have_submited_details_profile
+  // (bool) + profile_percentage (int). `preferences` (existing Json) holds the
+  // legacy preference arrays (dietary/cuisine/celebration_subcategory/...).
+  detailsSubmitted     Boolean  @default(false)
+  completionPercentage Int      @default(0)
+  preferences          Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Address {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId  String?   @unique
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String?
+  line1     String
+  line2     String?
+  city      String?
+  state     String?
+  pinCode   String?
+  lat       Float?
+  lon       Float?
+  isDefault Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  orders Order[]
+
+  @@index([userId])
+}
+
+model Session {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String   @unique
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// =====================================================================
+// Merchant / Staff / Roles
+// =====================================================================
+
+model Organization {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  merchants Merchant[]
+}
+
+model Merchant {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId            String?       @unique
+  organizationId      String?       @db.Uuid
+  organization        Organization? @relation(fields: [organizationId], references: [id])
+  legalName           String
+  email               String?       @unique
+  phone               String?       @unique
+  isBlocked           Boolean       @default(false)
+  // Merchant onboarding gate (P1.7.8) ← legacy VendorUser.have_vendor_submitted_details
+  onboardingSubmitted Boolean       @default(false)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  deletedAt           DateTime?
+
+  staff           StaffMember[]
+  roles           Role[]
+  restaurants     Restaurant[]
+  subscriptions   Subscription[]
+  menus           Menu[]
+  menuItems       MenuItem[]
+  orders          Order[]
+  offers          Offer[]
+  settlements     Settlement[]
+  deliveryTasks   DeliveryTask[]
+  tipPayments     TipPayment[]
+  seatingRequests SeatingRequest[]
+  experiences     Experience[]
+
+  @@index([organizationId])
+}
+
+model StaffMember {
+  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId   String?            @unique
+  // Nullable: populated => merchant-scoped staff; NULL => platform-scoped
+  // (e.g. SUPER_ADMIN). onDelete: Restrict so a merchant cannot be hard-deleted
+  // out from under its staff, and staff are never silently promoted to
+  // platform scope via SetNull (merchants use soft-delete via deletedAt).
+  merchantId String?            @db.Uuid
+  merchant   Merchant?          @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  status     StaffAccountStatus @default(ACTIVE)
+  name       String
+  email      String?
+  phone      String?
+  staffRole  StaffRole          @default(MERCHANT_STAFF)
+  roleId     String?            @db.Uuid
+  role       Role?              @relation(fields: [roleId], references: [id])
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  deletedAt  DateTime?
+
+  credentials StaffCredential[]
+  sessions    StaffSession[]
+
+  @@index([merchantId])
+  @@index([status])
+}
+
+// Staff/admin authentication secret, kept separate from StaffMember identity
+// data (P1.7.1D). One credential per (staffMember, type). PASSWORD stores a
+// bcrypt hash in secretHash; the generic name keeps future credential types
+// (OTP/SSO/MFA) representable without a StaffMember redesign. No plaintext.
+model StaffCredential {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffMemberId String              @db.Uuid
+  staffMember   StaffMember         @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  type          StaffCredentialType @default(PASSWORD)
+  secretHash    String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([staffMemberId, type])
+  @@index([staffMemberId])
+}
+
+// Server-side staff/admin session boundary for future rotating refresh tokens
+// (P1.7.1D). Intentionally separate from the consumer Session (P1.7.1B), which
+// is not modified. Stores only a hashed refresh secret; revocation = row
+// delete, rotation = update hash + expiry (behavior implemented in a later
+// phase). Act-as-merchant context is deferred (not added in this phase).
+model StaffSession {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffMemberId    String      @db.Uuid
+  staffMember      StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  refreshTokenHash String      @unique
+  expiresAt        DateTime
+  createdAt        DateTime    @default(now())
+
+  @@index([staffMemberId])
+  @@index([expiresAt])
+}
+
+model Role {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId String?   @db.Uuid
+  merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name       String
+  scope      String // MERCHANT | ADMIN
+  isDefault  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  permissions RolePermission[]
+  staff       StaffMember[]
+
+  @@unique([merchantId, name])
+  @@index([merchantId])
+}
+
+model RolePermission {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId        String  @db.Uuid
+  role          Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionKey String
+  allowed       Boolean @default(false)
+
+  @@unique([roleId, permissionKey])
+  @@index([roleId])
+}
+
+model Subscription {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId   String      @db.Uuid
+  merchant     Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  restaurantId String?     @db.Uuid
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  productType  String // ORDERING | SEATING | EVENT | SCAN_PAY
+  status       String      @default("ACTIVE")
+  config       Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([merchantId])
+}
+
+// =====================================================================
+// Location / Restaurants
+// =====================================================================
+
+model RestaurantChain {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId  String       @db.Uuid
+  name        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  restaurants Restaurant[]
+
+  @@index([merchantId])
+}
+
+model Restaurant {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId       String?          @unique
+  merchantId     String           @db.Uuid
+  merchant       Merchant         @relation(fields: [merchantId], references: [id])
+  chainId        String?          @db.Uuid
+  chain          RestaurantChain? @relation(fields: [chainId], references: [id])
+  name           String
+  city           String?
+  state          String?
+  pinCode        String?
+  country        String?          @default("IN")
+  timezone       String?          @default("Asia/Kolkata")
+  currencyCode   String           @default("INR")
+  lat            Float?
+  lon            Float?
+  status         String           @default("ACTIVE")
+  // Authoritative platform commission rate in basis points (1% = 100 bps),
+  // restaurant-scoped (P1.7.32). Legacy stored this as restaurant.comissionCode →
+  // SubCategory.description (a percentage string) and looked it up live at
+  // settlement (mutable, no snapshot); the target normalizes it to an explicit
+  // integer bps here and SNAPSHOTS it onto each Settlement (historical settlements
+  // are stable). Null ⇒ platform default (0). GST-on-commission + the precise
+  // commissionable basis are deferred owner decisions (DR-03a / DR-COMM-BASIS).
+  commissionBps  Int?
+  // Restaurant onboarding progress (P1.7.8): onboardingStep ← legacy
+  // restaurant.page_completed_till (integer step counter); softOnboarding ← same.
+  onboardingStep Int              @default(0)
+  softOnboarding Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
+
+  operatingHours    OperatingHours[]
+  reservationBlocks ReservationBlock[]
+  seatingAreas      SeatingArea[]
+  features          RestaurantFeature[]
+  menus             Menu[]
+  menuItems         MenuItem[]
+  orders            Order[]
+  offers            Offer[]
+  settlements       Settlement[]
+  subscriptions     Subscription[]
+  seatingRequests   SeatingRequest[]
+  experiences       Experience[]
+
+  @@index([merchantId])
+  @@index([chainId])
+}
+
+model OperatingHours {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurantId String     @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  dayOfWeek    Int // 0=Sunday .. 6=Saturday
+  openTime     String // HH:MM (local)
+  closeTime    String
+  sessionType  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([restaurantId, dayOfWeek])
+}
+
+model ReservationBlock {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurantId String     @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  title        String?
+  allDay       Boolean    @default(false)
+  startAt      DateTime
+  endAt        DateTime
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([restaurantId])
+}
+
+model RestaurantFeature {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurantId String     @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  featureType  String // ACCESSIBILITY | DRESS_CODE | PARKING | PET | SERVICE_TYPE | SEATING_AREA ...
+  featureValue String
+
+  @@index([restaurantId, featureType])
+}
+
+// Normalized seating-area inventory (P1.7.16). Legacy source: the `area`
+// dimension of `subscription…table_setup.floors[]`/`table[].area` — merchant
+// physical layout sections. Hybrid boundary (DEC-2): seating feature gates/
+// timers/rules stay in `Subscription.config`; the physical inventory lives here.
+model SeatingArea {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId     String?           @unique
+  restaurantId String            @db.Uuid
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  deletedAt    DateTime?
+  tables       RestaurantTable[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+}
+
+// Normalized physical table inventory (P1.7.16). Legacy source:
+// `subscription…table_setup.table[]` (code←table_number, capacity←pax_value,
+// name, floor←floor_number, shape, isActive←active). `status` is RUNTIME STATE
+// (legacy `table[].status`), NOT merchant configuration. Legacy fields with no
+// confirmed target consumer (number, location, temporay, reserveDate) and the
+// separate `seat[]` array are intentionally NOT mapped (see doc 45).
+model RestaurantTable {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId        String?          @unique
+  seatingAreaId   String           @db.Uuid
+  seatingArea     SeatingArea      @relation(fields: [seatingAreaId], references: [id], onDelete: Cascade)
+  code            String
+  name            String?
+  floor           String?
+  shape           String?
+  capacity        Int              @default(2)
+  isActive        Boolean          @default(true)
+  // RUNTIME STATE (not configuration): seeded AVAILABLE, mutated by seating ops.
+  status          TableStatus      @default(AVAILABLE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+  seatingRequests SeatingRequest[]
+
+  @@unique([seatingAreaId, code])
+  @@index([seatingAreaId])
+}
+
+// =====================================================================
+// Catalog (shared taxonomy)
+// =====================================================================
+
+// Platform reference taxonomy (admin-defined). Represents the legacy unified
+// `Category` (parent) + `Sub Category` (child) taxonomy: one hierarchical tree
+// discriminated by `type`, selected by merchants and consumed by users.
+// Icons/media are EMBEDDED string fields (icon URL/key, icon_code, hexColor) —
+// mirroring legacy `Sub Category` — NOT a separate Icon entity (P1.7.4).
+model Category {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId    String?    @unique
+  name        String
+  code        String?    @unique
+  type        String?
+  description String?
+  icon        String?
+  iconCode    String?
+  hexColor    String?
+  status      String?
+  parentId    String?    @db.Uuid
+  parent      Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryChildren")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+
+  menuSections MenuSection[]
+  // P1.7.20: an Experience may reference a Category (and, separately, a
+  // sub-category — another Category row) as its taxonomy. Virtual back-relations.
+  experiences             Experience[] @relation("ExperienceCategory")
+  experienceSubCategories Experience[] @relation("ExperienceSubCategory")
+
+  @@index([parentId])
+  @@index([type])
+}
+
+// Platform currency reference (admin-defined; legacy `currency`, P1.7.6).
+// Canonical identity = ISO 4217 code (`isoCode @unique`). SUPPLEMENTS the
+// embedded `currencyCode` on money-bearing models (which is NOT changed) — no
+// FK migration, no FX/conversion, no Country coupling (geography is separate).
+// `isActive` mirrors legacy `status` (bool); `deletedAt` mirrors `is_deleted`.
+model Currency {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId    String?   @unique
+  isoCode     String    @unique
+  symbol      String?
+  name        String?
+  countryName String?
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+}
+
+// Platform cuisine reference (admin-defined lookup; legacy `Cusine`). Kept as a
+// dedicated lookup per P1.4 (database/05-ENUM-STATUS-STRATEGY). Icon embedded.
+model Cuisine {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId    String? @unique
+  name        String  @unique
+  description String?
+  icon        String?
+  status      String?
+}
+
+model UnitOfMeasure {
+  id       String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code     String        @unique
+  name     String
+  variants ItemVariant[]
+}
+
+// =====================================================================
+// Menu / Items
+// =====================================================================
+
+model Menu {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId     String?    @unique
+  merchantId   String     @db.Uuid
+  merchant     Merchant   @relation(fields: [merchantId], references: [id])
+  restaurantId String     @db.Uuid
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  type         MenuType   @default(CUSTOM)
+  visibility   Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  sections       MenuSection[]
+  experienceMenus ExperienceMenu[]
+
+  @@index([restaurantId])
+  @@index([merchantId])
+}
+
+model MenuSection {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  menuId     String    @db.Uuid
+  menu       Menu      @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  categoryId  String?   @db.Uuid
+  category    Category? @relation(fields: [categoryId], references: [id])
+  name        String
+  description String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items MenuItem[]
+
+  @@index([menuId])
+}
+
+model MenuItem {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId      String?          @unique
+  merchantId    String           @db.Uuid
+  merchant      Merchant         @relation(fields: [merchantId], references: [id])
+  restaurantId  String           @db.Uuid
+  restaurant    Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuSectionId String?          @db.Uuid
+  menuSection   MenuSection?     @relation(fields: [menuSectionId], references: [id])
+  name          String
+  description   String?
+  availability  ItemAvailability @default(AVAILABLE)
+  // Publication gate (P1.7.18) ← legacy vendorItems.status (Boolean). Distinct
+  // from `availability` (stock). Default false: an item is not customer-visible
+  // until the merchant publishes it. NOT a workflow/schedule.
+  isPublished   Boolean          @default(false)
+  posItemId     String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  deletedAt     DateTime?
+
+  variants       ItemVariant[]
+  channelConfigs ItemChannelConfig[]
+  addOnGroups    AddOnGroup[]
+
+  @@index([restaurantId])
+  @@index([merchantId])
+  @@index([restaurantId, availability])
+}
+
+model ItemVariant {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  menuItemId   String         @db.Uuid
+  menuItem     MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  size         String?
+  uomId        String?        @db.Uuid
+  uom          UnitOfMeasure? @relation(fields: [uomId], references: [id])
+  priceMinor   BigInt
+  currencyCode String         @default("INR")
+  pax          Int?
+  // Source-backed variant flags (P1.7.18) ← legacy vendorItems.size[].isDefault
+  // / .available. isDefault marks the default variant; available is a per-variant
+  // stock flag (distinct from item-level availability).
+  isDefault    Boolean        @default(false)
+  available    Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([menuItemId])
+}
+
+model ItemChannelConfig {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  menuItemId         String    @db.Uuid
+  menuItem           MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  channel            OrderType
+  enabled            Boolean   @default(true)
+  priceOverrideMinor BigInt?
+  surcharges         Json?
+
+  @@unique([menuItemId, channel])
+}
+
+model AddOnGroup {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  menuItemId String   @db.Uuid
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name       String
+  minSelect  Int      @default(0)
+  maxSelect  Int?
+  addOns     AddOn[]
+
+  @@index([menuItemId])
+}
+
+model AddOn {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  addOnGroupId String     @db.Uuid
+  addOnGroup   AddOnGroup @relation(fields: [addOnGroupId], references: [id], onDelete: Cascade)
+  name         String
+  priceMinor   BigInt     @default(0)
+  currencyCode String     @default("INR")
+
+  @@index([addOnGroupId])
+}
+
+// =====================================================================
+// Experience configuration (P1.7.20) — merchant-owned bookable experiences.
+// Source: legacy `experiences` (Experience.type food|event; expType SPECIAL|
+// CURATED; Category/Sub Category FKs; totalSeats/min/max capacity; active/
+// isDraft; scalar prices; food/menu mode; CustomMenu[] refs). Booking
+// (expRequest), payment/refund, Diner/Order, media, scheduling engine, packages,
+// events, and the ExpEventManagement/scraped catalogs are DEFERRED (doc 48).
+// `seatsLeft`/`seatsBooked` are RUNTIME booking inventory — intentionally NOT
+// modeled here (this is a configuration foundation, not the booking slice).
+// =====================================================================
+
+enum ExperienceType {
+  FOOD
+  EVENT
+}
+
+enum ExperienceKind {
+  SPECIAL
+  CURATED
+}
+
+// Food inclusion (legacy is_food_included / serveFood / isOccasionWithText).
+enum ExperienceFoodMode {
+  NONE
+  INCLUDED
+  SEPARATE
+  OCCASION_TEXT
+}
+
+// Menu strategy (legacy mutually-exclusive isStandardMenu/isCustomMenu/isPackage).
+enum ExperienceMenuMode {
+  NONE
+  STANDARD
+  CUSTOM
+  PACKAGE
+}
+
+model Experience {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId      String?         @unique
+  merchantId    String          @db.Uuid
+  merchant      Merchant        @relation(fields: [merchantId], references: [id])
+  restaurantId  String          @db.Uuid
+  restaurant    Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  // Platform taxonomy (P1.7.4 Category). subCategory is another Category row.
+  categoryId    String?         @db.Uuid
+  category      Category?       @relation("ExperienceCategory", fields: [categoryId], references: [id])
+  subCategoryId String?         @db.Uuid
+  subCategory   Category?       @relation("ExperienceSubCategory", fields: [subCategoryId], references: [id])
+
+  name          String
+  description   String?
+  type          ExperienceType     @default(EVENT) // legacy Experience.type food|event
+  expType       ExperienceKind? // legacy Experience.expType SPECIAL|CURATED
+  foodMode      ExperienceFoodMode @default(NONE)
+  menuMode      ExperienceMenuMode @default(NONE)
+  foodDescription String? // legacy foodItems
+  occasionText    String? // legacy occasionWithText
+
+  // Capacity CONFIGURATION (not runtime inventory).
+  totalSeats Int?
+  minSeats   Int?
+  maxSeats   Int?
+
+  // Money in integer minor units (never float); distinct source price concepts.
+  listingPriceMinor  BigInt? // legacy Listing_price
+  adultPriceMinor    BigInt? // legacy adultPrice
+  kidsPriceMinor     BigInt? // legacy kidsPrice
+  occasionPriceMinor BigInt? // legacy Occasion_price
+  currencyCode       String  @default("INR") // inherited from restaurant unless set
+
+  // Fixed date window (legacy startDate/endDate). Richer timings/recurrence are
+  // preserved verbatim in scheduleConfig — NO scheduling engine in this slice.
+  startAt        DateTime?
+  endAt          DateTime?
+  scheduleConfig Json?
+
+  // Publication/draft (legacy active/isDraft). No workflow engine.
+  active   Boolean @default(false)
+  isDraft  Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  menus ExperienceMenu[]
+
+  @@index([restaurantId])
+  @@index([merchantId])
+  @@index([restaurantId, active])
+}
+
+// Experience → Custom Menu reference (legacy Experience.CustomMenu[] + default).
+// One experience references many CUSTOM menus of the SAME restaurant; exactly
+// one may be marked default (legacy defaultCustomId). Reference, not snapshot.
+model ExperienceMenu {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  experienceId String     @db.Uuid
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  menuId       String     @db.Uuid
+  menu         Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  isDefault    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  @@unique([experienceId, menuId])
+  @@index([menuId])
+}
+
+// =====================================================================
+// Cart & Orders
+// =====================================================================
+
+model Cart {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String?    @db.Uuid
+  user         User?      @relation(fields: [userId], references: [id])
+  guestToken   String?
+  merchantId   String?    @db.Uuid
+  restaurantId String?    @db.Uuid
+  type         OrderType?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  items CartItem[]
+
+  @@index([userId])
+  @@index([guestToken])
+}
+
+model CartItem {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId        String  @db.Uuid
+  cart          Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  menuItemId    String? @db.Uuid
+  variantId     String? @db.Uuid
+  quantity      Int     @default(1)
+  customization Json?
+  addOns        Json?
+
+  @@index([cartId])
+}
+
+model Order {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId            String?           @unique
+  orderNumber         String            @unique
+  merchantId          String            @db.Uuid
+  merchant            Merchant          @relation(fields: [merchantId], references: [id])
+  restaurantId        String            @db.Uuid
+  restaurant          Restaurant        @relation(fields: [restaurantId], references: [id])
+  userId              String?           @db.Uuid
+  user                User?             @relation(fields: [userId], references: [id])
+  type                OrderType
+  status              OrderStatus       @default(PENDING)
+  paymentStatus       PaymentStatus     @default(CREATED)
+  fulfillmentStatus   FulfillmentStatus @default(UNFULFILLED)
+  deliveryMethod      DeliveryMethod?
+  deliveryAddressId   String?           @db.Uuid
+  deliveryAddress     Address?          @relation(fields: [deliveryAddressId], references: [id])
+  // money in integer minor units
+  subtotalMinor       BigInt            @default(0)
+  taxTotalMinor       BigInt            @default(0)
+  discountTotalMinor  BigInt            @default(0)
+  feeTotalMinor       BigInt            @default(0)
+  deliveryChargeMinor BigInt            @default(0)
+  grandTotalMinor     BigInt            @default(0)
+  // Customer-funded tip (P1.7.36). Recorded canonically on the Order but held
+  // OUTSIDE the order_total_integrity equation (grand = subtotal − discount + tax
+  // + fee + delivery) and OUTSIDE the commissionable basis: a tip is not merchant
+  // commissionable revenue and is conceptually separately disbursable (legacy
+  // ORDER_TIP). No payout/GST wiring in this slice.
+  tipMinor            BigInt            @default(0)
+  // Customer-funded donation / charity pass-through (P1.7.36). Like tipMinor it is
+  // held outside grand-total and commission: it is not merchant revenue and is
+  // conceptually payable to the charity destination (legacy UDBHAV_ACCOUNT).
+  donationMinor       BigInt            @default(0)
+  currencyCode        String            @default("INR")
+  scheduledFor        DateTime?
+  placedAt            DateTime?
+  cancelReason        String?
+  // Applied offer/coupon (P1.7.24). Server-authoritative discount snapshot lives
+  // in discountTotalMinor; these record WHICH offer/coupon produced it.
+  offerId             String?           @db.Uuid
+  offer               Offer?            @relation(fields: [offerId], references: [id])
+  couponId            String?           @db.Uuid
+  coupon              Coupon?           @relation(fields: [couponId], references: [id])
+  createdBy           String?           @db.Uuid
+  updatedBy           String?           @db.Uuid
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  items             OrderItem[]
+  statusEvents      OrderStatusEvent[]
+  paymentIntents    PaymentIntent[]
+  tipPayments       TipPayment[]
+  refunds           Refund[]
+  transactions      Transaction[]
+  settlementItems   SettlementItem[]
+  deliveryTask      DeliveryTask?
+  couponRedemptions CouponRedemption[]
+
+  @@index([restaurantId, status])
+  @@index([merchantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String  @db.Uuid
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId      String? @db.Uuid
+  nameSnapshot    String
+  variantSnapshot String?
+  unitPriceMinor  BigInt
+  quantity        Int     @default(1)
+  lineTotalMinor  BigInt
+  currencyCode    String  @default("INR")
+  customization   Json?
+  addOns          Json?
+
+  @@index([orderId])
+}
+
+model OrderStatusEvent {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String       @db.Uuid
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorType  String?
+  actorId    String?      @db.Uuid
+  reason     String?
+  createdAt  DateTime     @default(now())
+
+  @@index([orderId])
+}
+
+// =====================================================================
+// Payments / Settlement (append-only ledgers; immutability enforced by
+// DB triggers in a follow-up migration + application policy)
+// =====================================================================
+
+model PaymentIntent {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String?       @db.Uuid
+  order           Order?        @relation(fields: [orderId], references: [id])
+  amountMinor     BigInt
+  currencyCode    String        @default("INR")
+  status          PaymentStatus @default(CREATED)
+  method          PaymentMethod
+  razorpayOrderId String?       @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  attempts        PaymentAttempt[]
+  transactions    Transaction[]
+  refunds         Refund[]
+  settlementItems SettlementItem[]
+
+  @@index([orderId])
+}
+
+// Collected customer TIP as a SEPARATE payment component (P1.7.38, per the P1.7.42
+// approved policy). This is DELIBERATELY isolated from the order `PaymentIntent`:
+// tip money never enters `Order.grandTotalMinor`, the order payment amount, the
+// commission basis, or merchant settlement gross. `basisMinor` snapshots
+// `Order.grandTotalMinor` at creation (the approved "total order amount" tip
+// basis). `beneficiaryPolicy` snapshots the merchant-configured policy for
+// historical integrity; routing/settlement of the tip is deferred to P1.7.39.
+model TipPayment {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId             String               @db.Uuid
+  order               Order                @relation(fields: [orderId], references: [id])
+  merchantId          String               @db.Uuid
+  merchant            Merchant             @relation(fields: [merchantId], references: [id])
+  // Server-authoritative tip selection + calculation (basis = grandTotalMinor snapshot)
+  basisMinor          BigInt
+  percentBps          Int? // 1000/1500/2000 for %; null for a custom amount
+  isCustom            Boolean              @default(false)
+  amountMinor         BigInt // server-calculated collected tip amount
+  currencyCode        String               @default("INR")
+  // Separate payment lifecycle (mirrors PaymentIntent but fully isolated)
+  status              PaymentStatus        @default(CREATED)
+  razorpayOrderId     String?              @unique
+  razorpayPaymentId   String?              @unique
+  capturedAt          DateTime?
+  // Refund foundation (state only; the lifecycle rides the order/payment refund flow)
+  refundedAmountMinor BigInt               @default(0)
+  refundStatus        RefundStatus?
+  providerRefundId    String?              @unique
+  refundedAt          DateTime?
+  // Beneficiary policy SNAPSHOT at collection time (governs routing in P1.7.39)
+  beneficiaryPolicy   TipBeneficiaryPolicy
+  // Settle-once link (P1.7.39): the ORDER_TIP settlement item that routed this tip.
+  settlementItem      SettlementItem?
+  // Tip-refund ledger transactions (P1.7.43): wallet-credit REFUND transactions.
+  transactions        Transaction[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([orderId])
+  @@index([merchantId])
+  @@index([status])
+}
+
+model PaymentAttempt {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentIntentId   String        @db.Uuid
+  paymentIntent     PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  amountMinor       BigInt
+  currencyCode      String        @default("INR")
+  status            PaymentStatus @default(CREATED)
+  razorpayPaymentId String?       @unique
+  idempotencyKey    String        @unique
+  providerPayload   Json?
+  createdAt         DateTime      @default(now())
+
+  @@index([paymentIntentId])
+}
+
+model WebhookEvent {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider         WebhookProvider
+  providerEventId  String                  @unique
+  type             String
+  payload          Json
+  processingStatus WebhookProcessingStatus @default(RECEIVED)
+  receivedAt       DateTime                @default(now())
+  processedAt      DateTime?
+
+  @@index([provider, processingStatus])
+}
+
+model Transaction {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId        String?              @unique
+  type            TransactionType
+  direction       TransactionDirection
+  amountMinor     BigInt
+  currencyCode    String               @default("INR")
+  userId          String?              @db.Uuid
+  merchantId      String?              @db.Uuid
+  orderId         String?              @db.Uuid
+  order           Order?               @relation(fields: [orderId], references: [id])
+  paymentIntentId String?              @db.Uuid
+  paymentIntent   PaymentIntent?       @relation(fields: [paymentIntentId], references: [id])
+  // Tip-refund ledger link (P1.7.43): a tip refund's REFUND transaction references
+  // the TipPayment (not a PaymentIntent), keeping tip money distinguishable from
+  // order money in the ledger.
+  tipPaymentId    String?              @db.Uuid
+  tipPayment      TipPayment?          @relation(fields: [tipPaymentId], references: [id])
+  walletEntryId   String?              @db.Uuid
+  walletEntry     WalletEntry?         @relation(fields: [walletEntryId], references: [id])
+  createdAt       DateTime             @default(now())
+
+  @@index([userId])
+  @@index([merchantId])
+  @@index([orderId])
+  @@index([tipPaymentId])
+  @@index([type, createdAt])
+}
+
+model Refund {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String?        @db.Uuid
+  order           Order?         @relation(fields: [orderId], references: [id])
+  paymentIntentId String?        @db.Uuid
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id])
+  method          RefundMethod
+  amountMinor     BigInt
+  currencyCode    String         @default("INR")
+  status          RefundStatus   @default(INITIATED)
+  // Idempotency (P1.7.29). Legacy refunds had NO idempotency key (doc 56 §16/§25);
+  // this DB-enforced unique key makes refund processing idempotent.
+  idempotencyKey  String?        @unique
+  // Provider (Razorpay) refund id (P1.7.30). Unique => one provider refund maps to
+  // exactly one internal Refund; the async refund.processed/failed webhook is keyed
+  // on it. Null for internal WALLET refunds (no provider call).
+  providerRefundId String?       @unique
+  gatewayPayload  Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([orderId])
+  @@index([paymentIntentId])
+}
+
+model Wallet {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @unique @db.Uuid
+  user         User     @relation(fields: [userId], references: [id])
+  balanceMinor BigInt   @default(0)
+  currencyCode String   @default("INR")
+  isKyc        Boolean  @default(false)
+  isClosed     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entries     WalletEntry[]
+  withdrawals WithdrawalRequest[]
+}
+
+model WalletEntry {
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  walletId          String               @db.Uuid
+  wallet            Wallet               @relation(fields: [walletId], references: [id])
+  direction         TransactionDirection
+  amountMinor       BigInt
+  balanceAfterMinor BigInt
+  refType           String?
+  refId             String?              @db.Uuid
+  createdAt         DateTime             @default(now())
+
+  transactions Transaction[]
+
+  @@index([walletId])
+}
+
+model Settlement {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId   String               @db.Uuid
+  merchant     Merchant             @relation(fields: [merchantId], references: [id])
+  restaurantId String?              @db.Uuid
+  restaurant   Restaurant?          @relation(fields: [restaurantId], references: [id])
+  payoutType   SettlementPayoutType
+  status       SettlementStatus     @default(PENDING)
+  // Audit trail. grossAmountMinor = Σ per-payment net-of-refund contributions
+  // (= Σ items = merchant payout pool). commissionBasisMinor (P1.7.34) = Σ per-order
+  // commissionable basis = subtotal − vendor-funded discount (VERIFIED legacy
+  // `totalComission`: base_amount − vendor discount; excludes tax/delivery/tips;
+  // ADMIN-funded discount NOT subtracted; refund-independent). commissionMinor =
+  // floor(commissionBasisMinor × commissionBps / 10000). amountMinor =
+  // grossAmountMinor − commissionMinor = net payout. GST-on-commission DEFERRED
+  // (DR-03a).
+  grossAmountMinor     BigInt          @default(0)
+  commissionBasisMinor BigInt          @default(0)
+  commissionMinor      BigInt          @default(0)
+  commissionBps        Int             @default(0)
+  amountMinor  BigInt
+  currencyCode String               @default("INR")
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  items   SettlementItem[]
+  payouts Payout[]
+
+  @@index([merchantId, status])
+}
+
+model SettlementItem {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  settlementId    String         @db.Uuid
+  settlement      Settlement     @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  orderId         String?        @db.Uuid
+  order           Order?         @relation(fields: [orderId], references: [id])
+  // The captured payment this item settles. UNIQUE => a payment contributes to at
+  // most one settlement (idempotency: "settle a payment once"). (P1.7.31)
+  paymentIntentId String?        @unique @db.Uuid
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id])
+  // The collected TIP this item settles (P1.7.39, ORDER_TIP settlements). UNIQUE =>
+  // a tip is routed to at most one settlement (idempotency: "route a tip once").
+  // A tip settlement item carries `tipPaymentId` (with `paymentIntentId` null); an
+  // order settlement item carries `paymentIntentId` (with `tipPaymentId` null).
+  tipPaymentId    String?        @unique @db.Uuid
+  tipPayment      TipPayment?    @relation(fields: [tipPaymentId], references: [id])
+  // Net-of-refund contribution for this payment at settlement time (minor units).
+  amountMinor     BigInt
+
+  @@index([settlementId])
+}
+
+model Payout {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  settlementId     String           @db.Uuid
+  settlement       Settlement       @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  provider         PaymentProvider  @default(RAZORPAYX)
+  providerPayoutId String?          @unique
+  // Request idempotency (P1.7.31): one payout instruction => at most one provider
+  // payout (mirrors PaymentAttempt/Refund).
+  idempotencyKey   String?          @unique
+  amountMinor      BigInt
+  status           SettlementStatus @default(PENDING)
+  payload          Json?
+  createdAt        DateTime         @default(now())
+
+  @@index([settlementId])
+}
+
+model WithdrawalRequest {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  walletId     String           @db.Uuid
+  wallet       Wallet           @relation(fields: [walletId], references: [id])
+  userId       String           @db.Uuid
+  user         User             @relation(fields: [userId], references: [id])
+  amountMinor  BigInt
+  currencyCode String           @default("INR")
+  status       WithdrawalStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([walletId])
+}
+
+model BankAccount {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerType String // USER | MERCHANT
+  ownerId   String   @db.Uuid
+  details   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerType, ownerId])
+}
+
+// =====================================================================
+// Reservations / Seating (unified Diner)
+// =====================================================================
+
+model SeatingRequest {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId        String?          @unique
+  merchantId      String           @db.Uuid
+  merchant        Merchant         @relation(fields: [merchantId], references: [id])
+  restaurantId    String           @db.Uuid
+  restaurant      Restaurant       @relation(fields: [restaurantId], references: [id])
+  userId          String?          @db.Uuid
+  user            User?            @relation(fields: [userId], references: [id])
+  type            SeatingType
+  status          SeatingStatus    @default(PENDING)
+  partySize       Int              @default(1)
+  kidsCount       Int?
+  highChairs      Int?
+  specialRequests String?
+  reservationAt   DateTime?
+  tableId         String?          @db.Uuid
+  table           RestaurantTable? @relation(fields: [tableId], references: [id])
+  confirmedAt     DateTime?
+  cancelReason    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, reservationAt])
+}
+
+// =====================================================================
+// Notifications (business event vs delivery)
+// =====================================================================
+
+model NotificationTemplate {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key            String              @unique
+  channel        NotificationChannel
+  market         String?             @default("IN")
+  providerFlowId String?
+  subject        String?
+  body           String?
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  requests NotificationRequest[]
+}
+
+model NotificationRequest {
+  id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateKey   String
+  template      NotificationTemplate @relation(fields: [templateKey], references: [key])
+  eventType     String
+  recipientType RecipientType
+  recipientId   String               @db.Uuid
+  refType       String?
+  refId         String?              @db.Uuid
+  payload       Json?
+  createdAt     DateTime             @default(now())
+
+  deliveries NotificationDelivery[]
+
+  @@index([recipientId, createdAt])
+}
+
+model NotificationDelivery {
+  id                    String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notificationRequestId String                     @db.Uuid
+  notificationRequest   NotificationRequest        @relation(fields: [notificationRequestId], references: [id], onDelete: Cascade)
+  channel               NotificationChannel
+  provider              String?
+  status                NotificationDeliveryStatus @default(QUEUED)
+  providerMessageId     String?
+  attempt               Int                        @default(1)
+  error                 String?
+  sentAt                DateTime?
+  deliveredAt           DateTime?
+  createdAt             DateTime                   @default(now())
+
+  @@index([status])
+  @@index([notificationRequestId])
+}
+
+model DevicePushToken {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerType RecipientType
+  ownerId   String        @db.Uuid
+  userId    String?       @db.Uuid
+  user      User?         @relation(fields: [userId], references: [id])
+  token     String
+  platform  String?
+  createdAt DateTime      @default(now())
+  revokedAt DateTime?
+
+  @@unique([ownerType, ownerId, token])
+}
+
+// =====================================================================
+// Promotions (baseline-optional)
+// =====================================================================
+
+model Offer {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyId        String?             @unique
+  merchantId      String?             @db.Uuid
+  merchant        Merchant?           @relation(fields: [merchantId], references: [id])
+  restaurantId    String?             @db.Uuid
+  restaurant      Restaurant?         @relation(fields: [restaurantId], references: [id])
+  title           String
+  description     String? // legacy Offers.description
+  termsAndConditions String? // legacy Offers.terms_and_condition (text only; no media)
+  isGlobal        Boolean             @default(false)
+  // Publication state (P1.7.22) ← legacy Offers.active. Config only — no cron/
+  // automatic expiry, no redemption. Default false: not usable until activated.
+  active          Boolean             @default(false)
+  settlementType  OfferSettlementType @default(MERCHANT) // legacy VENDOR→MERCHANT; SPLIT stored, NOT calculated
+  // Discount: exactly one of percent (1..100) or fixed minor units (validated in service).
+  discountMinor   BigInt?
+  discountPercent Int?
+  maxDiscountMinor BigInt? // legacy maximum_discount_applied (cap for percentage & fixed)
+  // Order-amount gates. Enforced server-side at order creation (P1.7.24) against
+  // the server-authoritative subtotal.
+  minOrderMinor   BigInt? // legacy minimum_order_applied
+  maxOrderMinor   BigInt? // legacy maximum_order_applied
+  serviceTypes    Json? // legacy service_type[]; matched against canonical OrderType tokens (P1.7.24)
+  validFrom       DateTime? // legacy start_date
+  validTo         DateTime? // legacy end_date
+  // Usage limits. maxUsageLimit (total) + perUserLimit (per-user lifetime) are
+  // ENFORCED at order creation via DERIVED counts of ACTIVE redemptions (P1.7.24).
+  // useLimit/useFrequency (per-period) semantics remain under-specified => deferred
+  // to P1.7.25 (config preserved; NOT enforced). NO offerUsed/offerUsedBy counters.
+  maxUsageLimit   Int? // legacy maximum_usage_limit (total) — ENFORCED
+  perUserLimit    Int? // legacy maxUsage (per-user lifetime) — ENFORCED
+  useLimit        Int? // legacy useLimit (per-period) — deferred (P1.7.25)
+  useFrequency    String? // legacy useFrequency (DAILY|WEEKLY|MONTHLY|YEARLY) — deferred (P1.7.25)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  deletedAt       DateTime?
+
+  coupons Coupon[]
+  orders  Order[] // orders that applied this offer (P1.7.24)
+
+  @@index([merchantId])
+  @@index([restaurantId])
+}
+
+model Coupon {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  offerId      String   @db.Uuid
+  offer        Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  code         String   @unique
+  useFrequency String?
+  createdAt    DateTime @default(now())
+
+  redemptions CouponRedemption[]
+  orders      Order[] // orders that applied this coupon (P1.7.24)
+
+  @@index([offerId])
+}
+
+// Redemption ledger (P1.7.24). One ACTIVE redemption per (coupon, order); usage
+// is DERIVED by counting ACTIVE rows (no mutable offerUsed/offerUsedBy). Reversed
+// (order cancel) => status REVERSED + reversedAt, excluded from usage counts.
+enum RedemptionStatus {
+  ACTIVE
+  REVERSED
+}
+
+model CouponRedemption {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  couponId             String           @db.Uuid
+  coupon               Coupon           @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId               String?          @db.Uuid
+  user                 User?            @relation(fields: [userId], references: [id])
+  orderId              String?          @db.Uuid
+  order                Order?           @relation(fields: [orderId], references: [id])
+  status               RedemptionStatus @default(ACTIVE)
+  discountAppliedMinor BigInt? // server-calculated discount snapshot at redemption
+  reversedAt           DateTime?
+  createdAt            DateTime         @default(now())
+
+  // Idempotency: at most one redemption per (coupon, order). Prevents duplicate
+  // redemption for the same order (order idempotency = Order.orderNumber @unique).
+  @@unique([couponId, orderId])
+  @@index([couponId])
+  @@index([userId])
+}
+
+model ReferralProgram {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  active    Boolean  @default(true)
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Favourite {
+  id         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String              @db.Uuid
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetType FavouriteTargetType
+  targetId   String              @db.Uuid
+  createdAt  DateTime            @default(now())
+
+  @@unique([userId, targetType, targetId])
+}
+
+// =====================================================================
+// Delivery (orchestration only; live tracking + driver app are DEFERRED)
+// =====================================================================
+
+model DeliveryPartner {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      DeliveryPartnerCode @unique
+  name      String
+  config    Json?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  tasks DeliveryTask[]
+}
+
+model DeliveryPerson {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId String?   @db.Uuid
+  name       String
+  phone      String?
+  isOnline   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  tasks DeliveryTask[]
+
+  @@index([merchantId])
+}
+
+model DeliveryTask {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId          String               @unique @db.Uuid
+  order            Order                @relation(fields: [orderId], references: [id])
+  merchantId       String?              @db.Uuid
+  merchant         Merchant?            @relation(fields: [merchantId], references: [id])
+  method           DeliveryMethod
+  partnerCode      DeliveryPartnerCode?
+  partnerId        String?              @db.Uuid
+  partner          DeliveryPartner?     @relation(fields: [partnerId], references: [id])
+  deliveryPersonId String?              @db.Uuid
+  deliveryPerson   DeliveryPerson?      @relation(fields: [deliveryPersonId], references: [id])
+  status           DeliveryTaskStatus   @default(PENDING)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([status])
+}
+
+// =====================================================================
+// Administration / Audit
+// =====================================================================
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @db.Uuid
+  actorType  String?
+  action     String
+  targetType String?
+  targetId   String?  @db.Uuid
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([actorId, createdAt])
+}
+
+model AppVersion {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  platform    String
+  version     String
+  minVersion  String?
+  forceUpdate Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([platform, version])
+}

@@ -1,0 +1,29 @@
+# Local development PostgreSQL for the Amealio target platform (P1.5).
+# Reproducible, containerized dev database. Synthetic credentials only — never production.
+#
+#   Start:    docker compose up -d db
+#   Stop:     docker compose down
+#   Reset:    docker compose down -v   (drops the volume)
+#
+# The connection string matches .env.example DATABASE_URL.
+services:
+  db:
+    image: postgres:16
+    container_name: amealio_pg_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: amealio
+      POSTGRES_PASSWORD: amealio_dev_pw
+      POSTGRES_DB: amealio_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - amealio_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amealio -d amealio_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  amealio_pg_data:

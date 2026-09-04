@@ -1,12 +1,12 @@
 # Global Catalogue API Contract — Forensic Trace
 
-**Status:** FORENSIC / RECONCILIATION ONLY  
+**Status:** FORENSIC + NARROW TARGET FOUNDATION IMPLEMENTED  
 **Date:** 2026-09-03  
 **Target branch:** `replatform/backend-consolidation`
 
 ## Purpose
 
-Capture the concrete legacy request/response surfaces now traced for Global Catalogue administration and merchant reuse. This document does not implement or change target behavior.
+Capture the concrete legacy request/response surfaces traced for Global Catalogue administration and merchant reuse, then record the deliberately narrow target implementation that proves the established contract without inventing unresolved behavior.
 
 ## 1. Catalogue container lifecycle
 
@@ -17,7 +17,7 @@ The Super Admin dashboard uses the `/catalogue` service for the Global Catalogue
 - `PATCH /catalogue/:id` — update catalogue container fields;
 - `DELETE /catalogue/:id` — delete a catalogue container.
 
-The dashboard explicitly performs these operations for Global Catalogue Management. The create/update UI sends a `formData` object; the dashboard displays catalogue `name` and `description` and toggles `status`. The previously traced form contract also includes `cuisin_type` and catalogue identity state. This confirms that catalogue metadata is a separate lifecycle from global item construction. fileciteturn223file0 fileciteturn224file0
+The dashboard explicitly performs these operations for Global Catalogue Management. The create/update UI sends a `formData` object; the dashboard displays catalogue `name` and `description` and toggles `status`. The traced form contract also includes `cuisin_type` and catalogue identity state. This confirms that catalogue metadata is a separate lifecycle from global item construction. fileciteturn223file0 fileciteturn224file0
 
 ## 2. Global catalogue construction is a separate endpoint
 
@@ -69,39 +69,74 @@ The same merchant materialization service has an explicit `chainCatalogue` branc
 
 The legacy merchant materialization path requires a valid authorization token and resolves the authenticated vendor before operating. The Super Admin UI calls the catalogue administration endpoints with the authenticated access token. Legacy authorization enforcement is inconsistent in some underlying services, so the target should preserve capability intent using the modern RBAC/merchant-scope model rather than reproduce missing legacy checks. fileciteturn216file0 fileciteturn223file0
 
-## 8. What is now established for target implementation
+## 8. Established target boundary
 
-The evidence is now sufficient to define the target's first Global Catalogue vertical boundary without guessing the entire legacy item schema:
+The evidence is sufficient to define the target's first Global Catalogue vertical boundary without guessing the entire legacy item schema:
 
 1. platform-owned reusable catalogue container;
 2. platform-owned reusable category/item source content;
 3. Super Admin-only administration of that source;
-4. merchant-scoped discovery;
-5. explicit merchant materialization into local catalog records;
+4. merchant-scoped discovery/materialization;
+5. explicit merchant copy into local `MenuItem` records;
 6. independent local editing after materialization;
-7. optional operational menu attachment;
-8. separate Global vs Chain source classes;
+7. optional operational menu-section attachment;
+8. separate Global vs Chain source concept (Chain implementation remains deferred);
 9. no mutation of the global source when a merchant edits its copy.
 
-## 9. Still blocked / not to invent
+## 9. Narrow target implementation now present
+
+The branch now contains a deliberately small PostgreSQL source layer:
+
+- `platform_catalogs` — reusable platform-owned catalogue containers;
+- `platform_catalog_categories` — reusable source categories;
+- `platform_catalog_items` — reusable source items;
+- `platform_catalog_item_materializations` — explicit source-item → merchant `MenuItem` copy records.
+
+The implementation is under `apps/api/src/modules/platform-catalog/` and is registered in `AppModule`.
+
+The application service enforces:
+
+- `SUPER_ADMIN` for global catalogue/category/item creation;
+- merchant-owner/staff scope for materialization;
+- server-derived restaurant/merchant scope;
+- destination menu-section/restaurant consistency;
+- source preservation through an explicit source payload extension field;
+- atomic creation of the local `MenuItem` plus materialization link.
+
+The source layer intentionally does **not** add global flags to `MenuItem`, and it does not implement source-to-copy propagation.
+
+## 10. Still blocked / not to invent
 
 Do not infer yet:
 
 - global-source update propagation to existing copies;
-- permanent lineage requirements;
+- permanent lineage requirements beyond the explicit materialization record;
 - exact modern duplicate key beyond observed legacy name-based checks;
 - chain-over-global precedence;
 - whether temporary preview state must remain visible in the new UI;
-- full legacy item field parity;
-- whether the two import paths should converge in the final API;
-- deletion/archive semantics for source content that already has merchant copies.
+- full legacy item field parity and variant/media/nutrition mapping;
+- whether the two legacy import paths should converge in the final API;
+- deletion/archive semantics for source content that already has merchant copies;
+- a public REST controller until the existing staff route/guard conventions are traced and the endpoint contract is reconciled with the legacy UI.
 
-These are either evidence gaps or owner/business decisions, not implementation details to guess.
+These are evidence gaps or owner/business decisions, not implementation details to guess.
 
-## 10. Next implementation slice
+## 11. Validation gate
 
-Proceed with the smallest PostgreSQL implementation that proves the established contract, while deliberately deferring unresolved behavior:
+CI remains the authoritative build/migration/test gate. The branch must not be merged merely because the files were committed. Required proof for this slice is:
 
-**Super Admin → create Global Catalogue → create reusable category/item → merchant discovers → selects → materializes local copy → edits local copy → attaches to menu → verify source unchanged.**
+1. migration applies cleanly to an empty canonical PostgreSQL database;
+2. Prisma generation/validation remains clean;
+3. API build/lint/format remain clean;
+4. a SUPER_ADMIN can create source catalogue/category/item records;
+5. a merchant can materialize an item only inside its own restaurant scope;
+6. the resulting `MenuItem` is merchant-owned and independent from the source;
+7. editing the local item leaves the global source unchanged;
+8. cross-merchant materialization is rejected;
+9. the transaction does not leave an orphan local item when materialization-link creation fails.
 
-The implementation should reuse the existing target merchant/restaurant/menu/item foundation where appropriate, but introduce a distinct platform-source aggregate rather than adding legacy global flags to `MenuItem`.
+Because GitHub Actions is currently blocked before workflow execution by the repository/account billing lock, these checks are **not yet claimed as CI-validated**.
+
+## 12. Next implementation slice
+
+Next, trace and implement the smallest **read/discovery + staff REST boundary** needed by the existing Super Admin and merchant dashboards, then add contract tests before exposing frontend integration. Keep Chain Catalogue, full legacy field parity, propagation, and unresolved deletion semantics out of scope until their evidence is complete.

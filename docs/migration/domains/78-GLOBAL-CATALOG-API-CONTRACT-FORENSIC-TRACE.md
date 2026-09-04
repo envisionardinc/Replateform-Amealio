@@ -139,4 +139,7 @@ Because GitHub Actions is currently blocked before workflow execution by the rep
 
 ## 12. Next implementation slice
 
-Next, trace and implement the smallest **read/discovery + staff REST boundary** needed by the existing Super Admin and merchant dashboards, then add contract tests before exposing frontend integration. Keep Chain Catalogue, full legacy field parity, propagation, and unresolved deletion semantics out of scope until their evidence is complete.
+**Update (2026-09-04):** read/discovery + catalogue metadata update are implemented on
+`platform-catalog` (see doc 82). Remaining deferred items: Chain Catalogue,
+temp-local materialization/promote, full doc-77 field copy expansion, delete
+semantics when materializations exist, and frontend integration.

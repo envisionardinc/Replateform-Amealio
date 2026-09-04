@@ -61,6 +61,44 @@ export class PlatformCatalogRepository {
     return rows[0];
   }
 
+  async updateCatalog(input: {
+    catalogId: string;
+    name?: string;
+    description?: string | null;
+    cuisineType?: string | null;
+    status?: string;
+    sourcePayload?: unknown;
+    updatedBy?: string | null;
+  }): Promise<PlatformCatalogRecord | null> {
+    const existing = await this.findCatalog(input.catalogId);
+    if (!existing) return null;
+
+    const name = input.name !== undefined ? input.name.trim() : existing.name;
+    const description = input.description !== undefined ? input.description : existing.description;
+    const cuisineType = input.cuisineType !== undefined ? input.cuisineType : existing.cuisineType;
+    const status = input.status !== undefined ? input.status : existing.status;
+    const sourcePayload =
+      input.sourcePayload !== undefined ? input.sourcePayload : existing.sourcePayload;
+
+    const rows = await this.prisma.$queryRaw<PlatformCatalogRecord[]>`
+      UPDATE "platform_catalogs"
+      SET
+        "name" = ${name},
+        "description" = ${description},
+        "cuisine_type" = ${cuisineType},
+        "status" = ${status},
+        "source_payload" = ${sourcePayload ?? null},
+        "updated_by" = ${input.updatedBy ?? null},
+        "updated_at" = CURRENT_TIMESTAMP
+      WHERE "id" = ${input.catalogId}::uuid
+      RETURNING
+        "id", "legacy_id" AS "legacyId", "name", "description",
+        "cuisine_type" AS "cuisineType", "status", "source_payload" AS "sourcePayload",
+        "created_at" AS "createdAt", "updated_at" AS "updatedAt"
+    `;
+    return rows[0] ?? null;
+  }
+
   async createCategory(input: {
     catalogId: string;
     name: string;
@@ -103,6 +141,28 @@ export class PlatformCatalogRepository {
     return rows[0];
   }
 
+  async listCatalogs(status?: string): Promise<PlatformCatalogRecord[]> {
+    if (status) {
+      return this.prisma.$queryRaw<PlatformCatalogRecord[]>`
+        SELECT
+          "id", "legacy_id" AS "legacyId", "name", "description",
+          "cuisine_type" AS "cuisineType", "status", "source_payload" AS "sourcePayload",
+          "created_at" AS "createdAt", "updated_at" AS "updatedAt"
+        FROM "platform_catalogs"
+        WHERE "status" = ${status}
+        ORDER BY "name" ASC
+      `;
+    }
+    return this.prisma.$queryRaw<PlatformCatalogRecord[]>`
+      SELECT
+        "id", "legacy_id" AS "legacyId", "name", "description",
+        "cuisine_type" AS "cuisineType", "status", "source_payload" AS "sourcePayload",
+        "created_at" AS "createdAt", "updated_at" AS "updatedAt"
+      FROM "platform_catalogs"
+      ORDER BY "name" ASC
+    `;
+  }
+
   async findItem(itemId: string): Promise<PlatformCatalogItemRecord | null> {
     const rows = await this.prisma.$queryRaw<PlatformCatalogItemRecord[]>`
       SELECT "id", "catalog_id" AS "catalogId", "category_id" AS "categoryId",
@@ -122,6 +182,50 @@ export class PlatformCatalogRepository {
       WHERE "id" = ${catalogId}::uuid
     `;
     return rows[0] ?? null;
+  }
+
+  async listCategories(catalogId: string): Promise<PlatformCatalogCategoryRecord[]> {
+    return this.prisma.$queryRaw<PlatformCatalogCategoryRecord[]>`
+      SELECT
+        "id", "catalog_id" AS "catalogId", "legacy_id" AS "legacyId", "name",
+        "description", "sort_order" AS "sortOrder", "source_payload" AS "sourcePayload"
+      FROM "platform_catalog_categories"
+      WHERE "catalog_id" = ${catalogId}::uuid
+      ORDER BY "sort_order" ASC, "name" ASC
+    `;
+  }
+
+  async findCategory(categoryId: string): Promise<PlatformCatalogCategoryRecord | null> {
+    const rows = await this.prisma.$queryRaw<PlatformCatalogCategoryRecord[]>`
+      SELECT
+        "id", "catalog_id" AS "catalogId", "legacy_id" AS "legacyId", "name",
+        "description", "sort_order" AS "sortOrder", "source_payload" AS "sourcePayload"
+      FROM "platform_catalog_categories"
+      WHERE "id" = ${categoryId}::uuid
+    `;
+    return rows[0] ?? null;
+  }
+
+  async listItems(catalogId: string, categoryId?: string): Promise<PlatformCatalogItemRecord[]> {
+    if (categoryId) {
+      return this.prisma.$queryRaw<PlatformCatalogItemRecord[]>`
+        SELECT
+          "id", "catalog_id" AS "catalogId", "category_id" AS "categoryId", "legacy_id" AS "legacyId",
+          "name", "description", "source_payload" AS "sourcePayload"
+        FROM "platform_catalog_items"
+        WHERE "catalog_id" = ${catalogId}::uuid
+          AND "category_id" = ${categoryId}::uuid
+        ORDER BY "name" ASC
+      `;
+    }
+    return this.prisma.$queryRaw<PlatformCatalogItemRecord[]>`
+      SELECT
+        "id", "catalog_id" AS "catalogId", "category_id" AS "categoryId", "legacy_id" AS "legacyId",
+        "name", "description", "source_payload" AS "sourcePayload"
+      FROM "platform_catalog_items"
+      WHERE "catalog_id" = ${catalogId}::uuid
+      ORDER BY "name" ASC
+    `;
   }
 
   async sectionRestaurant(sectionId: string): Promise<{ restaurantId: string } | null> {
@@ -163,7 +267,8 @@ export class PlatformCatalogRepository {
         RETURNING "id"
       `;
       const materializationId = linkRows[0]?.id;
-      if (!materializationId) throw new Error('Catalogue materialization link did not return an id');
+      if (!materializationId)
+        throw new Error('Catalogue materialization link did not return an id');
 
       return { menuItemId, materializationId };
     });

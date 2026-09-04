@@ -2,22 +2,27 @@
 
 > **Type:** VALIDATION. Records what the current target implements versus the forensic contract.
 >
-> **Authority:** Docs 75–78 + `apps/api/src/modules/platform-catalog/` on `replatform/backend-consolidation`.
+> **Authority:** Docs 75–78 + direct legacy sources in `amealio-vendordashboard` / `amealiodashboardmvp-` + `apps/api/src/modules/platform-catalog/` on `replatform/backend-consolidation`.
 >
 > **Brand:** amealio
 
 ## Status
 
-**🟡 Partial — foundation validated; discovery/list and temp-materialization paths still incomplete.**
+**🟡 Discovery + create + materialize implemented; temp-local path / chain / full field copy / delete still deferred.**
 
-The narrow Global Item Catalogue foundation matches the forensic contract for:
+## Legacy endpoints traced (this slice)
 
-- platform-owned reusable catalogue / category / item source layer;
-- Super Admin–only administration of that source;
-- merchant-scoped copy/materialization into local `MenuItem`;
-- no invented live sync / propagation / chain collapse.
-
-It does **not** yet restore the full Super Admin container CRUD surface or the two-phase merchant temp→promote workflow.
+| Operation | Legacy evidence |
+|---|---|
+| List catalogues | `GET /catalogue` — `catalogue.class.ts#find`; Super Admin `admin_get_global_catalog`; merchant `get_all_global_cateloge_menu` |
+| Get catalogue detail | `GET /catalogue/:id` — `catalogue.class.ts#get` (+ after-hook category enrichment); merchant + Super Admin |
+| Item discovery by category | `GET /vendor/items/:categoryId?catlogue_id=` — `addItemGlobalCatelogAction.js` |
+| Create catalogue | `POST /catalogue` — Super Admin UI |
+| Update catalogue | `PATCH /catalogue/:id` — `admin_update_global_catalog` |
+| Bulk create content | `POST /global-catalogue` — split into explicit category/item create in target |
+| Materialize | `POST /vendor/items?add=true` — merchant copy into local items |
+| Delete catalogue | `DELETE /catalogue/:id` — **deferred** (materialization RESTRICT semantics unresolved) |
+| Temp local path | `/vendor/localCategoryItems` — **deferred** |
 
 ## Capability matrix
 
@@ -26,40 +31,28 @@ It does **not** yet restore the full Super Admin container CRUD surface or the t
 | Platform catalogue container distinct from merchant menu | `platform_catalogs` + service | Preserved |
 | Platform categories / items as reusable source | `platform_catalog_categories` / `platform_catalog_items` | Preserved |
 | Explicit materialization lineage | `platform_catalog_item_materializations` | Preserved |
-| Super Admin creates global catalogue/category/item | `POST platform-catalog/global` (+ categories/items) + `@PlatformOnly` | Validated |
-| Merchant materialize copy into local MenuItem | `POST platform-catalog/global-items/:sourceItemId/materialize` + merchant roles + `MerchantScopeService` | Validated |
-| Restaurant/menu-section ownership server-validated | Service checks restaurant scope + section restaurant match | Validated (unit tests) |
-| Materialization is copy, not live reference | Service copies name/description; does not mutate source on merchant edit path | Preserved |
+| Super Admin creates global catalogue/category/item | `POST platform-catalog/global*` + `@PlatformOnly` | Validated |
+| Super Admin updates catalogue metadata | `PATCH platform-catalog/global/:catalogId` + `@PlatformOnly` | Implemented |
+| List/get catalogues | `GET platform-catalog/global`, `GET .../global/:catalogId` | Implemented |
+| List categories / items | `GET .../categories`, `GET .../items?categoryId=` | Implemented |
+| Get global item | `GET platform-catalog/global-items/:itemId` | Implemented |
+| Merchant discovery reads | Same GET routes; `MERCHANT_OWNER` / `MERCHANT_STAFF` (+ SUPER_ADMIN) | Implemented |
+| Merchant materialize copy into local MenuItem | `POST .../materialize` + restaurant/section scope | Validated |
 | No invented source→copy sync / deletion propagation | Not implemented | Correct — deferred |
-| Chain catalogue distinct from global | Not implemented | Deferred (doc 76/78) |
-| Catalogue container list/update/delete (`/catalogue`) | Not exposed on platform-catalog HTTP yet | Gap — next |
-| Bulk `/global-catalogue` composite create | Split into explicit create endpoints | Acceptable narrowing (doc 78 §9) |
-| Merchant discovery GET catalogue/items | Not exposed yet | Gap — next |
-| Temp local materialization + promote (`localCategoryItems`) | Not implemented | Gap — deferred until UI path recovered |
-| Full vendorItems field copy on materialize | Narrow name/description + `sourcePayload` on source | Gap — expand using doc 77 dispositions |
+| Chain catalogue | Not implemented | Deferred |
+| Temp local materialization + promote | Not implemented | Deferred |
+| Full vendorItems field copy on materialize | name/description + `source_payload` on source | Deferred (doc 77) |
+| Delete catalogue | Not exposed | Deferred (owner/RESTRICT) |
 
-## Authorization validation
+## Authorization
 
-Aligned with doc 81 coarse RBAC:
-
-- No token / missing principal → controller refuses service call; guard returns 401 when composed.
-- Merchant staff on `@PlatformOnly` global create → rejected.
-- Merchant staff materialize own restaurant → allowed after scope check.
-- Merchant staff materialize other merchant restaurant → `ForbiddenException` via `MerchantScopeService`.
-- Section from another restaurant → `BadRequestException`.
-
-Covered by `platform-catalog.controller.spec.ts`, `platform-catalog.service.spec.ts`, and `merchant-scope.service.spec.ts`.
+- Discovery: `JwtStaffGuard` + `StaffAuthorizationGuard` + `@RequireStaffRoles(SUPER_ADMIN, MERCHANT_OWNER, MERCHANT_STAFF)`
+- Source mutations: `@PlatformOnly` (SUPER_ADMIN)
+- Materialization: `@RequireStaffRoles(MERCHANT_OWNER, MERCHANT_STAFF)` + `MerchantScopeService`
+- Request `merchantId` never grants scope
 
 ## Explicit non-claims
 
 - Not claiming full Global Catalogue product parity.
-- Not claiming CI passed (local unit tests only).
-- Not inventing temp-local / chain / sync semantics.
-
-## Next actions for this vertical
-
-1. Add Super Admin list/get/update/status endpoints for catalogue containers (legacy `/catalogue` lifecycle).
-2. Add merchant discovery reads (list catalogues / catalogue contents) with merchant auth.
-3. Expand materialization field copy per doc 77 dispositions (not blind Mongo dump).
-4. Trace and restore temp-local → promote only if merchant UI still depends on it.
-5. Keep Chain Catalogue separate until its own forensic slice.
+- Not claiming CI passed.
+- Not inventing temp-local / chain / sync / delete-with-copies semantics.

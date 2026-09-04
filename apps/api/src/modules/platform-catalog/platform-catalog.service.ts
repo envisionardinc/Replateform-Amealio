@@ -2,8 +2,6 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type { StaffPrincipal } from '../identity/staff-authentication/staff-principal';
 import { MerchantScopeService } from '../merchant/application/merchant-scope.service';
 import { RestaurantRepository } from '../merchant/infrastructure/restaurant.repository';
-import { CatalogWriteService } from '../catalog/application/catalog-write.service';
-import type { CreateItemInput } from '../catalog/domain/catalog-write.types';
 import {
   PlatformCatalogRepository,
   PlatformCatalogRecord,
@@ -30,7 +28,6 @@ export class PlatformCatalogService {
     private readonly repo: PlatformCatalogRepository,
     private readonly scope: MerchantScopeService,
     private readonly restaurants: RestaurantRepository,
-    private readonly catalogWrite: CatalogWriteService,
   ) {}
 
   async createGlobalCatalog(
@@ -83,12 +80,7 @@ export class PlatformCatalogService {
     return this.repo.createItem({ ...input, sourcePayload: jsonPayload(input.sourcePayload) });
   }
 
-  /**
-   * Copy a reusable global item into the merchant's operational MenuItem layer.
-   * The caller supplies the destination restaurant/menu section; merchant scope
-   * is derived and checked server-side. Existing MenuItem write validation is
-   * reused rather than bypassed.
-   */
+  /** Copy a reusable global item into the merchant's operational MenuItem layer. */
   async materializeGlobalItem(
     principal: StaffPrincipal,
     input: {
@@ -111,33 +103,22 @@ export class PlatformCatalogService {
     if (!restaurant || restaurant.deletedAt !== null) throw new NotFoundException('Restaurant not found');
     await this.scope.assertRestaurantInScope(principal, input.restaurantId);
 
+    if (input.menuSectionId) {
+      const section = await this.repo.sectionRestaurant(input.menuSectionId);
+      if (!section) throw new NotFoundException('Menu section not found');
+      if (section.restaurantId !== input.restaurantId) {
+        throw new BadRequestException('section does not belong to this restaurant');
+      }
+    }
+
     const name = input.nameOverride ?? source.name;
     if (!nonEmpty(name)) throw new BadRequestException('materialized item name is required');
-
-    if (input.menuSectionId) {
-      // Reuse the existing catalog write path's tenancy/section validation by
-      // constructing only the validated operational item fields here.
-      const operationalInput: CreateItemInput = {
-        restaurantId: input.restaurantId,
-        menuSectionId: input.menuSectionId,
-        name: name.trim(),
-        description: input.descriptionOverride ?? source.description ?? undefined,
-      };
-      const item = await this.catalogWrite.createItem(principal, operationalInput);
-      const linked = await this.repo.materializeItemLinkOnly({
-        sourceItemId: source.id,
-        menuItemId: item.id,
-        merchantId: restaurant.merchantId,
-        restaurantId: input.restaurantId,
-      });
-      return linked;
-    }
 
     return this.repo.materializeItem({
       sourceItemId: source.id,
       merchantId: restaurant.merchantId,
       restaurantId: input.restaurantId,
-      menuSectionId: null,
+      menuSectionId: input.menuSectionId ?? null,
       name: name.trim(),
       description: input.descriptionOverride ?? source.description,
     });

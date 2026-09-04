@@ -26,12 +26,18 @@ The database enforces:
 - immutable rows via the existing `amealio_prevent_mutation()` trigger
 - positive adjustment amounts
 - non-empty currency/idempotency values
-- source/type consistency for the two approved refund types
+- source/type/direction consistency for the two approved refund types
 - one adjustment per order `Refund`
 - one adjustment per `TipPayment`
 - foreign-key preservation of settlement and source records
 
 The repository is idempotent: replaying the same idempotency key with the same economics returns the original adjustment; reusing it for different economics is rejected.
+
+## Persistence boundary
+
+The P1.7.44 migration owns the PostgreSQL table and constraints. The application repository currently accesses this new table through parameterized Prisma SQL (`$queryRaw` / `$executeRaw`) rather than adding a generated Prisma model in this phase.
+
+This is deliberate: it avoids a broad replacement of the large canonical `prisma/schema.prisma` while introducing a financial ledger. Prisma schema/client regeneration can be handled as a separate controlled change after the underlying migration is proven. No existing Prisma models are modified by P1.7.44.
 
 ## Position semantics
 
@@ -41,7 +47,7 @@ adjustedAmountMinor
   + Σ(CREDIT adjustments)
   − Σ(DEBIT adjustments)
 
-payableAmountMinor    = max(adjustedAmountMinor, 0)
+payableAmountMinor     = max(adjustedAmountMinor, 0)
 recoverableAmountMinor = max(-adjustedAmountMinor, 0)
 ```
 

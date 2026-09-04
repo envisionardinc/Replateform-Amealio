@@ -1,6 +1,9 @@
-import { BadRequestException } from '@nestjs/common';
 import { PlatformCatalogController } from './platform-catalog.controller';
 import type { StaffPrincipal } from '../identity/staff-authentication/staff-principal';
+import {
+  STAFF_PLATFORM_ONLY_KEY,
+  STAFF_ROLES_KEY,
+} from '../identity/staff-authentication/authorization/staff-authorization.decorators';
 
 describe('PlatformCatalogController', () => {
   const service = {
@@ -19,7 +22,7 @@ describe('PlatformCatalogController', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('rejects requests without an authenticated staff principal', () => {
+  it('requires an authenticated staff principal before invoking the service', () => {
     expect(() => controller.createGlobal({} as any, { name: 'x' })).toThrow(Error);
     expect(service.createGlobalCatalog).not.toHaveBeenCalled();
   });
@@ -36,5 +39,18 @@ describe('PlatformCatalogController', () => {
     service.materializeGlobalItem.mockResolvedValue({ menuItemId: 'item-1', materializationId: 'link-1' });
     await controller.materialize({ staffPrincipal: p } as any, 'source-1', { restaurantId: 'restaurant-1' });
     expect(service.materializeGlobalItem).toHaveBeenCalledWith(p, expect.objectContaining({ sourceItemId: 'source-1', restaurantId: 'restaurant-1' }));
+  });
+
+  it('declares platform-only authorization on global catalogue administration routes', () => {
+    expect(Reflect.getMetadata(STAFF_PLATFORM_ONLY_KEY, PlatformCatalogController.prototype.createGlobal)).toBe(true);
+    expect(Reflect.getMetadata(STAFF_PLATFORM_ONLY_KEY, PlatformCatalogController.prototype.createCategory)).toBe(true);
+    expect(Reflect.getMetadata(STAFF_PLATFORM_ONLY_KEY, PlatformCatalogController.prototype.createItem)).toBe(true);
+  });
+
+  it('declares merchant staff role authorization on global item materialization', () => {
+    expect(Reflect.getMetadata(STAFF_ROLES_KEY, PlatformCatalogController.prototype.materialize)).toEqual([
+      'MERCHANT_OWNER',
+      'MERCHANT_STAFF',
+    ]);
   });
 });

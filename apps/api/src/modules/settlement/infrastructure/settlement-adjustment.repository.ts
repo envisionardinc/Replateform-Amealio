@@ -76,6 +76,8 @@ export class SettlementAdjustmentRepository {
           return { ...this.toResult(existing[0]), created: false };
         }
 
+        await this.validateSource(tx, args);
+
         const created = await tx.$queryRaw<AdjustmentRow[]>`
           INSERT INTO "SettlementAdjustment" (
             "settlementId", "merchantId", "orderId", "paymentIntentId",
@@ -178,6 +180,122 @@ export class SettlementAdjustmentRepository {
       LIMIT 1
     `;
     return rows[0] ? { ...this.toResult(rows[0]), created: false } : null;
+  }
+
+  private async validateSource(
+    tx: Prisma.TransactionClient,
+    args: CreateSettlementAdjustmentInput,
+  ): Promise<void> {
+    if (args.type === 'ORDER_REFUND') {
+      if (!args.orderId || !args.paymentIntentId || !args.refundId) {
+        throw new BadRequestException(
+          'ORDER_REFUND requires orderId, paymentIntentId, and refundId',
+        );
+      }
+
+      const refunds = await tx.$queryRaw<Array<{
+        id: string;
+        orderId: string | null;
+        paymentIntentId: string | null;
+        amountMinor: bigint;
+        currencyCode: string;
+        status: string;
+      }>>`
+        SELECT "id", "orderId", "paymentIntentId", "amountMinor", "currencyCode", "status"
+        FROM "Refund"
+        WHERE "id" = ${args.refundId}::uuid
+        FOR UPDATE
+      `;
+      const refund = refunds[0];
+      if (!refund) throw new NotFoundException('Refund not found');
+      if (refund.status !== 'PROCESSED') {
+        throw new BadRequestException('Only PROCESSED refunds can create settlement adjustments');
+      }
+      if (refund.orderId !== args.orderId || refund.paymentIntentId !== args.paymentIntentId) {
+        throw new BadRequestException('Refund source does not match the supplied order/payment intent');
+      }
+      if (refund.currencyCode !== args.currencyCode) {
+        throw new BadRequestException('Refund currency must match the adjustment currency');
+      }
+      if (args.amountMinor > refund.amountMinor) {
+        throw new BadRequestException('Adjustment amount cannot exceed the refund amount');
+      }
+
+      const paymentIntents = await tx.$queryRaw<Array<{
+        id: string;
+        orderId: string | null;
+        amountMinor: bigint;
+        currencyCode: string;
+      }>>`
+        SELECT "id", "orderId", "amountMinor", "currencyCode"
+        FROM "PaymentIntent"
+        WHERE "id" = ${args.paymentIntentId}::uuid
+        FOR UPDATE
+      `;
+      const paymentIntent = paymentIntents[0];
+      if (!paymentIntent) throw new NotFoundException('Payment intent not found');
+      if (paymentIntent.orderId !== args.orderId) {
+        throw new BadRequestException('Payment intent does not belong to the supplied order');
+      }
+      if (paymentIntent.currencyCode !== args.currencyCode) {
+        throw new BadRequestException('Payment intent currency must match the adjustment currency');
+      }
+
+      const orders = await tx.$queryRaw<Array<{
+        id: string;
+        merchantId: string;
+      }>>`
+        SELECT "id", "merchantId"
+        FROM "Order"
+        WHERE "id" = ${args.orderId}::uuid
+        LIMIT 1
+      `;
+      const order = orders[0];
+      if (!order) throw new NotFoundException('Order not found');
+      if (order.merchantId !== args.merchantId) {
+        throw new BadRequestException('Order does not belong to the merchant');
+      }
+      return;
+    }
+
+    if (!args.tipPaymentId) {
+      throw new BadRequestException('TIP_REFUND requires tipPaymentId');
+    }
+
+    const tips = await tx.$queryRaw<Array<{
+      id: string;
+      orderId: string;
+      merchantId: string;
+      amountMinor: bigint;
+      refundedAmountMinor: bigint;
+      currencyCode: string;
+      status: string;
+      refundStatus: string | null;
+    }>>`
+      SELECT
+        "id", "orderId", "merchantId", "amountMinor", "refundedAmountMinor",
+        "currencyCode", "status", "refundStatus"
+      FROM "TipPayment"
+      WHERE "id" = ${args.tipPaymentId}::uuid
+      FOR UPDATE
+    `;
+    const tip = tips[0];
+    if (!tip) throw new NotFoundException('Tip payment not found');
+    if (tip.merchantId !== args.merchantId) {
+      throw new BadRequestException('Tip payment does not belong to the merchant');
+    }
+    if (tip.currencyCode !== args.currencyCode) {
+      throw new BadRequestException('Tip payment currency must match the adjustment currency');
+    }
+    if (tip.status !== 'CAPTURED') {
+      throw new BadRequestException('Only CAPTURED tip payments can create settlement adjustments');
+    }
+    if (tip.refundStatus !== 'PROCESSED') {
+      throw new BadRequestException('Only PROCESSED tip refunds can create settlement adjustments');
+    }
+    if (tip.refundedAmountMinor <= 0n || args.amountMinor > tip.refundedAmountMinor) {
+      throw new BadRequestException('Adjustment amount cannot exceed the processed tip refund amount');
+    }
   }
 
   private validateInput(args: CreateSettlementAdjustmentInput): void {

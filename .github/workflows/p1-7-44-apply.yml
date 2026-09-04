@@ -1,0 +1,123 @@
+name: P1.7.44 settlement adjustment apply
+
+on:
+  push:
+    branches:
+      - 'cursor/p1-7-44-settlement-adjustment-foundation-a8e0'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'P1.7.44 implementation') }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: amealio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d amealio_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: cursor/p1-7-44-settlement-adjustment-foundation-a8e0
+          fetch-depth: 0
+
+      - name: Patch Prisma schema
+        env:
+          SCHEMA: prisma/schema.prisma
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('prisma/schema.prisma')
+          text = path.read_text()
+          if 'enum SettlementAdjustmentType {' in text:
+              print('P1.7.44 schema already applied')
+              raise SystemExit(0)
+
+          replacements = [
+              (
+                  '''enum SettlementPayoutType {\n  ORDER\n  ORDER_TIP\n  SCAN_AND_PAY\n}\n''',
+                  '''enum SettlementPayoutType {\n  ORDER\n  ORDER_TIP\n  SCAN_AND_PAY\n}\n\nenum SettlementAdjustmentType {\n  ORDER_REFUND\n  TIP_REFUND\n}\n\nenum SettlementAdjustmentDirection {\n  DEBIT\n  CREDIT\n}\n'''
+              ),
+              (
+                  '''  settlements     Settlement[]\n  deliveryTasks   DeliveryTask[]''',
+                  '''  settlements           Settlement[]\n  settlementAdjustments SettlementAdjustment[]\n  deliveryTasks         DeliveryTask[]'''
+              ),
+              (
+                  '''  settlementItems   SettlementItem[]\n  deliveryTask''',
+                  '''  settlementItems       SettlementItem[]\n  settlementAdjustments SettlementAdjustment[]\n  deliveryTask'''
+              ),
+              (
+                  '''  settlementItems SettlementItem[]\n\n  @@index([orderId])\n}\n\n// Collected customer TIP''',
+                  '''  settlementItems       SettlementItem[]\n  settlementAdjustments SettlementAdjustment[]\n\n  @@index([orderId])\n}\n\n// Collected customer TIP'''
+              ),
+              (
+                  '''  transactions        Transaction[]\n  createdAt           DateTime             @default(now())''',
+                  '''  transactions        Transaction[]\n  settlementAdjustments SettlementAdjustment[]\n  createdAt           DateTime             @default(now())'''
+              ),
+              (
+                  '''  @@index([paymentIntentId])\n}\n\nmodel Wallet {''',
+                  '''  settlementAdjustments SettlementAdjustment[]\n\n  @@index([paymentIntentId])\n}\n\nmodel Wallet {'''
+              ),
+              (
+                  '''  items   SettlementItem[]\n  payouts Payout[]\n\n  @@index([merchantId, status])''',
+                  '''  items       SettlementItem[]\n  payouts     Payout[]\n  adjustments SettlementAdjustment[]\n\n  @@index([merchantId, status])'''
+              ),
+              (
+                  '''model Payout {''',
+                  '''model SettlementAdjustment {\n  id              String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid\n  settlementId    String                          @db.Uuid\n  settlement      Settlement                      @relation(fields: [settlementId], references: [id], onDelete: Restrict)\n  merchantId      String                          @db.Uuid\n  merchant        Merchant                        @relation(fields: [merchantId], references: [id], onDelete: Restrict)\n  orderId         String?                         @db.Uuid\n  order           Order?                          @relation(fields: [orderId], references: [id], onDelete: Restrict)\n  paymentIntentId String?                         @db.Uuid\n  paymentIntent   PaymentIntent?                  @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)\n  tipPaymentId    String?                         @db.Uuid\n  tipPayment      TipPayment?                     @relation(fields: [tipPaymentId], references: [id], onDelete: Restrict)\n  refundId        String?                         @db.Uuid\n  refund          Refund?                         @relation(fields: [refundId], references: [id], onDelete: Restrict)\n  type            SettlementAdjustmentType        \n  direction       SettlementAdjustmentDirection   \n  amountMinor     BigInt\n  currencyCode    String                          @default("INR")\n  idempotencyKey  String                          @unique\n  reason          String?\n  createdAt       DateTime                        @default(now())\n\n  @@index([settlementId, createdAt])\n  @@index([merchantId, createdAt])\n  @@index([orderId])\n  @@index([paymentIntentId])\n  @@index([tipPaymentId])\n  @@index([refundId])\n}\n\nmodel Payout {'''
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'Missing schema marker: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          print('P1.7.44 schema patch applied')
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/amealio_test
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/amealio_test
+        run: npx prisma validate
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/amealio_test
+        run: npx prisma migrate deploy
+
+      - name: Run P1.7.44 tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/amealio_test
+        run: npm test --workspace @amealio/api -- --runInBand test/settlement-adjustment.e2e-spec.ts
+
+      - name: Commit implementation and remove bootstrap workflow
+        run: |
+          rm -f .github/workflows/p1-7-44-apply.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add prisma/schema.prisma .github/workflows/p1-7-44-apply.yml
+          git commit -m 'feat(settlement): implement P1.7.44 implementation'
+          git push origin HEAD:cursor/p1-7-44-settlement-adjustment-foundation-a8e0

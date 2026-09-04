@@ -269,12 +269,9 @@ export class SettlementAdjustmentRepository {
       amountMinor: bigint;
       refundedAmountMinor: bigint;
       currencyCode: string;
-      status: string;
-      refundStatus: string | null;
     }>>`
       SELECT
-        "id", "orderId", "merchantId", "amountMinor", "refundedAmountMinor",
-        "currencyCode", "status", "refundStatus"
+        "id", "orderId", "merchantId", "amountMinor", "refundedAmountMinor", "currencyCode"
       FROM "TipPayment"
       WHERE "id" = ${args.tipPaymentId}::uuid
       FOR UPDATE
@@ -286,12 +283,6 @@ export class SettlementAdjustmentRepository {
     }
     if (tip.currencyCode !== args.currencyCode) {
       throw new BadRequestException('Tip payment currency must match the adjustment currency');
-    }
-    if (tip.status !== 'CAPTURED') {
-      throw new BadRequestException('Only CAPTURED tip payments can create settlement adjustments');
-    }
-    if (tip.refundStatus !== 'PROCESSED') {
-      throw new BadRequestException('Only PROCESSED tip refunds can create settlement adjustments');
     }
     if (tip.refundedAmountMinor <= 0n || args.amountMinor > tip.refundedAmountMinor) {
       throw new BadRequestException('Adjustment amount cannot exceed the processed tip refund amount');

@@ -118,7 +118,7 @@ describe('Settlement adjustment foundation (P1.7.44)', () => {
     ).rejects.toThrow();
   });
 
-  it('creates a TIP_REFUND debit without touching order economics', async () => {
+  it('supports multiple partial TIP_REFUND adjustments without exceeding the processed refund total', async () => {
     const f = await createOrderFixture();
     await prisma.order.update({ where: { id: f.order.id }, data: { tipMinor: 2000n } });
     const tip = await prisma.tipPayment.create({
@@ -151,16 +151,41 @@ describe('Settlement adjustment foundation (P1.7.44)', () => {
       data: { settlementId: tipSettlement.id, orderId: f.order.id, tipPaymentId: tip.id, amountMinor: 2000n },
     });
 
-    await repo.createAdjustment({
+    const first = await repo.createAdjustment({
       settlementId: tipSettlement.id,
       merchantId: f.merchant.id,
       type: 'TIP_REFUND',
       direction: 'DEBIT',
-      amountMinor: 2000n,
+      amountMinor: 1200n,
       currencyCode: 'INR',
-      idempotencyKey: uniq('tipadj'),
+      idempotencyKey: uniq('tipadj1'),
       tipPaymentId: tip.id,
     });
+    const second = await repo.createAdjustment({
+      settlementId: tipSettlement.id,
+      merchantId: f.merchant.id,
+      type: 'TIP_REFUND',
+      direction: 'DEBIT',
+      amountMinor: 800n,
+      currencyCode: 'INR',
+      idempotencyKey: uniq('tipadj2'),
+      tipPaymentId: tip.id,
+    });
+
+    expect(first.created).toBe(true);
+    expect(second.created).toBe(true);
+    await expect(
+      repo.createAdjustment({
+        settlementId: tipSettlement.id,
+        merchantId: f.merchant.id,
+        type: 'TIP_REFUND',
+        direction: 'DEBIT',
+        amountMinor: 1n,
+        currencyCode: 'INR',
+        idempotencyKey: uniq('tipadj3'),
+        tipPaymentId: tip.id,
+      }),
+    ).rejects.toThrow(/cumulative tip refund adjustments/i);
 
     const orderAfter = await prisma.order.findUniqueOrThrow({ where: { id: f.order.id } });
     expect(orderAfter.grandTotalMinor).toBe(10000n);

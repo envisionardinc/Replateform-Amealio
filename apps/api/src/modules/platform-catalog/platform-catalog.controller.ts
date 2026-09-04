@@ -1,6 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { PlatformCatalogService } from './platform-catalog.service';
 import type { StaffPrincipal } from '../identity/staff-authentication/staff-principal';
+import { JwtStaffGuard } from '../identity/staff-authentication/guards/jwt-staff.guard';
+import { StaffAuthorizationGuard } from '../identity/staff-authentication/authorization/staff-authorization.guard';
+import {
+  PlatformOnly,
+  RequireStaffRoles,
+} from '../identity/staff-authentication/authorization/staff-authorization.decorators';
 
 interface StaffRequest extends Request {
   staffPrincipal?: StaffPrincipal;
@@ -11,6 +17,8 @@ export class PlatformCatalogController {
   constructor(private readonly service: PlatformCatalogService) {}
 
   @Post('global')
+  @UseGuards(JwtStaffGuard, StaffAuthorizationGuard)
+  @PlatformOnly()
   createGlobal(@Req() req: StaffRequest, @Body() body: Record<string, unknown>) {
     return this.service.createGlobalCatalog(this.principal(req), {
       name: String(body.name ?? ''),
@@ -23,6 +31,8 @@ export class PlatformCatalogController {
   }
 
   @Post('global/:catalogId/categories')
+  @UseGuards(JwtStaffGuard, StaffAuthorizationGuard)
+  @PlatformOnly()
   createCategory(@Req() req: StaffRequest, @Param('catalogId') catalogId: string, @Body() body: Record<string, unknown>) {
     return this.service.createGlobalCategory(this.principal(req), {
       catalogId,
@@ -35,6 +45,8 @@ export class PlatformCatalogController {
   }
 
   @Post('global/:catalogId/items')
+  @UseGuards(JwtStaffGuard, StaffAuthorizationGuard)
+  @PlatformOnly()
   createItem(@Req() req: StaffRequest, @Param('catalogId') catalogId: string, @Body() body: Record<string, unknown>) {
     return this.service.createGlobalItem(this.principal(req), {
       catalogId,
@@ -47,6 +59,8 @@ export class PlatformCatalogController {
   }
 
   @Post('global-items/:sourceItemId/materialize')
+  @UseGuards(JwtStaffGuard, StaffAuthorizationGuard)
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   materialize(@Req() req: StaffRequest, @Param('sourceItemId') sourceItemId: string, @Body() body: Record<string, unknown>) {
     return this.service.materializeGlobalItem(this.principal(req), {
       sourceItemId,

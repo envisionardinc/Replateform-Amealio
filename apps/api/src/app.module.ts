@@ -12,6 +12,7 @@ import { MerchantModule } from './modules/merchant/merchant.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { ReferenceDataModule } from './modules/reference-data/reference-data.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { PlatformCatalogModule } from './modules/platform-catalog/platform-catalog.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { UserProfileModule } from './modules/user-profile/user-profile.module';
 import { OrderingModule } from './modules/ordering/ordering.module';
@@ -27,8 +28,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
 
 /**
  * Root application module (P1.6 foundation).
- * Wires cross-cutting infrastructure only. NO business/domain modules yet —
- * those are added independently in P1.7+ under a future `modules/` directory.
+ * Wires cross-cutting infrastructure and recovered domain modules.
  *
  * Dependency direction (enforced by convention; see docs 21):
  *   controller -> application/use-case -> domain -> infrastructure/provider adapters
@@ -54,6 +54,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     SubscriptionModule,
     ReferenceDataModule,
     CatalogModule,
+    PlatformCatalogModule,
     OnboardingModule,
     UserProfileModule,
     OrderingModule,

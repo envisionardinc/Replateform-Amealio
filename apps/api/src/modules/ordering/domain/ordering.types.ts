@@ -176,6 +176,7 @@ export interface OrderRecord {
   cancelReason: string | null;
   checkoutIdempotencyKey: string | null;
   deliveryPersonId: string | null;
+  deliveryPerson?: OrderDeliveryPersonSummary | null;
   items: OrderItemRecord[];
   statusEvents: OrderStatusEventRecord[];
   paymentIntents: OrderPaymentSummary[];

@@ -1037,6 +1037,9 @@ model Order {
   coupon              Coupon?           @relation(fields: [couponId], references: [id])
   // Consumer checkout idempotency (doc 90). Nullable so existing rows stay valid.
   checkoutIdempotencyKey String?        @unique
+  // Self-delivery assignment (doc 91). Nullable; OrderStatus remains SoT.
+  deliveryPersonId    String?           @db.Uuid
+  deliveryPerson      DeliveryPerson?   @relation(fields: [deliveryPersonId], references: [id])
   createdBy           String?           @db.Uuid
   updatedBy           String?           @db.Uuid
   createdAt           DateTime          @default(now())
@@ -1056,6 +1059,7 @@ model Order {
   @@index([merchantId, createdAt])
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([deliveryPersonId, status])
 }
 
 model OrderItem {
@@ -1602,7 +1606,8 @@ model DeliveryPerson {
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
-  tasks DeliveryTask[]
+  tasks  DeliveryTask[]
+  orders Order[]
 
   @@index([merchantId])
 }

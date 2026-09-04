@@ -68,3 +68,19 @@ Capture (verify **or** webhook **or** retry) promotes `INITIAL → PENDING` thro
 ## Database (Phase 2)
 
 `Order.checkoutIdempotencyKey String? @unique` — nullable so existing rows stay valid; PostgreSQL allows multiple NULLs.
+
+## Phase 3 HTTP (doc 91)
+
+| Method | Path                                 | Actor                                                |
+| ------ | ------------------------------------ | ---------------------------------------------------- |
+| PATCH  | `/api/v1/orders/:id/assign`          | merchant staff; `HOME_DELIVERY` + `READY`            |
+| POST   | `/api/v1/delivery/sessions`          | merchant staff issues rider JWT (`amealio-delivery`) |
+| GET    | `/api/v1/delivery/orders/:id`        | assigned rider                                       |
+| PATCH  | `/api/v1/delivery/orders/:id/status` | rider: `READY→ON_THE_WAY`, `ON_THE_WAY→DELIVERED`    |
+| PATCH  | `/api/v1/orders/:id/status`          | merchant/system: `DELIVERED→COMPLETED`               |
+
+Occupied = another order for that rider in `READY` or `ON_THE_WAY`. Offline riders are rejected. Reassign is allowed while `READY` (OD-SDL-REASSIGN recommended IMPROVE). `DeliveryTask` is unused. No OTP/POD.
+
+## Database (Phase 3)
+
+`Order.deliveryPersonId` optional FK to `DeliveryPerson`. `OrderStatus` remains the only lifecycle authority.

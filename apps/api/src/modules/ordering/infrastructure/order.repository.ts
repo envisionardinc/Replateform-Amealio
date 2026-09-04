@@ -7,6 +7,7 @@ import type {
   AppliedOffer,
   ListOrdersQuery,
   OrderItemRecord,
+  OrderDeliveryPersonSummary,
   OrderPaymentSummary,
   OrderRecord,
   OrderStatusEventRecord,
@@ -53,6 +54,9 @@ const ORDER_INCLUDE = {
       createdAt: true,
     },
     orderBy: { createdAt: 'asc' as const },
+  },
+  deliveryPerson: {
+    select: { id: true, name: true, phone: true, isOnline: true },
   },
 } as const;
 
@@ -443,6 +447,22 @@ export class OrderRepository {
     return { order: await this.findByIdOrThrow(id), changed };
   }
 
+  /**
+   * Bind a rider while the order is still READY. Does not change OrderStatus
+   * (assignment is not a second state machine). CAS on status=READY.
+   */
+  async assignDeliveryPerson(
+    orderId: string,
+    deliveryPersonId: string,
+  ): Promise<OrderRecord | null> {
+    const result = await this.prisma.order.updateMany({
+      where: { id: orderId, status: 'READY' },
+      data: { deliveryPersonId },
+    });
+    if (result.count === 0) return null;
+    return this.findById(orderId);
+  }
+
   private async lockAndAssertRedemptionLimits(
     tx: Prisma.TransactionClient,
     r: RedemptionDirective,
@@ -504,6 +524,8 @@ export class OrderRepository {
     couponId: string | null;
     cancelReason: string | null;
     checkoutIdempotencyKey: string | null;
+    deliveryPersonId: string | null;
+    deliveryPerson?: OrderDeliveryPersonSummary | null;
     items: Array<Omit<OrderItemRecord, 'quantity'> & { quantity: number }>;
     statusEvents: Array<{
       id: string;
@@ -537,7 +559,8 @@ export class OrderRepository {
       couponId: row.couponId,
       cancelReason: row.cancelReason,
       checkoutIdempotencyKey: row.checkoutIdempotencyKey ?? null,
-      deliveryPersonId: null,
+      deliveryPersonId: row.deliveryPersonId ?? null,
+      deliveryPerson: row.deliveryPerson ?? null,
       items: row.items as OrderItemRecord[],
       statusEvents: row.statusEvents.map((e): OrderStatusEventRecord => ({
         id: e.id,

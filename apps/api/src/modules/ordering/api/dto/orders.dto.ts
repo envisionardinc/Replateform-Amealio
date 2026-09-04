@@ -57,3 +57,17 @@ export class PatchOrderStatusDto {
   @IsIn(STATUSES)
   expectedStatus?: (typeof STATUSES)[number];
 }
+
+export class AssignDeliveryDto {
+  @IsUUID()
+  deliveryPersonId!: string;
+
+  @IsOptional()
+  @IsIn(STATUSES)
+  expectedStatus?: (typeof STATUSES)[number];
+}
+
+export class IssueDeliverySessionDto {
+  @IsUUID()
+  deliveryPersonId!: string;
+}

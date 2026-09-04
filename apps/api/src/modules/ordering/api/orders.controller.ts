@@ -15,14 +15,18 @@ import { RequireStaffRoles } from '../../identity/staff-authentication/authoriza
 import { CurrentStaff } from '../../identity/staff-authentication/current-staff.decorator';
 import type { StaffPrincipal } from '../../identity/staff-authentication/staff-principal';
 import { OrderManagementService } from '../application/order-management.service';
-import { ListOrdersQueryDto, PatchOrderStatusDto } from './dto/orders.dto';
+import { DeliveryService } from '../application/delivery.service';
+import { AssignDeliveryDto, ListOrdersQueryDto, PatchOrderStatusDto } from './dto/orders.dto';
 import { serializeOrder } from './order-http.serialize';
 
 @Controller({ path: 'orders', version: '1' })
 @UseGuards(JwtStaffGuard, StaffAuthorizationGuard)
 @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
 export class OrdersController {
-  constructor(private readonly management: OrderManagementService) {}
+  constructor(
+    private readonly management: OrderManagementService,
+    private readonly delivery: DeliveryService,
+  ) {}
 
   private staff(principal?: StaffPrincipal): StaffPrincipal {
     if (!principal) throw new UnauthorizedException('Staff authentication required');
@@ -57,5 +61,21 @@ export class OrdersController {
       },
     );
     return serializeOrder(order);
+  }
+
+  @Patch(':id/assign')
+  async assign(
+    @CurrentStaff() principal: StaffPrincipal,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: AssignDeliveryDto,
+  ) {
+    return serializeOrder(
+      await this.delivery.assign(
+        this.staff(principal),
+        id,
+        body.deliveryPersonId,
+        body.expectedStatus,
+      ),
+    );
   }
 }

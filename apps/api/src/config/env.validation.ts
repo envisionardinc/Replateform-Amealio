@@ -96,6 +96,17 @@ export class EnvironmentVariables {
   @IsOptional()
   STAFF_AUTH_ENABLED: boolean = true;
 
+  // Delivery-person JWT (doc 91). Dedicated audience/secret so a staff or
+  // consumer token cannot authenticate as a rider. Dev default only.
+  @IsString()
+  @IsOptional()
+  DELIVERY_JWT_ACCESS_SECRET: string = 'dev-only-delivery-access-secret-change-me';
+
+  @IsInt()
+  @Min(60)
+  @IsOptional()
+  DELIVERY_JWT_ACCESS_TTL_SECONDS: number = 900;
+
   // ---- Payment / Razorpay (P1.7.28) — DEVELOPMENT config only ----
   // Provider credentials are CONFIGURATION ONLY. Dev defaults are used if unset so
   // local/dev + tests can run; real credentials MUST be infra-managed in staging/

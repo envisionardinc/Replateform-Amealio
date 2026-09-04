@@ -297,8 +297,22 @@ export class SettlementAdjustmentRepository {
     if (tip.refundedAmountMinor <= 0n || tip.refundedAmountMinor > tip.amountMinor) {
       throw new BadRequestException('Tip payment does not contain a valid processed refund amount');
     }
-    if (args.amountMinor > tip.refundedAmountMinor) {
-      throw new BadRequestException('Adjustment amount cannot exceed the processed tip refund amount');
+
+    const existingTipAdjustments = await tx.$queryRaw<Array<{
+      debitAmountMinor: bigint | null;
+    }>>`
+      SELECT
+        COALESCE(SUM("amountMinor"), 0)::bigint AS "debitAmountMinor"
+      FROM "SettlementAdjustment"
+      WHERE "tipPaymentId" = ${args.tipPaymentId}::uuid
+        AND "type" = 'TIP_REFUND'
+        AND "direction" = 'DEBIT'
+    `;
+    const existingTipAdjustmentTotal = existingTipAdjustments[0]?.debitAmountMinor ?? 0n;
+    if (existingTipAdjustmentTotal + args.amountMinor > tip.refundedAmountMinor) {
+      throw new BadRequestException(
+        'Cumulative tip refund adjustments cannot exceed the processed tip refund amount',
+      );
     }
 
     const orders = await tx.$queryRaw<Array<{

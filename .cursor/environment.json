@@ -1,7 +1,7 @@
 {
   "name": "Amealio Replatforming (multi-repo dev)",
-  "install": "bash .cursor/install.sh",
-  "start": "bash .cursor/start.sh",
+  "install": "bash /agent/repos/replateform-amealio/.cursor/install.sh",
+  "start": "bash /agent/repos/replateform-amealio/.cursor/start.sh",
   "terminals": [
     {
       "name": "nestjs-tracking-backend",

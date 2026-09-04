@@ -36,8 +36,11 @@ The repository additionally validates source integrity before insertion:
 - `ORDER_REFUND` requires a `PROCESSED` `Refund`, matching `orderId` and `paymentIntentId`, matching currency, and an adjustment amount no greater than the refund amount
 - the referenced `PaymentIntent` must belong to the supplied order and use the same currency
 - the referenced `Order` must belong to the supplied merchant
+- the referenced `PaymentIntent` must have a `SettlementItem` in the supplied settlement, preventing a refund from being attributed to an unrelated settlement
 - `TIP_REFUND` requires a positive processed-refund amount already recorded on the `TipPayment`, matching merchant and currency, and the adjustment cannot exceed that refunded amount
-- source rows are locked during validation so the adjustment decision is serialized against concurrent refund-state changes
+- the referenced tip's `Order` must belong to the supplied merchant
+- the referenced `TipPayment` must have a `SettlementItem` in the supplied settlement
+- refund/payment/tip/order source rows are locked during validation where they participate in mutable refund or ownership state, serializing the adjustment decision against concurrent changes
 
 The repository is idempotent: replaying the same idempotency key with the same economics returns the original adjustment; reusing it for different economics is rejected.
 

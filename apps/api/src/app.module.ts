@@ -13,6 +13,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { ReferenceDataModule } from './modules/reference-data/reference-data.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { PlatformCatalogModule } from './modules/platform-catalog/platform-catalog.module';
+import { PlatformExperienceCatalogueModule } from './modules/platform-experience-catalogue/platform-experience-catalogue.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { UserProfileModule } from './modules/user-profile/user-profile.module';
 import { OrderingModule } from './modules/ordering/ordering.module';
@@ -55,6 +56,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     ReferenceDataModule,
     CatalogModule,
     PlatformCatalogModule,
+    PlatformExperienceCatalogueModule,
     OnboardingModule,
     UserProfileModule,
     OrderingModule,

@@ -73,7 +73,7 @@ Important distinction:
 - **Chain catalogue:** separate reusable chain-level path and must not be collapsed into the global path without evidence.
 - **Merchant-created items:** remain supported and must coexist with copied global items.
 
-## 4. Verified Experience Catalogue evidence
+## 4. Verified Experience Catalogue and clone evidence
 
 `AmealioDashboardMVP-/client/src/components/superAdminComponents/superAdminAllComponent/SuperAdminExperience/ExperienceCatalog/` is a dedicated Super Admin **Experience Catalogue** area.
 
@@ -91,6 +91,15 @@ Verified files include:
 This establishes a platform-managed reusable experience catalogue/media capability. It must not be incorrectly collapsed into merchant-owned `Experience` records.
 
 The legacy `Experience` MongoDB model itself is merchant/restaurant-scoped (`vendorId`, `restaurantId`) and represents the merchant's published/operational experience. The platform Experience Catalogue is therefore a distinct **reusable platform content/workflow layer**, even though the legacy implementation stores different pieces of the capability in different services/models.
+
+There is also a direct merchant **copy/clone** workflow in `CreateExpericence.js`:
+
+- `ClonePopup.js` searches `/experience?expType=...&type=recentList` or `/experience?search=...&type=...` and lets the merchant select an existing experience to copy;
+- the selected experience is loaded from `/experience/:id`;
+- the form is repopulated into a new experience creation flow rather than simply editing the source record;
+- `CloneFolderPopup.js` loads `/experience-media/:id`, copies active folder photos/videos plus folder metadata into the new experience form, and then creates a new merchant experience.
+
+This proves that the reusable experience capability is not limited to media administration: existing experience data and curated Experience Catalogue folders can feed a **new merchant Experience** creation flow.
 
 ## 5. Target impact
 
@@ -126,6 +135,8 @@ Merchant Experience configuration / operational record
 
 The existing target `Experience` model must not be repurposed to mean the platform catalogue without a migration design review.
 
+The merchant clone path should likewise create a **new** merchant Experience from source data; it must not mutate the source Experience.
+
 ## 6. What remains owner-decision / unknown
 
 This reconciliation does **not** establish the following without additional source tracing:
@@ -135,7 +146,8 @@ This reconciliation does **not** establish the following without additional sour
 - whether copied merchant records retain a source/global-item lineage identifier;
 - exact global-vs-chain precedence when both exist;
 - whether Experience Catalogue folders are reusable templates, reusable media only, or both for every experience workflow;
-- exact propagation/update semantics for experience catalogue content after merchant reuse.
+- exact propagation/update semantics for experience catalogue content after merchant reuse;
+- the full field-level mapping and persistence semantics for experience clone operations.
 
 These are forensic questions, not reasons to block the migration. Do not invent answers until traced from the corresponding backend services and UI actions.
 

@@ -28,7 +28,7 @@ The database enforces:
 - non-empty currency/idempotency values
 - source/type/direction consistency for the two approved refund types
 - one adjustment per order `Refund`
-- one adjustment per `TipPayment`
+- multiple adjustment rows may reference the same `TipPayment`, because a tip can be partially refunded through multiple provider refund events
 - foreign-key preservation of settlement and source records
 
 The repository additionally validates source integrity before insertion:
@@ -37,12 +37,13 @@ The repository additionally validates source integrity before insertion:
 - the referenced `PaymentIntent` must belong to the supplied order and use the same currency
 - the referenced `Order` must belong to the supplied merchant
 - the referenced `PaymentIntent` must have a `SettlementItem` in the supplied settlement, preventing a refund from being attributed to an unrelated settlement
-- `TIP_REFUND` requires a positive processed-refund amount already recorded on the `TipPayment`, matching merchant and currency, and the adjustment cannot exceed that refunded amount
+- `TIP_REFUND` requires a positive processed-refund amount already recorded on the `TipPayment`, matching merchant and currency
+- cumulative tip settlement adjustments must not exceed the `TipPayment.refundedAmountMinor`; the locked tip row serializes this check against concurrent refund state changes
 - the referenced tip's `Order` must belong to the supplied merchant
 - the referenced `TipPayment` must have a `SettlementItem` in the supplied settlement
 - refund/payment/tip/order source rows are locked during validation where they participate in mutable refund or ownership state, serializing the adjustment decision against concurrent changes
 
-The repository is idempotent: replaying the same idempotency key with the same economics returns the original adjustment; reusing it for different economics is rejected.
+The repository is idempotent: replaying the same idempotency key with the same economics returns the original adjustment; reusing it for different economics is rejected. Tip refund events therefore use distinct idempotency keys while sharing the same `TipPayment` source.
 
 ## Persistence boundary
 

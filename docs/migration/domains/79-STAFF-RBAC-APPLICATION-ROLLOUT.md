@@ -58,9 +58,15 @@ Apply the same mechanism to ordering, offers, payments/refunds, settlement, and 
 
 ## Permission-key policy
 
-The existing `staff.read` and `staff.write` keys remain foundation/test permissions only. They are not the final business permission catalogue.
+The existing `staff.read` and `staff.write` keys remain foundation/test permissions only. They are not a business permission catalogue.
 
-Before introducing domain permission keys, trace legacy Admin/Super Admin and Merchant role definitions, permission trees/catalogues, backend authorization checks, frontend route/action visibility, merchant-vs-platform ownership checks, and role-specific exceptions. Then create a documented legacy-to-target mapping.
+**Forensic result (doc 81):** legacy `vendorPermission` / `superAdminPermission` trees are unfinished UI + persisted schema. Backend enforcement is coarse `VendorUser.role` (`vendor` | `superadmin`). There is no VendorUser→role assignment FK and AddRole does not POST checkbox values.
+
+Therefore:
+
+- do **not** invent domain permission keys from UI checkbox labels;
+- Admin/Merchant HTTP authorization for verified parity uses coarse `@PlatformOnly` / `@RequireStaffRoles` plus service-level merchant scope;
+- finishing a fine-grained catalogue is a future product capability, not legacy parity.
 
 ## Security invariants
 
@@ -80,6 +86,10 @@ A staff-facing domain is RBAC-integrated only when the route is authenticated, a
 
 **🟢 Global Item Catalogue:** controller-level RBAC wired; service-level scope checks retained.
 
-**🟡 Merchant/Admin domain controllers:** application services exist, but many staff-facing HTTP surfaces still need to be introduced before route-level enforcement can be applied.
+**🟢 Legacy RBAC linkage/enforcement forensic (doc 81):** complete — coarse role mapping only; fine-grained tree activation deferred.
 
-**🟡 Legacy fine-grained permission catalogue:** forensic mapping still required; foundation permission keys are not the final business permission model.
+**🟡 Merchant/Admin domain controllers:** onboarding, catalog, platform-catalog, and merchant experience HTTP surfaces are staff-authorized; additional operational domains still need controllers as they are exposed.
+
+**🟡 Global Experience Catalogue platform HTTP:** merchant experience surface exists; Super Admin reusable experience/media catalogue still requires legacy trace + platform routes.
+
+**🟡 Staff role-management HTTP:** Role/RolePermission storage exists; CRUD/assignment surface not yet reconciled to legacy role-management APIs.

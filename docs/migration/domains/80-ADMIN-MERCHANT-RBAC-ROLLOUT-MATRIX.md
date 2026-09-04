@@ -29,12 +29,15 @@ Make the existing staff RBAC foundation an application-wide capability without i
 | Merchant staff management | Existing Role/RolePermission data; route surface not yet reconciled | TBD | merchant | Next |
 | Ordering operations | Existing service foundation | TBD | merchant/restaurant | Next |
 | Payment/settlement administration | Existing service foundation | TBD | merchant/platform | Next |
+| Legacy RBAC forensic (doc 81) | N/A | Coarse role parity only | N/A | Complete |
 
 ## Security rule
 
-Do not introduce domain permission keys until the legacy permission catalogue is mapped to actual Admin/Merchant actions. `staff.read` and `staff.write` remain foundation/test permissions only.
+Do not introduce domain permission keys from the unfinished legacy UI permission trees. Doc 81 establishes that verified backend enforcement is coarse `vendor` / `superadmin` (target: `SUPER_ADMIN` / `MERCHANT_OWNER` / `MERCHANT_STAFF`). `staff.read` and `staff.write` remain foundation/test permissions only.
 
 Do not trust request-supplied merchant IDs to grant scope. Request IDs may only be used to detect a cross-merchant mismatch; authoritative merchant scope comes from the authenticated staff principal and resource ownership checks.
+
+Do not implement legacy Super Admin act-as-merchant (`vendor-access`) without an explicit owner decision.
 
 ## Implementation gate
 
@@ -43,7 +46,7 @@ A domain is considered RBAC-complete only when:
 1. legacy Admin/Merchant authorization behavior has been traced,
 2. route authentication is enforced,
 3. coarse role boundaries are enforced,
-4. fine-grained permission behavior is mapped where legacy evidence requires it,
+4. fine-grained permission behavior is mapped only where legacy evidence requires runtime enforcement (doc 81: not required for current parity),
 5. resource tenant isolation is enforced in the application layer,
 6. unauthorized and cross-merchant cases are tested,
 7. no business rule has been invented to fill an evidence gap.

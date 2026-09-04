@@ -26,12 +26,11 @@ const FOOD_MODES = new Set<ExperienceFoodModeName>([
 const MENU_MODES = new Set<ExperienceMenuModeName>(['NONE', 'STANDARD', 'CUSTOM', 'PACKAGE']);
 
 /**
- * Merchant Experience CONFIGURATION foundation (P1.7.20). Create/update/publish/
- * soft-delete a merchant-owned `Experience` + its custom-menu references over the
- * new target models. Merchant-tenant-scoped (P1.7.1F/P1.7.2): server-derived
- * scope, cross-merchant/deleted/unknown rejected, SUPER_ADMIN explicit target,
- * activation gate (P1.7.14) upstream. No booking/payment/refund/Diner/Order,
- * no media, no scheduling engine, no packages, no events.
+ * Merchant Experience CONFIGURATION foundation (P1.7.20 + media URL fields).
+ * Create/update/publish/soft-delete a merchant-owned `Experience` + custom-menu
+ * references. Merchant-tenant-scoped. Media is URL-string arrays only (legacy
+ * Experience photos/videos). No booking/payment, no platform-folder lineage,
+ * no server-side clone/materialize.
  */
 @Injectable()
 export class ExperienceService {
@@ -49,6 +48,7 @@ export class ExperienceService {
     this.validateEnums(input);
     this.validateCapacity(input.totalSeats, input.minSeats, input.maxSeats);
     this.validatePrices(input);
+    this.validateMedia(input);
     const merchantId = await this.assertRestaurant(principal, input.restaurantId);
     await this.assertCategory(input.categoryId);
     await this.assertCategory(input.subCategoryId);
@@ -93,6 +93,7 @@ export class ExperienceService {
     this.validateEnums(input);
     this.validateCapacity(input.totalSeats, input.minSeats, input.maxSeats);
     this.validatePrices(input);
+    this.validateMedia(input);
     await this.assertCategory(input.categoryId);
     await this.assertCategory(input.subCategoryId);
 
@@ -113,6 +114,13 @@ export class ExperienceService {
       data.subCategory = input.subCategoryId
         ? { connect: { id: input.subCategoryId } }
         : { disconnect: true };
+    if (input.photos !== undefined) data.photos = input.photos;
+    if (input.photoThumbnails !== undefined) data.photoThumbnails = input.photoThumbnails;
+    if (input.videos !== undefined) data.videos = input.videos;
+    if (input.promotionalVideos !== undefined) data.promotionalVideos = input.promotionalVideos;
+    if (input.userBenefits !== undefined) data.userBenefits = input.userBenefits;
+    if (input.termsAndConditions !== undefined) data.termsAndConditions = input.termsAndConditions;
+    if (input.tags !== undefined) data.tags = input.tags;
     if (input.totalSeats !== undefined) data.totalSeats = input.totalSeats;
     if (input.minSeats !== undefined) data.minSeats = input.minSeats;
     if (input.maxSeats !== undefined) data.maxSeats = input.maxSeats;
@@ -246,6 +254,21 @@ export class ExperienceService {
     })) {
       if (v != null && (v as bigint) < 0n) {
         throw new BadRequestException(`${k} must be >= 0`);
+      }
+    }
+  }
+
+  private validateMedia(input: CreateExperienceInput | UpdateExperienceInput): void {
+    for (const [field, value] of Object.entries({
+      photos: input.photos,
+      photoThumbnails: input.photoThumbnails,
+      videos: input.videos,
+      promotionalVideos: input.promotionalVideos,
+      tags: input.tags,
+    })) {
+      if (value === undefined) continue;
+      if (!Array.isArray(value) || value.some((u) => typeof u !== 'string' || !u.trim())) {
+        throw new BadRequestException(`${field} must be an array of non-empty URL/strings`);
       }
     }
   }

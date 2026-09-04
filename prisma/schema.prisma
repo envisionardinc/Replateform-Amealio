@@ -897,6 +897,16 @@ model Experience {
   foodDescription String? // legacy foodItems
   occasionText    String? // legacy occasionWithText
 
+  // Media/content (legacy Experience string URL arrays + clone-from-folder text).
+  // URL references only — no binary assets, no platform-folder lineage.
+  photos              String[] @default([])
+  photoThumbnails     String[] @default([])
+  videos              String[] @default([])
+  promotionalVideos   String[] @default([])
+  userBenefits        String? // legacy userBenefits / folder what_users_get
+  termsAndConditions  String? // legacy tc / folder terms_and_conditions
+  tags                String[] @default([])
+
   // Capacity CONFIGURATION (not runtime inventory).
   totalSeats Int?
   minSeats   Int?

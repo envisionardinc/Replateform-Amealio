@@ -16,8 +16,14 @@ describe('ExperienceController', () => {
   };
   const controller = new ExperienceController(service as any);
 
-  const principal = (role: StaffPrincipal['staffRole'], merchantId = 'merchant-1'): StaffPrincipal => ({
-    staffMemberId: 'staff-1', actorType: 'STAFF', staffRole: role, merchantId,
+  const principal = (
+    role: StaffPrincipal['staffRole'],
+    merchantId = 'merchant-1',
+  ): StaffPrincipal => ({
+    staffMemberId: 'staff-1',
+    actorType: 'STAFF',
+    staffRole: role,
+    merchantId,
   });
 
   beforeEach(() => jest.clearAllMocks());
@@ -37,16 +43,20 @@ describe('ExperienceController', () => {
 
   it('requires merchant owner or merchant staff for the entire controller', () => {
     expect(Reflect.getMetadata(STAFF_ROLES_KEY, ExperienceController)).toEqual([
-      'MERCHANT_OWNER', 'MERCHANT_STAFF',
+      'MERCHANT_OWNER',
+      'MERCHANT_STAFF',
     ]);
   });
 
   it('normalizes experience money inputs at the HTTP boundary', async () => {
     const p = principal('MERCHANT_OWNER');
     const input = {
-      restaurantId: 'restaurant-1', name: 'Dinner',
-      listingPriceMinor: '1500', adultPriceMinor: 2000,
-      kidsPriceMinor: null, occasionPriceMinor: '0',
+      restaurantId: 'restaurant-1',
+      name: 'Dinner',
+      listingPriceMinor: '1500',
+      adultPriceMinor: 2000,
+      kidsPriceMinor: null,
+      occasionPriceMinor: '0',
     };
     await controller.create({ staffPrincipal: p } as any, input as any);
     const normalized = service.createExperience.mock.calls[0][1];

@@ -21,15 +21,14 @@ interface ResolvedCreate {
 }
 
 /**
- * Write/read access for the merchant Experience configuration (P1.7.20) over the
- * new `Experience` + `ExperienceMenu` models. Experience + its menu links are
- * created/replaced atomically. Authorization/tenancy is enforced by ExperienceService.
+ * Write/read access for the merchant Experience configuration over the
+ * `Experience` + `ExperienceMenu` models. Authorization/tenancy is enforced by
+ * ExperienceService.
  */
 @Injectable()
 export class ExperienceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ---- scope resolvers ----
   async experienceScope(
     id: string,
   ): Promise<{ restaurantId: string; deletedAt: Date | null } | null> {
@@ -65,7 +64,6 @@ export class ExperienceRepository {
     }
   }
 
-  // ---- create ----
   async create(args: ResolvedCreate): Promise<ExperienceRecord> {
     const { merchantId, input, menuLinks } = args;
     const created = await this.prisma.experience.create({
@@ -83,6 +81,13 @@ export class ExperienceRepository {
         ...(input.menuMode !== undefined ? { menuMode: input.menuMode } : {}),
         foodDescription: input.foodDescription ?? null,
         occasionText: input.occasionText ?? null,
+        photos: input.photos ?? [],
+        photoThumbnails: input.photoThumbnails ?? [],
+        videos: input.videos ?? [],
+        promotionalVideos: input.promotionalVideos ?? [],
+        userBenefits: input.userBenefits ?? null,
+        termsAndConditions: input.termsAndConditions ?? null,
+        tags: input.tags ?? [],
         totalSeats: input.totalSeats ?? null,
         minSeats: input.minSeats ?? null,
         maxSeats: input.maxSeats ?? null,
@@ -158,7 +163,6 @@ export class ExperienceRepository {
     await this.prisma.experience.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
-  /** Replace the experience's custom-menu links atomically. */
   async replaceMenus(
     experienceId: string,
     menuLinks: Array<{ menuId: string; isDefault: boolean }>,
@@ -181,7 +185,7 @@ function toDate(v?: string | Date | null): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function toRecord(row: {
+type ExperienceRow = {
   id: string;
   legacyId: string | null;
   merchantId: string;
@@ -196,6 +200,13 @@ function toRecord(row: {
   menuMode: string;
   foodDescription: string | null;
   occasionText: string | null;
+  photos: string[];
+  photoThumbnails: string[];
+  videos: string[];
+  promotionalVideos: string[];
+  userBenefits: string | null;
+  termsAndConditions: string | null;
+  tags: string[];
   totalSeats: number | null;
   minSeats: number | null;
   maxSeats: number | null;
@@ -209,7 +220,9 @@ function toRecord(row: {
   active: boolean;
   isDraft: boolean;
   menus: Array<{ id: string; menuId: string; isDefault: boolean }>;
-}): ExperienceRecord {
+};
+
+function toRecord(row: ExperienceRow): ExperienceRecord {
   return {
     id: row.id,
     legacyId: row.legacyId,
@@ -225,6 +238,13 @@ function toRecord(row: {
     menuMode: row.menuMode as ExperienceMenuModeName,
     foodDescription: row.foodDescription,
     occasionText: row.occasionText,
+    photos: row.photos ?? [],
+    photoThumbnails: row.photoThumbnails ?? [],
+    videos: row.videos ?? [],
+    promotionalVideos: row.promotionalVideos ?? [],
+    userBenefits: row.userBenefits,
+    termsAndConditions: row.termsAndConditions,
+    tags: row.tags ?? [],
     totalSeats: row.totalSeats,
     minSeats: row.minSeats,
     maxSeats: row.maxSeats,

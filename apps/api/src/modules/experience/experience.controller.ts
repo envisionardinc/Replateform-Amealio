@@ -3,16 +3,24 @@ import type { Request } from 'express';
 import { JwtStaffGuard } from '../identity/staff-authentication/guards/jwt-staff.guard';
 import { StaffAuthorizationGuard } from '../identity/staff-authentication/authorization/staff-authorization.guard';
 import { RequireStaffRoles } from '../identity/staff-authentication/authorization/staff-authorization.decorators';
-import type { RequestWithStaffPrincipal, StaffPrincipal } from '../identity/staff-authentication/staff-principal';
+import type {
+  RequestWithStaffPrincipal,
+  StaffPrincipal,
+} from '../identity/staff-authentication/staff-principal';
 import { ExperienceService } from './application/experience.service';
-import type { CreateExperienceInput, ExperienceMenuLinkInput, UpdateExperienceInput } from './domain/experience.types';
+import type {
+  CreateExperienceInput,
+  ExperienceMenuLinkInput,
+  UpdateExperienceInput,
+} from './domain/experience.types';
 
 /**
  * Staff-facing merchant Experience configuration surface.
  *
- * This exposes only behavior already implemented by ExperienceService. Media,
- * booking, ticketing, seating allocation, payment, packages, scheduling
- * engines, and event runtime remain separate domains.
+ * Media fields are URL-string arrays (legacy Experience). Platform folder
+ * discovery remains on `/platform-experience-catalogue*` — clients map folder
+ * media into create/update payloads (see `mapPlatformFolderToExperienceMedia`).
+ * There is no server-side clone/materialize endpoint here.
  */
 @Controller('experiences')
 @UseGuards(JwtStaffGuard, StaffAuthorizationGuard)
@@ -39,17 +47,27 @@ export class ExperienceController {
   }
 
   @Post()
-  async create(@Req() req: Request & RequestWithStaffPrincipal, @Body() input: CreateExperienceInput) {
-    return this.service.createExperience(this.principal(req), normalizeMoney(input));
+  async create(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.service.createExperience(
+      this.principal(req),
+      normalizeMoney(parseExperienceBody(body) as unknown as CreateExperienceInput),
+    );
   }
 
   @Patch(':id')
   async update(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('id') id: string,
-    @Body() input: UpdateExperienceInput,
+    @Body() body: Record<string, unknown>,
   ) {
-    return this.service.updateExperience(this.principal(req), id, normalizeMoney(input));
+    return this.service.updateExperience(
+      this.principal(req),
+      id,
+      normalizeMoney(parseExperienceBody(body) as unknown as UpdateExperienceInput),
+    );
   }
 
   @Post(':id/publish')
@@ -78,13 +96,48 @@ export class ExperienceController {
   }
 }
 
-function normalizeMoney<T extends Record<string, unknown>>(input: T): T {
-  const output = { ...input } as T;
-  for (const key of ['listingPriceMinor', 'adultPriceMinor', 'kidsPriceMinor', 'occasionPriceMinor']) {
+type MoneyPayload = {
+  listingPriceMinor?: unknown;
+  adultPriceMinor?: unknown;
+  kidsPriceMinor?: unknown;
+  occasionPriceMinor?: unknown;
+};
+
+function normalizeMoney<T extends MoneyPayload>(input: T): T {
+  const output = { ...input };
+  for (const key of [
+    'listingPriceMinor',
+    'adultPriceMinor',
+    'kidsPriceMinor',
+    'occasionPriceMinor',
+  ] as const) {
     const value = output[key];
     if (value !== undefined && value !== null && typeof value !== 'bigint') {
-      output[key] = BigInt(value as string | number) as T[Extract<keyof T, string>];
+      output[key] = BigInt(value as string | number) as T[typeof key];
     }
   }
   return output;
+}
+
+/** Accept camelCase target fields plus legacy aliases (tc, promotional_videos). */
+function parseExperienceBody(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...body };
+
+  if (out.termsAndConditions === undefined && body.tc !== undefined) {
+    out.termsAndConditions = body.tc;
+  }
+  if (out.promotionalVideos === undefined && body.promotional_videos !== undefined) {
+    out.promotionalVideos = body.promotional_videos;
+  }
+  if (out.photoThumbnails === undefined && body.photoThumbnails === undefined) {
+    // no-op; keep explicit
+  }
+
+  // Strip lineage-like keys if a client mistakenly sends them — do not persist.
+  delete out.sourceFolderId;
+  delete out.sourceExperienceId;
+  delete out.clonedFrom;
+  delete out.platformFolderId;
+
+  return out;
 }

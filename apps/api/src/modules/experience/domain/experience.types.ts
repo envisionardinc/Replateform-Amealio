@@ -1,8 +1,10 @@
 /**
- * Experience configuration domain types (P1.7.20). Merchant-owned bookable
- * experience CONFIGURATION over the new target `Experience` + `ExperienceMenu`
- * models. Money is exact integer minor units (`bigint`). Booking/payment/refund,
- * Diner/Order, media, scheduling engine, packages, and events are DEFERRED.
+ * Experience configuration domain types (P1.7.20 + media reconciliation).
+ * Merchant-owned bookable experience CONFIGURATION. Money is exact integer
+ * minor units (`bigint`). Media is URL-string arrays matching legacy Experience
+ * (photos/photoThumbnails/videos/promotional_videos). Booking/payment/refund,
+ * Diner/Order, scheduling engine, packages, events, and platform-folder lineage
+ * remain out of scope.
  */
 
 export type ExperienceTypeName = 'FOOD' | 'EVENT';
@@ -15,7 +17,18 @@ export interface ExperienceMenuLinkInput {
   isDefault?: boolean;
 }
 
-export interface CreateExperienceInput {
+/** Media/content fields shared by create + update (legacy Experience URL arrays). */
+export interface ExperienceMediaFields {
+  photos?: string[];
+  photoThumbnails?: string[];
+  videos?: string[];
+  promotionalVideos?: string[];
+  userBenefits?: string | null;
+  termsAndConditions?: string | null;
+  tags?: string[];
+}
+
+export interface CreateExperienceInput extends ExperienceMediaFields {
   restaurantId: string;
   name: string;
   description?: string | null;
@@ -42,7 +55,7 @@ export interface CreateExperienceInput {
   customMenus?: ExperienceMenuLinkInput[];
 }
 
-export interface UpdateExperienceInput {
+export interface UpdateExperienceInput extends ExperienceMediaFields {
   name?: string;
   description?: string | null;
   type?: ExperienceTypeName;
@@ -87,6 +100,13 @@ export interface ExperienceRecord {
   menuMode: ExperienceMenuModeName;
   foodDescription: string | null;
   occasionText: string | null;
+  photos: string[];
+  photoThumbnails: string[];
+  videos: string[];
+  promotionalVideos: string[];
+  userBenefits: string | null;
+  termsAndConditions: string | null;
+  tags: string[];
   totalSeats: number | null;
   minSeats: number | null;
   maxSeats: number | null;

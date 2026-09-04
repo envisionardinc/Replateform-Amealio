@@ -23,7 +23,7 @@ import type { StaffPrincipal } from '../src/modules/identity/staff-authenticatio
 /**
  * P1.7.20 Merchant experience configuration foundation — integration (TEST DB).
  * Merchant-scoped create/update/publish/soft-delete of Experience + custom-menu
- * references. No booking/payment/Diner/Order/media/events.
+ * references + URL media fields. No booking/payment/Diner/Order/events/lineage.
  */
 describe('Experience configuration foundation (integration)', () => {
   let app: INestApplication;
@@ -305,5 +305,57 @@ describe('Experience configuration foundation (integration)', () => {
     await owners.activateMerchant(superAdmin, merchantId);
     const session = await staffAuth.login({ email, password });
     expect(session.staff.merchantId).toBe(merchantId);
+  });
+
+  it('persists and updates merchant Experience media URL fields without platform linkage', async () => {
+    const { merchantId, restaurantId } = await seed();
+    const staff = staffOf(merchantId);
+    const created = await experiences.createExperience(staff, {
+      restaurantId,
+      name: 'Media Exp',
+      photos: ['https://cdn.example/1.jpg', 'https://cdn.example/2.jpg'],
+      photoThumbnails: ['https://cdn.example/1.jpg', 'https://cdn.example/2.jpg'],
+      videos: ['https://cdn.example/v.mp4'],
+      promotionalVideos: ['https://cdn.example/p.mp4'],
+      userBenefits: 'Benefits',
+      termsAndConditions: 'T&Cs',
+      tags: ['tag-a'],
+    });
+    expect(created.photos).toEqual(['https://cdn.example/1.jpg', 'https://cdn.example/2.jpg']);
+    expect(created.videos).toEqual(['https://cdn.example/v.mp4']);
+    expect(created.promotionalVideos).toEqual(['https://cdn.example/p.mp4']);
+    expect(created.userBenefits).toBe('Benefits');
+    expect(created.termsAndConditions).toBe('T&Cs');
+    expect(created.tags).toEqual(['tag-a']);
+    expect(created).not.toHaveProperty('sourceFolderId');
+
+    const row = await prisma.experience.findUniqueOrThrow({ where: { id: created.id } });
+    expect(row.photos).toEqual(['https://cdn.example/1.jpg', 'https://cdn.example/2.jpg']);
+    expect((row as { sourceFolderId?: string }).sourceFolderId).toBeUndefined();
+
+    const updated = await experiences.updateExperience(staff, created.id, {
+      photos: ['https://cdn.example/3.jpg'],
+      videos: [],
+      tags: ['tag-b'],
+    });
+    expect(updated.photos).toEqual(['https://cdn.example/3.jpg']);
+    expect(updated.videos).toEqual([]);
+    expect(updated.tags).toEqual(['tag-b']);
+    expect(updated.promotionalVideos).toEqual(['https://cdn.example/p.mp4']);
+  });
+
+  it('rejects cross-merchant media updates', async () => {
+    const a = await seed();
+    const b = await seed();
+    const exp = await experiences.createExperience(staffOf(a.merchantId), {
+      restaurantId: a.restaurantId,
+      name: 'Owned',
+      photos: ['https://cdn.example/a.jpg'],
+    });
+    await expect(
+      experiences.updateExperience(staffOf(b.merchantId), exp.id, {
+        photos: ['https://cdn.example/hack.jpg'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

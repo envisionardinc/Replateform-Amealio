@@ -1,6 +1,8 @@
 # 87 — Merchant Order Management Forensic Reconciliation
 
-**Status:** FORENSIC / RECONCILIATION ONLY — no implementation in this slice  
+**Status:** FORENSIC EVIDENCE (legacy recovery). Target behavior is **not** this document.  
+**Target contract:** [88-MERCHANT-ORDER-MANAGEMENT-TARGET-BEHAVIOR-CONTRACT.md](./88-MERCHANT-ORDER-MANAGEMENT-TARGET-BEHAVIOR-CONTRACT.md)  
+**Rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  
 **Date:** 2026-09-04  
 **Brand:** amealio  
 **Canonical target:** `replateform-amealio` / `replatform/backend-consolidation`  

@@ -194,31 +194,36 @@ export class CatalogController {
   }
 }
 
-/**
- * JSON cannot carry bigint. The public contract therefore accepts decimal
- * integer strings (or safe JSON integers) and converts only known money fields
- * before the domain service sees them. No currency arithmetic is introduced.
- */
-function normalizeMoney<T extends Record<string, unknown>>(input: T): T {
-  const output = { ...input } as T;
+type MoneyPayload = Record<string, unknown> & {
+  variants?: MoneyPayload[];
+  channelConfigs?: MoneyPayload[];
+  addOnGroups?: Array<MoneyPayload & { addOns?: MoneyPayload[] }>;
+  addOns?: MoneyPayload[];
+};
+
+/** JSON cannot carry bigint; normalize only the known money fields at the API boundary. */
+function normalizeMoney<T>(input: T): T {
+  const source = input as unknown as MoneyPayload;
+  const output: MoneyPayload = { ...source };
   for (const key of ['priceMinor', 'priceOverrideMinor']) {
     const value = output[key];
     if (value !== undefined && value !== null && typeof value !== 'bigint') {
-      output[key] = BigInt(value as string | number) as T[Extract<keyof T, string>];
+      if (typeof value === 'number' && !Number.isSafeInteger(value)) {
+        throw new TypeError(`${key} must be a safe integer or decimal string`);
+      }
+      output[key] = BigInt(value as string | number);
     }
   }
-
-  if (Array.isArray(output.variants)) {
-    output.variants = output.variants.map((v: VariantInput) => normalizeMoney(v));
+  if (Array.isArray(source.variants)) output.variants = source.variants.map(normalizeMoney);
+  if (Array.isArray(source.channelConfigs)) {
+    output.channelConfigs = source.channelConfigs.map(normalizeMoney);
   }
-  if (Array.isArray(output.channelConfigs)) {
-    output.channelConfigs = output.channelConfigs.map((v: ChannelConfigInput) => normalizeMoney(v));
-  }
-  if (Array.isArray(output.addOnGroups)) {
-    output.addOnGroups = output.addOnGroups.map((group) => ({
+  if (Array.isArray(source.addOnGroups)) {
+    output.addOnGroups = source.addOnGroups.map((group) => ({
       ...group,
-      addOns: group.addOns?.map((addOn) => normalizeMoney(addOn)),
+      addOns: group.addOns?.map(normalizeMoney),
     }));
   }
-  return output;
+  if (Array.isArray(source.addOns)) output.addOns = source.addOns.map(normalizeMoney);
+  return output as unknown as T;
 }

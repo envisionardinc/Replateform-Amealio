@@ -409,6 +409,8 @@ Do **not** duplicate `OrderService.transitionStatus`, payment/refund/settlement 
 
 ## 19. Owner decisions
 
+**Superseded by doc 88 §4 (auto-resolved) and §6 (remaining).** The list below is the forensic open set as of 87 and must not be implemented as-is.
+
 Stop only on these (evidence conflicts or policy):
 
 1. **OD-MOM-ENGINE** — Canonical merchant advance: one-hop target graph vs Path A increment/skip vs Path B `orderSteps` 3/7 chaining.

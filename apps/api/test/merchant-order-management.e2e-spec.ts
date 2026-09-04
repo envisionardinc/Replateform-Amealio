@@ -337,7 +337,9 @@ describe('Merchant order management (doc 88 HTTP e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ toStatus: 'ON_THE_WAY' });
     expect(ofdPickup.status).toBe(400);
-    expect((await prisma.order.findUniqueOrThrow({ where: { id: pickup.id } })).status).toBe('READY');
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: pickup.id } })).status).toBe(
+      'READY',
+    );
 
     const hdReady = await seedOrder(a.restaurant.id, a.merchant.id, { type: 'HOME_DELIVERY' });
     await walkTo(token, hdReady.id, ['CONFIRMED', 'PREPARING', 'READY']);

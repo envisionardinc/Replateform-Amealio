@@ -164,9 +164,14 @@ export class OrderService {
     }
 
     if (
-      [taxTotalMinor, discountTotalMinor, feeTotalMinor, deliveryChargeMinor, tipMinor, donationMinor].some(
-        (v) => v < 0n,
-      )
+      [
+        taxTotalMinor,
+        discountTotalMinor,
+        feeTotalMinor,
+        deliveryChargeMinor,
+        tipMinor,
+        donationMinor,
+      ].some((v) => v < 0n)
     ) {
       throw new BadRequestException('money components must be >= 0');
     }
@@ -328,7 +333,9 @@ export class OrderService {
 
     if (order.type === 'HOME_DELIVERY') {
       if (toStatus === 'COMPLETED') {
-        throw new BadRequestException('HOME_DELIVERY cannot skip delivery; complete after DELIVERED');
+        throw new BadRequestException(
+          'HOME_DELIVERY cannot skip delivery; complete after DELIVERED',
+        );
       }
       if (toStatus === 'ON_THE_WAY' && order.deliveryPersonId) {
         throw new ForbiddenException('Assigned rider owns ON_THE_WAY');

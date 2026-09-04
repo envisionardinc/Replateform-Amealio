@@ -46,11 +46,16 @@ export class OrdersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: PatchOrderStatusDto,
   ) {
-    const order = await this.management.transitionMerchant(this.staff(principal), id, body.toStatus, {
-      expectedStatus: body.expectedStatus,
-      reason: body.reason,
-      reasonCode: body.reasonCode,
-    });
+    const order = await this.management.transitionMerchant(
+      this.staff(principal),
+      id,
+      body.toStatus,
+      {
+        expectedStatus: body.expectedStatus,
+        reason: body.reason,
+        reasonCode: body.reasonCode,
+      },
+    );
     return serializeOrder(order);
   }
 }

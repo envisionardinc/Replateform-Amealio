@@ -19,11 +19,7 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatusName, OrderStatusName[]
   RETURNED: [],
 };
 
-export const TERMINAL_ORDER_STATUSES: OrderStatusName[] = [
-  'COMPLETED',
-  'CANCELLED',
-  'RETURNED',
-];
+export const TERMINAL_ORDER_STATUSES: OrderStatusName[] = ['COMPLETED', 'CANCELLED', 'RETURNED'];
 
 /** Pickup-like types: after READY the merchant may complete (no rider hop). */
 export const PICKUP_LIKE_TYPES: ReadonlySet<OrderTypeName> = new Set([

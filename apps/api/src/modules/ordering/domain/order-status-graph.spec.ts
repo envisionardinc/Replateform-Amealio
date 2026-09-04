@@ -1,8 +1,4 @@
-import {
-  isAllowedTransition,
-  isPickupLike,
-  isTerminalStatus,
-} from './order-status-graph';
+import { isAllowedTransition, isPickupLike, isTerminalStatus } from './order-status-graph';
 
 describe('order-status-graph', () => {
   it('allows the canonical one-hop edges and forbids ON_THE_WAY cancel', () => {

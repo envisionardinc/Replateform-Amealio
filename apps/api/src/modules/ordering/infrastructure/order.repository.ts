@@ -412,17 +412,15 @@ export class OrderRepository {
       cancelReason: row.cancelReason,
       deliveryPersonId: null,
       items: row.items as OrderItemRecord[],
-      statusEvents: row.statusEvents.map(
-        (e): OrderStatusEventRecord => ({
-          id: e.id,
-          fromStatus: e.fromStatus as OrderStatusName | null,
-          toStatus: e.toStatus as OrderStatusName,
-          actorType: e.actorType,
-          actorId: e.actorId,
-          reason: e.reason,
-          createdAt: e.createdAt,
-        }),
-      ),
+      statusEvents: row.statusEvents.map((e): OrderStatusEventRecord => ({
+        id: e.id,
+        fromStatus: e.fromStatus as OrderStatusName | null,
+        toStatus: e.toStatus as OrderStatusName,
+        actorType: e.actorType,
+        actorId: e.actorId,
+        reason: e.reason,
+        createdAt: e.createdAt,
+      })),
       paymentIntents: row.paymentIntents,
     };
   }

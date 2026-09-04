@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtStaffGuard } from '../identity/staff-authentication/guards/jwt-staff.guard';
-import { StaffAuthorizationGuard } from '../identity/staff-authentication/guards/staff-authorization.guard';
+import { StaffAuthorizationGuard } from '../identity/staff-authentication/authorization/staff-authorization.guard';
 import { RequireStaffRoles } from '../identity/staff-authentication/authorization/staff-authorization.decorators';
-import { StaffPrincipal } from '../identity/staff-authentication/staff-principal.decorator';
-import type { StaffPrincipal as StaffPrincipalType } from '../identity/staff-authentication/staff-principal';
+import type { RequestWithStaffPrincipal, StaffPrincipal as StaffPrincipalType } from '../identity/staff-authentication/staff-principal';
 import { CatalogService } from './application/catalog.service';
 import { CatalogWriteService } from './application/catalog-write.service';
 import type {
@@ -33,164 +33,169 @@ export class CatalogController {
     private readonly writes: CatalogWriteService,
   ) {}
 
+  private principal(req: Request & RequestWithStaffPrincipal): StaffPrincipalType {
+    if (!req.staffPrincipal) throw new Error('Authenticated staff principal missing');
+    return req.staffPrincipal;
+  }
+
   @Get('restaurants/:restaurantId/menus')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   getMenus(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('restaurantId') restaurantId: string,
     @Query('visibleOnly') visibleOnly?: string,
   ) {
-    return this.catalog.getMenusForRestaurant(principal, restaurantId, visibleOnly === 'true');
+    return this.catalog.getMenusForRestaurant(this.principal(req), restaurantId, visibleOnly === 'true');
   }
 
   @Get('menus/:menuId/sections')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  getSections(@StaffPrincipal() principal: StaffPrincipalType, @Param('menuId') menuId: string) {
-    return this.catalog.getMenuSections(principal, menuId);
+  getSections(@Req() req: Request & RequestWithStaffPrincipal, @Param('menuId') menuId: string) {
+    return this.catalog.getMenuSections(this.principal(req), menuId);
   }
 
   @Get('items/:menuItemId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  getItem(@StaffPrincipal() principal: StaffPrincipalType, @Param('menuItemId') menuItemId: string) {
-    return this.catalog.getItemDetail(principal, menuItemId);
+  getItem(@Req() req: Request & RequestWithStaffPrincipal, @Param('menuItemId') menuItemId: string) {
+    return this.catalog.getItemDetail(this.principal(req), menuItemId);
   }
 
   @Get('restaurants/:restaurantId/items')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   getItems(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('restaurantId') restaurantId: string,
     @Query('availableOnly') availableOnly?: string,
   ) {
-    return this.catalog.getItemsForRestaurant(principal, restaurantId, availableOnly === 'true');
+    return this.catalog.getItemsForRestaurant(this.principal(req), restaurantId, availableOnly === 'true');
   }
 
   @Post('menus')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  createMenu(@StaffPrincipal() principal: StaffPrincipalType, @Body() input: CreateMenuInput) {
-    return this.writes.createMenu(principal, input);
+  createMenu(@Req() req: Request & RequestWithStaffPrincipal, @Body() input: CreateMenuInput) {
+    return this.writes.createMenu(this.principal(req), input);
   }
 
   @Patch('menus/:menuId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   updateMenu(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuId') menuId: string,
     @Body() input: UpdateMenuInput,
   ) {
-    return this.writes.updateMenu(principal, menuId, input);
+    return this.writes.updateMenu(this.principal(req), menuId, input);
   }
 
   @Post('sections')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  createSection(@StaffPrincipal() principal: StaffPrincipalType, @Body() input: CreateSectionInput) {
-    return this.writes.createSection(principal, input);
+  createSection(@Req() req: Request & RequestWithStaffPrincipal, @Body() input: CreateSectionInput) {
+    return this.writes.createSection(this.principal(req), input);
   }
 
   @Patch('sections/:sectionId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   updateSection(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('sectionId') sectionId: string,
     @Body() input: UpdateSectionInput,
   ) {
-    return this.writes.updateSection(principal, sectionId, input);
+    return this.writes.updateSection(this.principal(req), sectionId, input);
   }
 
   @Post('menus/:menuId/sections/reorder')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   reorderSections(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuId') menuId: string,
     @Body() body: { order: Array<{ sectionId: string; sortOrder: number }> },
   ) {
-    return this.writes.reorderSections(principal, menuId, body.order);
+    return this.writes.reorderSections(this.principal(req), menuId, body.order);
   }
 
   @Post('items')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  createItem(@StaffPrincipal() principal: StaffPrincipalType, @Body() input: CreateItemInput) {
-    return this.writes.createItem(principal, normalizeMoney(input));
+  createItem(@Req() req: Request & RequestWithStaffPrincipal, @Body() input: CreateItemInput) {
+    return this.writes.createItem(this.principal(req), normalizeMoney(input));
   }
 
   @Patch('items/:itemId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   updateItem(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('itemId') itemId: string,
     @Body() input: UpdateItemInput,
   ) {
-    return this.writes.updateItem(principal, itemId, input);
+    return this.writes.updateItem(this.principal(req), itemId, input);
   }
 
   @Post('items/:menuItemId/variants')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   createVariant(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuItemId') menuItemId: string,
     @Body() input: VariantInput,
   ) {
-    return this.writes.createVariant(principal, menuItemId, normalizeMoney(input));
+    return this.writes.createVariant(this.principal(req), menuItemId, normalizeMoney(input));
   }
 
   @Patch('variants/:variantId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   updateVariant(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('variantId') variantId: string,
     @Body() input: Partial<VariantInput>,
   ) {
-    return this.writes.updateVariant(principal, variantId, normalizeMoney(input));
+    return this.writes.updateVariant(this.principal(req), variantId, normalizeMoney(input));
   }
 
   @Patch('items/:menuItemId/channel-config')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   setChannelConfig(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuItemId') menuItemId: string,
     @Body() input: ChannelConfigInput,
   ) {
-    return this.writes.setChannelConfig(principal, menuItemId, normalizeMoney(input));
+    return this.writes.setChannelConfig(this.principal(req), menuItemId, normalizeMoney(input));
   }
 
   @Post('items/:menuItemId/add-on-groups')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   createAddOnGroup(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuItemId') menuItemId: string,
     @Body() input: { name: string; minSelect?: number; maxSelect?: number | null },
   ) {
-    return this.writes.createAddOnGroup(principal, menuItemId, input);
+    return this.writes.createAddOnGroup(this.principal(req), menuItemId, input);
   }
 
   @Patch('add-on-groups/:groupId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   updateAddOnGroup(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('groupId') groupId: string,
     @Body() input: { name?: string; minSelect?: number; maxSelect?: number | null },
   ) {
-    return this.writes.updateAddOnGroup(principal, groupId, input);
+    return this.writes.updateAddOnGroup(this.principal(req), groupId, input);
   }
 
   @Post('add-on-groups/:addOnGroupId/add-ons')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   createAddOn(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('addOnGroupId') addOnGroupId: string,
     @Body() input: { name: string; priceMinor?: bigint; currencyCode?: string },
   ) {
-    return this.writes.createAddOn(principal, addOnGroupId, normalizeMoney(input));
+    return this.writes.createAddOn(this.principal(req), addOnGroupId, normalizeMoney(input));
   }
 
   @Patch('add-ons/:addOnId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   updateAddOn(
-    @StaffPrincipal() principal: StaffPrincipalType,
+    @Req() req: Request & RequestWithStaffPrincipal,
     @Param('addOnId') addOnId: string,
     @Body() input: { name?: string; priceMinor?: bigint; currencyCode?: string },
   ) {
-    return this.writes.updateAddOn(principal, addOnId, normalizeMoney(input));
+    return this.writes.updateAddOn(this.principal(req), addOnId, normalizeMoney(input));
   }
 }
 
@@ -215,14 +220,9 @@ function normalizeMoney<T>(input: T): T {
     }
   }
   if (Array.isArray(source.variants)) output.variants = source.variants.map(normalizeMoney);
-  if (Array.isArray(source.channelConfigs)) {
-    output.channelConfigs = source.channelConfigs.map(normalizeMoney);
-  }
+  if (Array.isArray(source.channelConfigs)) output.channelConfigs = source.channelConfigs.map(normalizeMoney);
   if (Array.isArray(source.addOnGroups)) {
-    output.addOnGroups = source.addOnGroups.map((group) => ({
-      ...group,
-      addOns: group.addOns?.map(normalizeMoney),
-    }));
+    output.addOnGroups = source.addOnGroups.map((group) => ({ ...group, addOns: group.addOns?.map(normalizeMoney) }));
   }
   if (Array.isArray(source.addOns)) output.addOns = source.addOns.map(normalizeMoney);
   return output as unknown as T;

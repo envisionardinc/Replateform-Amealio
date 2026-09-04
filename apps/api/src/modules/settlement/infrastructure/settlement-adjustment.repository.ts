@@ -224,10 +224,9 @@ export class SettlementAdjustmentRepository {
       const paymentIntents = await tx.$queryRaw<Array<{
         id: string;
         orderId: string | null;
-        amountMinor: bigint;
         currencyCode: string;
       }>>`
-        SELECT "id", "orderId", "amountMinor", "currencyCode"
+        SELECT "id", "orderId", "currencyCode"
         FROM "PaymentIntent"
         WHERE "id" = ${args.paymentIntentId}::uuid
         FOR UPDATE
@@ -248,12 +247,23 @@ export class SettlementAdjustmentRepository {
         SELECT "id", "merchantId"
         FROM "Order"
         WHERE "id" = ${args.orderId}::uuid
-        LIMIT 1
+        FOR UPDATE
       `;
       const order = orders[0];
       if (!order) throw new NotFoundException('Order not found');
       if (order.merchantId !== args.merchantId) {
         throw new BadRequestException('Order does not belong to the merchant');
+      }
+
+      const settlementItems = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "SettlementItem"
+        WHERE "settlementId" = ${args.settlementId}::uuid
+          AND "paymentIntentId" = ${args.paymentIntentId}::uuid
+        LIMIT 1
+      `;
+      if (!settlementItems[0]) {
+        throw new BadRequestException('Payment intent is not settled in the supplied settlement');
       }
       return;
     }
@@ -284,8 +294,37 @@ export class SettlementAdjustmentRepository {
     if (tip.currencyCode !== args.currencyCode) {
       throw new BadRequestException('Tip payment currency must match the adjustment currency');
     }
-    if (tip.refundedAmountMinor <= 0n || args.amountMinor > tip.refundedAmountMinor) {
+    if (tip.refundedAmountMinor <= 0n || tip.refundedAmountMinor > tip.amountMinor) {
+      throw new BadRequestException('Tip payment does not contain a valid processed refund amount');
+    }
+    if (args.amountMinor > tip.refundedAmountMinor) {
       throw new BadRequestException('Adjustment amount cannot exceed the processed tip refund amount');
+    }
+
+    const orders = await tx.$queryRaw<Array<{
+      id: string;
+      merchantId: string;
+    }>>`
+      SELECT "id", "merchantId"
+      FROM "Order"
+      WHERE "id" = ${tip.orderId}::uuid
+      FOR UPDATE
+    `;
+    const order = orders[0];
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.merchantId !== args.merchantId) {
+      throw new BadRequestException('Tip payment order does not belong to the merchant');
+    }
+
+    const settlementItems = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "SettlementItem"
+      WHERE "settlementId" = ${args.settlementId}::uuid
+        AND "tipPaymentId" = ${args.tipPaymentId}::uuid
+      LIMIT 1
+    `;
+    if (!settlementItems[0]) {
+      throw new BadRequestException('Tip payment is not settled in the supplied settlement');
     }
   }
 

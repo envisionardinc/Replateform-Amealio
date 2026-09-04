@@ -21,7 +21,7 @@ The legacy backend registers a dedicated `/global-catalogue` service. Its implem
 
 The service rejects an item when another global item with the same name already exists. An `assign_items` array can associate item IDs to the catalogue. The implementation itself warns that `assign_items` is an explicit operation and should not be supplied casually.
 
-The service is registered at `/global-catalogue`, while the underlying catalogue container is separately registered at `/catalogue`.
+The service is registered at `/global-catalogue`, while the underlying catalogue container is separately registered at `/catalogue`. fileciteturn183file0
 
 ## 2. Super Admin catalogue lifecycle is broader than the bulk endpoint
 
@@ -37,23 +37,23 @@ The UI action creates the catalogue through `POST /catalogue`, reads catalogues 
 
 Therefore the migration must distinguish the **catalogue container lifecycle** from the separate **bulk global category/item construction** endpoint. Do not assume `/global-catalogue` is the only API involved in the Super Admin Global Catalogue workflow.
 
-The legacy Super Admin UI also exposes explicit Global Catalogue and Chain Catalogue screens and separate catalogue-detail/assignment flows.
+The legacy Super Admin UI also exposes explicit Global Catalogue and Chain Catalogue screens and separate catalogue-detail/assignment flows. fileciteturn173file0
 
 ## 3. Catalogue is a reusable container, not the merchant menu
 
-The legacy `/catalogue` service is a read service over the catalogue model. A catalogue contains a name, cuisine type, description, an item-ID collection, and active/status state. Reads populate the referenced items. This establishes a platform catalogue/container layer distinct from the merchant's operational menu.
+The legacy `/catalogue` service is a read service over the catalogue model. A catalogue contains a name, cuisine type, description, an item-ID collection, and active/status state. Reads populate the referenced items. This establishes a platform catalogue/container layer distinct from the merchant's operational menu. fileciteturn156file0 fileciteturn158file0
 
 The legacy service registration exposes three related paths:
 
 - `/catalogue` — catalogue container CRUD/read surface;
 - `/global-catalogue` — platform/global catalogue construction;
-- `/vendor/localCategoryItems` — merchant-side materialization/commit workflow.
+- `/vendor/localCategoryItems` — merchant-side materialization/commit workflow. fileciteturn182file0
 
 ## 4. Merchant Global Catalogue discovery and selection
 
 The merchant dashboard uses `/catalogue` to retrieve Global Catalogue containers, `/catalogue/:id` to retrieve the selected catalogue and its item/category data, and `/vendor/items/:categoryId?catlogue_id=:catalogueId` to retrieve items for a selected catalogue category.
 
-The merchant selection action then posts to `/vendor/items?add=true`. The request contains a `cat_id` and an `Items` collection of selected source item IDs. The legacy implementation authenticates the merchant, loads those source item records, copies their business fields into new merchant-owned item documents, replaces the category with the selected local category, and suppresses creation when the merchant already has an item with the same name.
+The merchant selection action then posts to `/vendor/items?add=true`. The request contains a `cat_id` and an `Items` collection of selected source item IDs. The legacy implementation authenticates the merchant, loads those source item records, copies their business fields into new merchant-owned item documents, replaces the category with the selected local category, and suppresses creation when the merchant already has an item with the same name. fileciteturn164file0 fileciteturn170file0
 
 This is direct evidence that merchant reuse is a **copy/materialization operation**, not a live reference to the global item document.
 
@@ -78,7 +78,7 @@ For each source item it follows the same pattern:
 - sets the merchant/vendor ID;
 - replaces the source category with the newly materialized local category;
 - records the catalogue ID; and
-- optionally associates a menu.
+- optionally associates a menu. fileciteturn157file0
 
 The source global records therefore remain distinct from the merchant records.
 
@@ -92,7 +92,7 @@ The legacy codebase contains both:
 
 ### B. Direct selected-item copy path
 
-`POST /vendor/items?add=true` receives selected source item IDs and copies the source fields into merchant-owned item documents under a supplied category.
+`POST /vendor/items?add=true` receives selected source item IDs and copies the source fields into merchant-owned item documents under a supplied category. The direct copy implementation explicitly carries over a broad set of item properties, including nutrition/allergy/personalization-related values, media, availability, tags, schedule/state values, description/ingredient information, cuisine/food classification, sizes, and add-ons. fileciteturn170file0
 
 These paths must not be collapsed until their UI usage and business differences are fully reconciled. They may represent different merchant setup workflows.
 
@@ -103,7 +103,7 @@ The legacy `/vendor/localCategoryItems` service's `create` operation treats sele
 - `is_temp_local: false`
 - `is_local: true`
 
-When a menu is supplied, the promoted category/item is associated with that menu and the relevant item IDs are inserted into the menu's category structure.
+When a menu is supplied, the promoted category/item is associated with that menu and the relevant item IDs are inserted into the menu's category structure. fileciteturn157file0
 
 This is important: **selection/materialization and operational activation are separate legacy states.** The target must not collapse those states into a single implicit insert if doing so would remove an existing merchant workflow or prevent cancellation before commit.
 
@@ -111,7 +111,7 @@ This is important: **selection/materialization and operational activation are se
 
 The same merchant materialization service has an explicit `chainCatalogue` path. When that query flag is present, it loads a chain catalogue and materializes its items through the same local-category/local-item machinery.
 
-The Super Admin UI also has separate Chain Catalogue create/read/update/delete actions and views.
+The Super Admin UI also has separate Chain Catalogue create/read/update/delete actions and views. The dashboard action layer calls `/chaincatalogue` for create and `/admin/chaincatalogue` for retrieval, with corresponding update/delete calls on `/chaincatalogue/:id`. fileciteturn163file0
 
 The target must therefore preserve the distinction:
 
@@ -121,13 +121,26 @@ The target must therefore preserve the distinction:
 
 Do not merge Global Catalogue and Chain Catalogue into one generic source without further evidence.
 
-## 9. Target gap confirmed
+## 9. Authorization evidence — preserve intent, not legacy weaknesses
 
-The current target catalog model is merchant/restaurant scoped. The target `MenuItem` belongs to a merchant and restaurant/menu structure; there is no equivalent platform-owned Global Catalogue aggregate in the current target baseline.
+The legacy authorization evidence is inconsistent across the related endpoints:
+
+- the merchant materialization service explicitly requires an authorization token and resolves the authenticated merchant before copying data;
+- Super Admin category creation explicitly checks that the authenticated vendor user has `role == "superadmin"`;
+- the legacy AdminItems create/find/get/patch/remove service requires an authenticated vendor user but does **not** independently enforce the `superadmin` role in the service implementation;
+- the `/catalogue` hooks shown here do not independently enforce the commented-out authorization check. fileciteturn157file0 fileciteturn197file0 fileciteturn198file0 fileciteturn199file0
+
+Therefore the target should preserve the **business intent** — Global Catalogue administration is a platform/Super Admin capability and merchant materialization is merchant-scoped — but should not copy legacy authorization omissions merely because they exist in code. The modern implementation must use the target RBAC/tenant-scope boundary.
+
+This is an implementation/security conclusion from evidence, not a new business rule.
+
+## 10. Target gap confirmed
+
+The current target catalog model is merchant/restaurant scoped. The target `MenuItem` belongs to a merchant and restaurant/menu structure; there is no equivalent platform-owned Global Catalogue aggregate in the current target baseline. The current write service is explicitly merchant-tenant-scoped. fileciteturn186file0
 
 Therefore the correct next step is **not** to add a collection of legacy flags to `MenuItem`. The missing capability is a domain boundary: a platform reusable source plus an explicit materialization relationship into merchant-owned catalog/menu records.
 
-## 10. Minimum target design direction — evidence-based
+## 11. Minimum target design direction — evidence-based
 
 The target implementation should be evaluated around these concepts:
 
@@ -147,7 +160,7 @@ The materialized merchant item/category can then be attached to a merchant/resta
 
 Because the legacy workflow copies source records and subsequently operates on merchant-local records, lineage should be explicit if it can be introduced without changing legacy semantics. The exact lineage fields and whether source updates ever propagate remain implementation questions requiring additional evidence.
 
-## 11. Business rules that are established
+## 12. Business rules that are established
 
 - Super Admin has a dedicated Global Catalogue workflow.
 - Global Catalogue has a catalogue/container lifecycle.
@@ -160,7 +173,7 @@ Because the legacy workflow copies source records and subsequently operates on m
 - Global and chain catalogue sources are distinct.
 - Existing merchant-created items remain a valid path and must continue to work.
 
-## 12. Business rules still not established
+## 13. Business rules still not established
 
 Do **not** infer the following without further evidence or an owner decision:
 
@@ -175,7 +188,7 @@ Do **not** infer the following without further evidence or an owner decision:
 9. whether the two observed merchant import paths are intentionally distinct or historical duplication;
 10. exact authorization roles/permissions beyond the observed requirement for a valid authenticated legacy token.
 
-## 13. Required vertical-slice acceptance test
+## 14. Required vertical-slice acceptance test
 
 Before calling this capability migrated, the target must prove the following against PostgreSQL:
 
@@ -193,12 +206,11 @@ Before calling this capability migrated, the target must prove the following aga
 12. Repeating the same materialization does not create unintended duplicate local records under the established duplicate rule.
 13. Both observed merchant import paths are reconciled before either is removed or collapsed.
 
-## 14. Immediate implementation gate
+## 15. Immediate implementation gate
 
 No Global Catalogue schema/API implementation should be merged until the remaining legacy evidence is traced for:
 
-- authorization/RBAC around the global endpoints;
-- exact Super Admin request shapes for category/item creation and assignment;
+- exact Super Admin request shapes for global item creation and assignment;
 - exact merchant request/response shapes for both import paths;
 - category/item selection semantics;
 - duplicate behavior across the two import paths;
@@ -206,5 +218,7 @@ No Global Catalogue schema/API implementation should be merged until the remaini
 - global edit/delete behavior and impact on existing merchant copies;
 - full field-level copy semantics; and
 - Experience Catalogue/template behavior.
+
+Authorization intent is now sufficiently understood to implement the modern boundary as **SUPER_ADMIN for platform Global Catalogue administration** and **merchant-scoped staff for merchant materialization**, subject to existing target RBAC conventions. The remaining questions above are still data/behavior questions, not reasons to block the forensic mapping.
 
 Once those traces are complete, implement the smallest PostgreSQL vertical slice and integration-test it before expanding the schema to cover the full legacy item field surface.

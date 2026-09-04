@@ -141,6 +141,10 @@ describe('Settlement adjustment foundation (P1.7.44)', () => {
     await expect(
       repo.createAdjustment({ ...input, amountMinor: 2000n }),
     ).rejects.toBeInstanceOf(BadRequestException);
+
+    await expect(
+      repo.createAdjustment({ ...input, idempotencyKey: uniq('other') }),
+    ).rejects.toThrow();
   });
 
   it('creates a TIP_REFUND debit without touching order settlement economics', async () => {
@@ -202,6 +206,72 @@ describe('Settlement adjustment foundation (P1.7.44)', () => {
     expect(position.recoverableAmountMinor).toBe(0n);
   });
 
+  it('enforces one adjustment per refund/tip source at the database boundary', async () => {
+    const merchant = await prisma.merchant.create({ data: { legalName: uniq('M') } });
+    const restaurant = await prisma.restaurant.create({
+      data: { merchantId: merchant.id, name: uniq('R') },
+    });
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: uniq('ORD'),
+        merchantId: merchant.id,
+        restaurantId: restaurant.id,
+        type: 'TAKE_AWAY',
+        subtotalMinor: 1000n,
+        grandTotalMinor: 1000n,
+      },
+    });
+    const paymentIntent = await prisma.paymentIntent.create({
+      data: { orderId: order.id, amountMinor: 1000n, method: 'RAZORPAY', status: 'CAPTURED' },
+    });
+    const settlement = await prisma.settlement.create({
+      data: {
+        merchantId: merchant.id,
+        restaurantId: restaurant.id,
+        payoutType: 'ORDER',
+        amountMinor: 1000n,
+        grossAmountMinor: 1000n,
+      },
+    });
+    const refund = await prisma.refund.create({
+      data: {
+        orderId: order.id,
+        paymentIntentId: paymentIntent.id,
+        method: 'WALLET',
+        amountMinor: 100n,
+        status: 'PROCESSED',
+      },
+    });
+
+    await repo.createAdjustment({
+      settlementId: settlement.id,
+      merchantId: merchant.id,
+      type: 'ORDER_REFUND',
+      direction: 'DEBIT',
+      amountMinor: 100n,
+      currencyCode: 'INR',
+      idempotencyKey: uniq('source'),
+      orderId: order.id,
+      paymentIntentId: paymentIntent.id,
+      refundId: refund.id,
+    });
+
+    await expect(
+      repo.createAdjustment({
+        settlementId: settlement.id,
+        merchantId: merchant.id,
+        type: 'ORDER_REFUND',
+        direction: 'DEBIT',
+        amountMinor: 100n,
+        currencyCode: 'INR',
+        idempotencyKey: uniq('source2'),
+        orderId: order.id,
+        paymentIntentId: paymentIntent.id,
+        refundId: refund.id,
+      }),
+    ).rejects.toThrow();
+  });
+
   it('keeps the adjustment ledger append-only at the database boundary', async () => {
     const merchant = await prisma.merchant.create({ data: { legalName: uniq('M') } });
     const restaurant = await prisma.restaurant.create({
@@ -246,13 +316,18 @@ describe('Settlement adjustment foundation (P1.7.44)', () => {
     });
 
     await expect(
-      prisma.settlementAdjustment.update({
-        where: { id: adjustment.adjustmentId },
-        data: { reason: 'mutate' },
-      }),
+      prisma.$executeRaw`
+        UPDATE "SettlementAdjustment"
+        SET "reason" = 'mutate'
+        WHERE "id" = ${adjustment.adjustmentId}::uuid
+      `,
     ).rejects.toThrow(/append-only/i);
+
     await expect(
-      prisma.settlementAdjustment.delete({ where: { id: adjustment.adjustmentId } }),
+      prisma.$executeRaw`
+        DELETE FROM "SettlementAdjustment"
+        WHERE "id" = ${adjustment.adjustmentId}::uuid
+      `,
     ).rejects.toThrow(/append-only/i);
   });
 });

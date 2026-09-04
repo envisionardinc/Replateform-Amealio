@@ -27,6 +27,15 @@ CREATE TABLE "SettlementAdjustment" (
   CONSTRAINT "settlement_adjustment_amount_positive" CHECK ("amountMinor" > 0),
   CONSTRAINT "settlement_adjustment_currency_nonempty" CHECK (length(trim("currencyCode")) > 0),
   CONSTRAINT "settlement_adjustment_idempotency_nonempty" CHECK (length(trim("idempotencyKey")) > 0),
+  CONSTRAINT "settlement_adjustment_source_consistency" CHECK (
+    ("type" = 'ORDER_REFUND' AND "direction" = 'DEBIT'
+      AND "orderId" IS NOT NULL AND "paymentIntentId" IS NOT NULL
+      AND "refundId" IS NOT NULL AND "tipPaymentId" IS NULL)
+    OR
+    ("type" = 'TIP_REFUND' AND "direction" = 'DEBIT'
+      AND "tipPaymentId" IS NOT NULL AND "orderId" IS NULL
+      AND "paymentIntentId" IS NULL AND "refundId" IS NULL)
+  ),
   CONSTRAINT "SettlementAdjustment_settlementId_fkey"
     FOREIGN KEY ("settlementId") REFERENCES "Settlement"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "SettlementAdjustment_merchantId_fkey"
@@ -43,6 +52,10 @@ CREATE TABLE "SettlementAdjustment" (
 
 CREATE UNIQUE INDEX "SettlementAdjustment_idempotencyKey_key"
   ON "SettlementAdjustment"("idempotencyKey");
+CREATE UNIQUE INDEX "SettlementAdjustment_refundId_key"
+  ON "SettlementAdjustment"("refundId");
+CREATE UNIQUE INDEX "SettlementAdjustment_tipPaymentId_key"
+  ON "SettlementAdjustment"("tipPaymentId");
 CREATE INDEX "SettlementAdjustment_settlementId_createdAt_idx"
   ON "SettlementAdjustment"("settlementId", "createdAt");
 CREATE INDEX "SettlementAdjustment_merchantId_createdAt_idx"

@@ -175,17 +175,16 @@ describe('Offer redemption reversal on cancellation (integration)', () => {
     expect((await orderRepo.findRedemptionByOrder(order.id))!.status).toBe('ACTIVE');
   });
 
-  it('does not double-reverse: repeated cancellation is rejected and the redemption stays REVERSED once', async () => {
+  it('does not double-reverse: same-status cancel is idempotent and redemption stays REVERSED once', async () => {
     const { merchantId, restaurantId } = await seedMerchantRestaurant();
     const staff = staffOf(merchantId);
     const { code } = await seedOffer(merchantId, restaurantId);
     const order = await orders.createOrder(staff, baseInput(restaurantId, { couponCode: code }));
     await orders.transitionStatus(staff, order.id, 'CANCELLED');
     const first = await orderRepo.findRedemptionByOrder(order.id);
-    // CANCELLED is terminal -> a second cancellation is rejected upstream.
-    await expect(orders.transitionStatus(staff, order.id, 'CANCELLED')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    // Doc 88: same toStatus is idempotent (200 / no new event), not a 400.
+    const again = await orders.transitionStatus(staff, order.id, 'CANCELLED');
+    expect(again.status).toBe('CANCELLED');
     const second = await orderRepo.findRedemptionByOrder(order.id);
     expect(second!.status).toBe('REVERSED');
     expect(second!.reversedAt!.getTime()).toBe(first!.reversedAt!.getTime()); // not re-stamped

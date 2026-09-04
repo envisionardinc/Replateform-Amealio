@@ -2,9 +2,12 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { istUsagePeriodWindow } from '../domain/usage-frequency';
+import { TERMINAL_ORDER_STATUSES } from '../domain/order-status-graph';
 import type {
   AppliedOffer,
+  ListOrdersQuery,
   OrderItemRecord,
+  OrderPaymentSummary,
   OrderRecord,
   OrderStatusEventRecord,
   OrderStatusName,
@@ -34,6 +37,19 @@ const ORDER_INCLUDE = {
       toStatus: true,
       actorType: true,
       actorId: true,
+      reason: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'asc' as const },
+  },
+  paymentIntents: {
+    select: {
+      id: true,
+      status: true,
+      method: true,
+      amountMinor: true,
+      currencyCode: true,
+      razorpayOrderId: true,
       createdAt: true,
     },
     orderBy: { createdAt: 'asc' as const },
@@ -69,25 +85,18 @@ interface CreateArgs {
   }>;
   actorType: string | null;
   actorId: string | null;
-  // P1.7.24: when present, the offer/coupon discount is persisted on the Order and
-  // a CouponRedemption is created atomically (usage-limit enforced under lock).
   redemption?: RedemptionDirective;
 }
 
 /**
- * Write/read access to `Order` / `OrderItem` / `OrderStatusEvent` (P1.7.12).
- * Creation and status transitions are TRANSACTIONAL (an Order always has its
- * items + an initial status event; a transition always records an event).
- * Authorization/tenancy + transition validity are enforced by OrderService.
+ * Write/read access to `Order` / `OrderItem` / `OrderStatusEvent`.
+ * Creation and status transitions are TRANSACTIONAL. Authorization and graph
+ * validity stay in OrderService / OrderManagementService.
  */
 @Injectable()
 export class OrderRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Resolve a coupon code to its offer for server-side validation (P1.7.24).
-   * Returns exactly the fields needed to validate eligibility + compute discount.
-   */
   async findAppliedOfferByCouponCode(code: string): Promise<AppliedOffer | null> {
     const coupon = await this.prisma.coupon.findUnique({
       where: { code },
@@ -142,54 +151,11 @@ export class OrderRepository {
     };
   }
 
-  /** Atomically create the Order + its OrderItems + the initial OrderStatusEvent. */
   async createOrderWithItems(args: CreateArgs): Promise<OrderRecord> {
     const created = await this.prisma.$transaction(async (tx) => {
       const r = args.redemption;
       if (r) {
-        // Serialize concurrent redemptions of the SAME coupon by row-locking the
-        // Coupon inside this transaction. Under READ COMMITTED, a competing txn
-        // blocks here until we commit, then observes our new redemption in its
-        // own count — so the derived usage check cannot oversubscribe (P1.7.24).
-        await tx.$queryRaw`SELECT id FROM "Coupon" WHERE id = ${r.couponId}::uuid FOR UPDATE`;
-
-        if (r.maxUsageLimit !== null) {
-          const total = await tx.couponRedemption.count({
-            where: { couponId: r.couponId, status: 'ACTIVE' },
-          });
-          if (total >= r.maxUsageLimit) {
-            throw new ConflictException('Offer usage limit reached');
-          }
-        }
-        if (r.perUserLimit !== null && r.userId) {
-          const perUser = await tx.couponRedemption.count({
-            where: { couponId: r.couponId, userId: r.userId, status: 'ACTIVE' },
-          });
-          if (perUser >= r.perUserLimit) {
-            throw new ConflictException('Per-user usage limit reached for this offer');
-          }
-        }
-        // Usage-frequency gate (P1.7.26B): per-user redemptions within the current
-        // IST calendar period (useFrequency), capped by useLimit. Legacy enforces
-        // this ONLY for global offers (doc 55, OD-USG-3) and per-user; the count is
-        // DERIVED from ACTIVE redemptions in the window (no mutable counter), and
-        // runs under the same coupon FOR UPDATE lock acquired above (concurrency).
-        if (r.isGlobal && r.useLimit !== null && r.useFrequency && r.userId) {
-          const window = istUsagePeriodWindow(r.useFrequency, new Date());
-          if (window) {
-            const inPeriod = await tx.couponRedemption.count({
-              where: {
-                couponId: r.couponId,
-                userId: r.userId,
-                status: 'ACTIVE',
-                createdAt: { gte: window.start, lt: window.endExclusive },
-              },
-            });
-            if (inPeriod >= r.useLimit) {
-              throw new ConflictException('Offer usage frequency limit reached for this period');
-            }
-          }
-        }
+        await this.lockAndAssertRedemptionLimits(tx, r);
       }
 
       const order = await tx.order.create({
@@ -240,8 +206,6 @@ export class OrderRepository {
       });
 
       if (r) {
-        // Idempotency invariant: @@unique([couponId, orderId]) — at most one
-        // redemption per (coupon, order). ACTIVE at order placement (commit point).
         await tx.couponRedemption.create({
           data: {
             couponId: r.couponId,
@@ -257,7 +221,6 @@ export class OrderRepository {
     return this.findByIdOrThrow(created);
   }
 
-  /** Read the (single) redemption attached to an order, if any. */
   async findRedemptionByOrder(orderId: string): Promise<RedemptionRecord | null> {
     const row = await this.prisma.couponRedemption.findFirst({
       where: { orderId },
@@ -285,6 +248,28 @@ export class OrderRepository {
     }
   }
 
+  async listOrders(query: ListOrdersQuery): Promise<OrderRecord[]> {
+    const where: Prisma.OrderWhereInput = {};
+    if (query.merchantId) where.merchantId = query.merchantId;
+    if (query.restaurantId) where.restaurantId = query.restaurantId;
+    if (query.status) where.status = query.status;
+    if (query.type) where.type = query.type;
+    if (query.userId) where.userId = query.userId;
+    if (query.lane === 'active') where.status = { notIn: [...TERMINAL_ORDER_STATUSES] };
+    if (query.lane === 'history') where.status = { in: [...TERMINAL_ORDER_STATUSES] };
+    if (query.status && query.lane) {
+      where.status = query.status;
+    }
+
+    const rows = await this.prisma.order.findMany({
+      where,
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    return rows.map((row) => this.toRecord(row));
+  }
+
   private async findByIdOrThrow(id: string): Promise<OrderRecord> {
     const row = await this.prisma.order.findUniqueOrThrow({
       where: { id },
@@ -293,38 +278,36 @@ export class OrderRepository {
     return this.toRecord(row);
   }
 
-  /** Atomically update the order status + append an OrderStatusEvent. */
+  /**
+   * Compare-and-set status + append OrderStatusEvent.
+   * `changed=false` when the row was no longer in `fromStatus` (lost race or
+   * already advanced). Caller interprets same-status vs 409.
+   */
   async updateStatusWithEvent(
     id: string,
     fromStatus: OrderStatusName,
     toStatus: OrderStatusName,
     actorType: string | null,
     actorId: string | null,
-  ): Promise<OrderRecord> {
+    reason?: string | null,
+  ): Promise<{ order: OrderRecord; changed: boolean }> {
+    let changed = false;
     await this.prisma.$transaction(async (tx) => {
-      // Compare-and-set (P1.7.25): only transition when the row is STILL in the
-      // expected `fromStatus`. This closes the read-then-write race in the service
-      // (status is read outside the tx): under concurrent transitions exactly one
-      // writer wins, so the status event and the cancellation reversal happen
-      // AT MOST ONCE. A losing/duplicate concurrent transition is an idempotent
-      // no-op (the winner already advanced the status). Sequential transitions —
-      // already validated by OrderService — always affect exactly one row.
-      const changed = await tx.order.updateMany({
+      const data: Prisma.OrderUpdateManyMutationInput = { status: toStatus };
+      if (toStatus === 'CANCELLED' && reason) {
+        data.cancelReason = reason;
+      }
+      const result = await tx.order.updateMany({
         where: { id, status: fromStatus },
-        data: { status: toStatus },
+        data,
       });
-      if (changed.count === 0) {
+      if (result.count === 0) {
         return;
       }
+      changed = true;
       await tx.orderStatusEvent.create({
-        data: { orderId: id, fromStatus, toStatus, actorType, actorId },
+        data: { orderId: id, fromStatus, toStatus, actorType, actorId, reason: reason ?? null },
       });
-      // Cancelling an order reverses its ACTIVE redemption(s) so usage is released
-      // (derived counts exclude REVERSED). This runs in the SAME transaction as the
-      // status change (atomic: never Order=CANCELLED with an ACTIVE redemption, nor
-      // the reverse). The `status: ACTIVE` predicate makes it exactly-once, so an
-      // already-REVERSED redemption stays REVERSED and no second reversal occurs.
-      // Refund-driven reversal is deferred (payment lifecycle not yet in target).
       if (toStatus === 'CANCELLED') {
         await tx.couponRedemption.updateMany({
           where: { orderId: id, status: 'ACTIVE' },
@@ -332,7 +315,47 @@ export class OrderRepository {
         });
       }
     });
-    return this.findByIdOrThrow(id);
+    return { order: await this.findByIdOrThrow(id), changed };
+  }
+
+  private async lockAndAssertRedemptionLimits(
+    tx: Prisma.TransactionClient,
+    r: RedemptionDirective,
+  ): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "Coupon" WHERE id = ${r.couponId}::uuid FOR UPDATE`;
+
+    if (r.maxUsageLimit !== null) {
+      const total = await tx.couponRedemption.count({
+        where: { couponId: r.couponId, status: 'ACTIVE' },
+      });
+      if (total >= r.maxUsageLimit) {
+        throw new ConflictException('Offer usage limit reached');
+      }
+    }
+    if (r.perUserLimit !== null && r.userId) {
+      const perUser = await tx.couponRedemption.count({
+        where: { couponId: r.couponId, userId: r.userId, status: 'ACTIVE' },
+      });
+      if (perUser >= r.perUserLimit) {
+        throw new ConflictException('Per-user usage limit reached for this offer');
+      }
+    }
+    if (r.isGlobal && r.useLimit !== null && r.useFrequency && r.userId) {
+      const window = istUsagePeriodWindow(r.useFrequency, new Date());
+      if (window) {
+        const inPeriod = await tx.couponRedemption.count({
+          where: {
+            couponId: r.couponId,
+            userId: r.userId,
+            status: 'ACTIVE',
+            createdAt: { gte: window.start, lt: window.endExclusive },
+          },
+        });
+        if (inPeriod >= r.useLimit) {
+          throw new ConflictException('Offer usage frequency limit reached for this period');
+        }
+      }
+    }
   }
 
   private toRecord(row: {
@@ -354,6 +377,7 @@ export class OrderRepository {
     currencyCode: string;
     offerId: string | null;
     couponId: string | null;
+    cancelReason: string | null;
     items: Array<Omit<OrderItemRecord, 'quantity'> & { quantity: number }>;
     statusEvents: Array<{
       id: string;
@@ -361,8 +385,10 @@ export class OrderRepository {
       toStatus: string;
       actorType: string | null;
       actorId: string | null;
+      reason: string | null;
       createdAt: Date;
     }>;
+    paymentIntents: OrderPaymentSummary[];
   }): OrderRecord {
     return {
       id: row.id,
@@ -383,15 +409,21 @@ export class OrderRepository {
       currencyCode: row.currencyCode,
       offerId: row.offerId,
       couponId: row.couponId,
+      cancelReason: row.cancelReason,
+      deliveryPersonId: null,
       items: row.items as OrderItemRecord[],
-      statusEvents: row.statusEvents.map((e): OrderStatusEventRecord => ({
-        id: e.id,
-        fromStatus: e.fromStatus as OrderStatusName | null,
-        toStatus: e.toStatus as OrderStatusName,
-        actorType: e.actorType,
-        actorId: e.actorId,
-        createdAt: e.createdAt,
-      })),
+      statusEvents: row.statusEvents.map(
+        (e): OrderStatusEventRecord => ({
+          id: e.id,
+          fromStatus: e.fromStatus as OrderStatusName | null,
+          toStatus: e.toStatus as OrderStatusName,
+          actorType: e.actorType,
+          actorId: e.actorId,
+          reason: e.reason,
+          createdAt: e.createdAt,
+        }),
+      ),
+      paymentIntents: row.paymentIntents,
     };
   }
 }

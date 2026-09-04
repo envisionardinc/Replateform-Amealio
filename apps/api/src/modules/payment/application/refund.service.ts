@@ -79,6 +79,20 @@ export class RefundService {
     return this.requestProviderRefund(input);
   }
 
+  /**
+   * Order-lifecycle refund after the caller has already authorized the actor.
+   * Rail is chosen by the caller from PaymentIntent.method (see refund-rail.ts).
+   * Does not invent a wallet-vs-Razorpay business rule.
+   */
+  async executeRefund(input: RefundRequestInput): Promise<RefundResult> {
+    this.validateInput(input);
+    const existing = await this.repo.findRefundByIdempotencyKey(input.idempotencyKey.trim());
+    if (existing) return existing;
+    const method = input.method ?? 'WALLET';
+    if (method === 'WALLET') return this.refund(input);
+    return this.requestProviderRefund(input);
+  }
+
   /** Asynchronous Razorpay refund: reserve → provider → INITIATED/PROCESSED. */
   private async requestProviderRefund(input: RefundRequestInput): Promise<RefundResult> {
     let reserved: { refundId: string; amount: bigint; providerPaymentId: string };

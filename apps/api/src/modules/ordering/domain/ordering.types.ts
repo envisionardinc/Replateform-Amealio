@@ -130,7 +130,25 @@ export interface OrderStatusEventRecord {
   toStatus: OrderStatusName;
   actorType: string | null;
   actorId: string | null;
+  reason: string | null;
   createdAt: Date;
+}
+
+export interface OrderPaymentSummary {
+  id: string;
+  status: string;
+  method: string;
+  amountMinor: bigint;
+  currencyCode: string;
+  razorpayOrderId: string | null;
+  createdAt: Date;
+}
+
+export interface OrderDeliveryPersonSummary {
+  id: string;
+  name: string;
+  phone: string | null;
+  isOnline: boolean;
 }
 
 export interface OrderRecord {
@@ -152,6 +170,32 @@ export interface OrderRecord {
   currencyCode: string;
   offerId: string | null;
   couponId: string | null;
+  cancelReason: string | null;
+  deliveryPersonId: string | null;
   items: OrderItemRecord[];
   statusEvents: OrderStatusEventRecord[];
+  paymentIntents: OrderPaymentSummary[];
 }
+
+export interface ListOrdersQuery {
+  merchantId?: string | null;
+  restaurantId?: string;
+  status?: OrderStatusName;
+  type?: OrderTypeName;
+  userId?: string;
+  lane?: 'active' | 'history';
+}
+
+export interface TransitionOptions {
+  expectedStatus?: OrderStatusName;
+  reason?: string | null;
+  reasonCode?: string | null;
+}
+
+export type ConsumerActor = { actorType: 'CUSTOMER'; userId: string };
+export type DeliveryActor = {
+  actorType: 'DELIVERY';
+  deliveryPersonId: string;
+  merchantId: string;
+};
+export type SystemActor = { actorType: 'SYSTEM'; actorId?: string | null };

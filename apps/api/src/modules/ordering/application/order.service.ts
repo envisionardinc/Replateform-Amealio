@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { StaffPrincipal } from '../../identity/staff-authentication/staff-principal';
 import { MerchantScopeService } from '../../merchant/application/merchant-scope.service';
@@ -6,12 +12,17 @@ import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.r
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
 import { OrderRepository } from '../infrastructure/order.repository';
 import { assertOfferEligible, calculateDiscountMinor } from '../domain/offer-discount';
+import { isAllowedTransition, isPickupLike } from '../domain/order-status-graph';
 import type {
+  ConsumerActor,
   CreateOrderInput,
+  DeliveryActor,
   OrderRecord,
   OrderStatusName,
   OrderTypeName,
   RedemptionDirective,
+  SystemActor,
+  TransitionOptions,
 } from '../domain/ordering.types';
 
 const ORDER_TYPES = new Set<OrderTypeName>([
@@ -23,32 +34,17 @@ const ORDER_TYPES = new Set<OrderTypeName>([
   'CATERING',
 ]);
 
-/**
- * Native order-status transition graph (P1.7.11-verified; single OrderStatus).
- * Terminal states (COMPLETED/CANCELLED/RETURNED) have no outgoing transitions.
- * READY → COMPLETED covers dine-in/takeaway (no delivery); READY → ON_THE_WAY →
- * DELIVERED covers home delivery (rider advances the SAME field).
- */
-const TRANSITIONS: Record<OrderStatusName, OrderStatusName[]> = {
-  INITIAL: ['PENDING', 'CANCELLED'],
-  PENDING: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['PREPARING', 'CANCELLED'],
-  PREPARING: ['PACKING', 'READY', 'CANCELLED'],
-  PACKING: ['READY', 'CANCELLED'],
-  READY: ['ON_THE_WAY', 'COMPLETED', 'CANCELLED'],
-  ON_THE_WAY: ['DELIVERED'],
-  DELIVERED: ['COMPLETED', 'RETURNED'],
-  COMPLETED: [],
-  CANCELLED: [],
-  RETURNED: [],
-};
+export type TransitionActor =
+  | { kind: 'STAFF'; principal: StaffPrincipal }
+  | { kind: 'CUSTOMER'; actor: ConsumerActor }
+  | { kind: 'DELIVERY'; actor: DeliveryActor }
+  | { kind: 'SYSTEM'; actor?: SystemActor };
 
 /**
- * Canonical Order creation + status lifecycle (P1.7.12). Merchant-tenant-scoped
- * (P1.7.1F/P1.7.2): a staff member operates only within their merchant; an order
- * cannot be created against another merchant's restaurant; SUPER_ADMIN is
- * platform-scoped. Money is exact BigInt minor units; grandTotal is derived to
- * satisfy the DB order_total_integrity CHECK. No payment/delivery/POS/realtime.
+ * Canonical Order creation + status lifecycle. ONE OrderStatus graph.
+ * HTTP/refund/assignment orchestration lives in OrderManagementService /
+ * CheckoutService / DeliveryService so this kernel stays usable without PaymentModule
+ * (ordering-foundation tests).
  */
 @Injectable()
 export class OrderService {
@@ -59,7 +55,10 @@ export class OrderService {
     private readonly orders: OrderRepository,
   ) {}
 
-  async createOrder(principal: StaffPrincipal, input: CreateOrderInput): Promise<OrderRecord> {
+  async createOrder(
+    actor: StaffPrincipal | ConsumerActor,
+    input: CreateOrderInput,
+  ): Promise<OrderRecord> {
     if (!ORDER_TYPES.has(input.type)) {
       throw new BadRequestException('type must be a valid OrderType');
     }
@@ -70,16 +69,19 @@ export class OrderService {
       throw new BadRequestException('order must have at least one item');
     }
 
-    // Tenancy: the restaurant must exist and be within the caller's merchant scope.
     const restaurant = await this.restaurants.findById(input.restaurantId);
     if (!restaurant || restaurant.deletedAt !== null) {
       throw new NotFoundException('Restaurant not found');
     }
-    await this.scope.assertRestaurantInScope(principal, input.restaurantId);
 
+    const isCustomer = actor.actorType === 'CUSTOMER';
+    if (!isCustomer) {
+      await this.scope.assertRestaurantInScope(actor, input.restaurantId);
+    }
+
+    const userId = isCustomer ? actor.userId : (input.userId ?? null);
     const currencyCode = input.currencyCode ?? 'INR';
 
-    // Validate items + compute exact money (integer minor units).
     let subtotalMinor = 0n;
     const items = [] as Array<{
       menuItemId: string | null;
@@ -126,19 +128,9 @@ export class OrderService {
     const taxTotalMinor = input.taxTotalMinor ?? 0n;
     const feeTotalMinor = input.feeTotalMinor ?? 0n;
     const deliveryChargeMinor = input.deliveryChargeMinor ?? 0n;
-    // Customer-funded tip / donation (P1.7.36). Recorded on the Order but
-    // DELIBERATELY excluded from grandTotal (the order_total_integrity CHECK) and
-    // from the commission basis — a tip is not merchant commissionable revenue and
-    // a donation is a charity pass-through, not merchant revenue. Payout/GST
-    // wiring is deferred; this slice only establishes the canonical fields.
     const tipMinor = input.tipMinor ?? 0n;
     const donationMinor = input.donationMinor ?? 0n;
 
-    // Discount is server-authoritative when an offer/coupon is applied (P1.7.24,
-    // DEC-OFF-1): the client-supplied discountTotalMinor is IGNORED in that case
-    // and the server validates the offer + computes the discount from the
-    // server-priced subtotal. Without a coupon, the existing ad-hoc discount
-    // behavior is preserved.
     const couponCode = input.couponCode?.trim();
     let discountTotalMinor: bigint;
     let redemption: RedemptionDirective | undefined;
@@ -159,7 +151,7 @@ export class OrderService {
       redemption = {
         offerId: offer.offerId,
         couponId: offer.couponId,
-        userId: input.userId ?? null,
+        userId,
         discountAppliedMinor: discountTotalMinor,
         maxUsageLimit: offer.maxUsageLimit,
         perUserLimit: offer.perUserLimit,
@@ -172,31 +164,23 @@ export class OrderService {
     }
 
     if (
-      [
-        taxTotalMinor,
-        discountTotalMinor,
-        feeTotalMinor,
-        deliveryChargeMinor,
-        tipMinor,
-        donationMinor,
-      ].some((v) => v < 0n)
+      [taxTotalMinor, discountTotalMinor, feeTotalMinor, deliveryChargeMinor, tipMinor, donationMinor].some(
+        (v) => v < 0n,
+      )
     ) {
       throw new BadRequestException('money components must be >= 0');
     }
-    // Derived to satisfy the order_total_integrity CHECK. This is the authoritative
-    // grand total — never a client-supplied value when an offer is involved.
     const grandTotalMinor =
       subtotalMinor - discountTotalMinor + taxTotalMinor + feeTotalMinor + deliveryChargeMinor;
     if (grandTotalMinor < 0n) {
       throw new BadRequestException('discount cannot exceed subtotal + charges');
     }
 
-    // Legacy creates orders as INITIAL (draft), then transitions to PENDING/etc.
     return this.orders.createOrderWithItems({
       orderNumber: input.orderNumber,
       merchantId: restaurant.merchantId,
       restaurantId: input.restaurantId,
-      userId: input.userId ?? null,
+      userId,
       type: input.type,
       status: 'INITIAL',
       subtotalMinor,
@@ -209,8 +193,8 @@ export class OrderService {
       donationMinor,
       currencyCode,
       items,
-      actorType: principal.actorType,
-      actorId: principal.staffMemberId,
+      actorType: isCustomer ? 'CUSTOMER' : actor.actorType,
+      actorId: isCustomer ? actor.userId : actor.staffMemberId,
       redemption,
     });
   }
@@ -227,21 +211,150 @@ export class OrderService {
     principal: StaffPrincipal,
     orderId: string,
     toStatus: OrderStatusName,
+    options?: TransitionOptions,
+  ): Promise<OrderRecord> {
+    return this.applyTransition({ kind: 'STAFF', principal }, orderId, toStatus, options);
+  }
+
+  async applyTransition(
+    actor: TransitionActor,
+    orderId: string,
+    toStatus: OrderStatusName,
+    options?: TransitionOptions,
   ): Promise<OrderRecord> {
     const order = await this.orders.findById(orderId);
     if (!order) throw new NotFoundException('Order not found');
-    await this.scope.assertRestaurantInScope(principal, order.restaurantId);
 
-    const allowed = TRANSITIONS[order.status] ?? [];
-    if (!allowed.includes(toStatus)) {
+    await this.assertActorScope(actor, order);
+
+    if (options?.expectedStatus && order.status !== options.expectedStatus) {
+      throw new ConflictException(
+        `expectedStatus ${options.expectedStatus} does not match current ${order.status}`,
+      );
+    }
+
+    if (order.status === toStatus) {
+      return order;
+    }
+
+    this.assertActorMayRequest(actor, order, toStatus);
+
+    if (!isAllowedTransition(order.status, toStatus)) {
       throw new BadRequestException(`Invalid status transition ${order.status} -> ${toStatus}`);
     }
-    return this.orders.updateStatusWithEvent(
+
+    this.assertTypeAwareReady(order, toStatus, actor);
+
+    const reason = this.composeReason(options);
+    const { order: next, changed } = await this.orders.updateStatusWithEvent(
       orderId,
       order.status,
       toStatus,
-      principal.actorType,
-      principal.staffMemberId,
+      this.actorType(actor),
+      this.actorId(actor),
+      reason,
     );
+
+    if (!changed) {
+      if (next.status === toStatus) return next;
+      throw new ConflictException(`Concurrent status change: now ${next.status}`);
+    }
+    return next;
+  }
+
+  private async assertActorScope(actor: TransitionActor, order: OrderRecord): Promise<void> {
+    if (actor.kind === 'STAFF') {
+      await this.scope.assertRestaurantInScope(actor.principal, order.restaurantId);
+      return;
+    }
+    if (actor.kind === 'CUSTOMER') {
+      if (!order.userId || order.userId !== actor.actor.userId) {
+        throw new ForbiddenException('Order does not belong to this customer');
+      }
+      return;
+    }
+    if (actor.kind === 'DELIVERY') {
+      if (order.merchantId !== actor.actor.merchantId) {
+        throw new ForbiddenException('Cross-merchant delivery access denied');
+      }
+      if (order.deliveryPersonId !== actor.actor.deliveryPersonId) {
+        throw new ForbiddenException('Delivery person is not assigned to this order');
+      }
+    }
+  }
+
+  private assertActorMayRequest(
+    actor: TransitionActor,
+    order: OrderRecord,
+    toStatus: OrderStatusName,
+  ): void {
+    if (actor.kind === 'CUSTOMER') {
+      if (toStatus !== 'CANCELLED') {
+        throw new ForbiddenException('Customer may only cancel an order');
+      }
+      if (order.status !== 'INITIAL' && order.status !== 'PENDING') {
+        throw new BadRequestException('Customer can cancel only while INITIAL or PENDING');
+      }
+      return;
+    }
+    if (actor.kind === 'DELIVERY') {
+      const ok =
+        (order.status === 'READY' && toStatus === 'ON_THE_WAY') ||
+        (order.status === 'ON_THE_WAY' && toStatus === 'DELIVERED');
+      if (!ok) {
+        throw new ForbiddenException('Delivery person may only set ON_THE_WAY or DELIVERED');
+      }
+      return;
+    }
+    if (actor.kind === 'SYSTEM') {
+      if (!(order.status === 'INITIAL' && toStatus === 'PENDING')) {
+        throw new ForbiddenException('System may only promote INITIAL to PENDING');
+      }
+      return;
+    }
+    // Staff: kitchen hops. Rider-owned hops blocked once assigned.
+    if (order.deliveryPersonId && (toStatus === 'ON_THE_WAY' || toStatus === 'DELIVERED')) {
+      throw new ForbiddenException('Assigned rider owns ON_THE_WAY and DELIVERED');
+    }
+  }
+
+  private assertTypeAwareReady(
+    order: OrderRecord,
+    toStatus: OrderStatusName,
+    actor: TransitionActor,
+  ): void {
+    if (order.status !== 'READY') return;
+    if (actor.kind === 'DELIVERY') return;
+
+    if (order.type === 'HOME_DELIVERY') {
+      if (toStatus === 'COMPLETED') {
+        throw new BadRequestException('HOME_DELIVERY cannot skip delivery; complete after DELIVERED');
+      }
+      if (toStatus === 'ON_THE_WAY' && order.deliveryPersonId) {
+        throw new ForbiddenException('Assigned rider owns ON_THE_WAY');
+      }
+    } else if (isPickupLike(order.type) && toStatus === 'ON_THE_WAY') {
+      throw new BadRequestException(`${order.type} cannot transition READY → ON_THE_WAY`);
+    }
+  }
+
+  private composeReason(options?: TransitionOptions): string | null {
+    if (!options) return null;
+    if (options.reasonCode && options.reason) return `${options.reasonCode}: ${options.reason}`;
+    return options.reasonCode ?? options.reason ?? null;
+  }
+
+  private actorType(actor: TransitionActor): string {
+    if (actor.kind === 'STAFF') return actor.principal.actorType;
+    if (actor.kind === 'CUSTOMER') return 'CUSTOMER';
+    if (actor.kind === 'DELIVERY') return 'DELIVERY';
+    return 'SYSTEM';
+  }
+
+  private actorId(actor: TransitionActor): string | null {
+    if (actor.kind === 'STAFF') return actor.principal.staffMemberId;
+    if (actor.kind === 'CUSTOMER') return actor.actor.userId;
+    if (actor.kind === 'DELIVERY') return actor.actor.deliveryPersonId;
+    return actor.actor?.actorId ?? null;
   }
 }

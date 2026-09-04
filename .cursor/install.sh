@@ -53,7 +53,7 @@ install_system_dbs
 #    Values are placeholders for Cloud Agent / local use only — not production.
 # ---------------------------------------------------------------------------
 NEST_DIR="$REPOS_ROOT/amealio-nestjs-backend"
-FEATHERS_DIR="$REPOS_ROOT/amealio-vendordashboard"
+FEATHERS_DIR="$REPOS_ROOT/Amealio-VendorDashboard"
 
 if [[ -d "$NEST_DIR" && ! -f "$NEST_DIR/.env" ]]; then
   echo "==> Writing LOCAL-DEV-ONLY stub $NEST_DIR/.env (will not overwrite existing)"
@@ -134,13 +134,14 @@ npm_install_required() {
     return 1
   fi
   echo "==> npm install: $dir  ($*)"
-  ( cd "$dir" && npm install "$@" )
+  # --no-audit/--no-fund/--prefer-offline keep installs fast and network-resilient;
+  # the audit/funding metadata calls otherwise dominate runtime on cached trees.
+  ( cd "$dir" && npm install --no-audit --no-fund --prefer-offline "$@" )
 }
 
 npm_install_required "$REPOS_ROOT/amealio-nestjs-backend"
 npm_install_required "$REPOS_ROOT/amealio-self-delivery-app"
 npm_install_required "$REPOS_ROOT/amealio_web_app" --legacy-peer-deps
-npm_install_required "$REPOS_ROOT/amealio-vendordashboard"
-npm_install_required "$REPOS_ROOT/amealiodashboardmvp-/client" --legacy-peer-deps
+npm_install_required "$REPOS_ROOT/Amealio-VendorDashboard"
 
 echo "==> install.sh complete."

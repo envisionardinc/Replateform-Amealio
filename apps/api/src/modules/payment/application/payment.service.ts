@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
+import { OrderService } from '../../ordering/application/order.service';
 import { PaymentRepository } from '../infrastructure/payment.repository';
 import { verifyPaymentSignature } from '../domain/razorpay-signature';
 import type {
@@ -14,15 +15,16 @@ import type {
  * Payment foundation (P1.7.28): create a `PaymentIntent` for an order and perform
  * a SERVER-VERIFIED Razorpay capture. The server never trusts a client "success"
  * flag (doc 56 §8) — it verifies the signature, the intent ownership, and the
- * amount/currency before creating any authoritative `Transaction`. Coupon
- * redemption stays committed at ORDER PLACEMENT (OD-REF-1); nothing here touches
- * CouponRedemption/Offer, refunds, wallet, or settlement.
+ * amount/currency before creating any authoritative `Transaction`. Prepaid
+ * capture promotes Order INITIAL→PENDING via OrderService (doc 90). Refunds stay
+ * on RefundService; this method does not invent a second payment write path.
  */
 @Injectable()
 export class PaymentService {
   constructor(
     private readonly repo: PaymentRepository,
     private readonly config: ConfigService,
+    private readonly orders: OrderService,
   ) {}
 
   /**
@@ -99,6 +101,7 @@ export class PaymentService {
     const existing = await this.repo.findAttemptByRazorpayPaymentId(razorpayPaymentId);
     if (existing) {
       const currentIntent = (await this.repo.findIntentById(existing.paymentIntentId)) ?? intent;
+      await this.promoteCapturedOrder(currentIntent.orderId);
       return {
         intent: currentIntent,
         attempt: existing,
@@ -125,6 +128,7 @@ export class PaymentService {
         razorpayPaymentId,
         idempotencyKey: key,
       });
+      await this.promoteCapturedOrder(updated.orderId);
       return { intent: updated, attempt, transactionId, created: true };
     } catch (e) {
       // Concurrency: another writer captured the same provider payment first. The
@@ -133,10 +137,16 @@ export class PaymentService {
         const winner = await this.repo.findAttemptByRazorpayPaymentId(razorpayPaymentId);
         const currentIntent = (await this.repo.findIntentById(intent.id)) ?? intent;
         if (winner) {
+          await this.promoteCapturedOrder(currentIntent.orderId);
           return { intent: currentIntent, attempt: winner, transactionId: '', created: false };
         }
       }
       throw e;
     }
+  }
+
+  private async promoteCapturedOrder(orderId: string | null): Promise<void> {
+    if (!orderId) return;
+    await this.orders.promoteOnPaymentCapture(orderId);
   }
 }

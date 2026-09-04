@@ -187,7 +187,7 @@ export class OrderService {
       restaurantId: input.restaurantId,
       userId,
       type: input.type,
-      status: 'INITIAL',
+      status: input.status ?? 'INITIAL',
       subtotalMinor,
       taxTotalMinor,
       discountTotalMinor,
@@ -201,7 +201,17 @@ export class OrderService {
       actorType: isCustomer ? 'CUSTOMER' : actor.actorType,
       actorId: isCustomer ? actor.userId : actor.staffMemberId,
       redemption,
+      checkoutIdempotencyKey: input.checkoutIdempotencyKey ?? null,
+      deferRedemption: input.deferRedemption === true,
     });
+  }
+
+  /**
+   * Prepaid capture hook (doc 90): INITIAL → PENDING, redeem deferred coupon once,
+   * clear the consumer cart. Idempotent under verify/webhook retries.
+   */
+  async promoteOnPaymentCapture(orderId: string): Promise<OrderRecord | null> {
+    return this.orders.promoteOnPaymentCapture(orderId);
   }
 
   async getOrder(principal: StaffPrincipal, orderId: string): Promise<OrderRecord | null> {

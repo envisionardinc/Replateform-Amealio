@@ -1035,6 +1035,8 @@ model Order {
   offer               Offer?            @relation(fields: [offerId], references: [id])
   couponId            String?           @db.Uuid
   coupon              Coupon?           @relation(fields: [couponId], references: [id])
+  // Consumer checkout idempotency (doc 90). Nullable so existing rows stay valid.
+  checkoutIdempotencyKey String?        @unique
   createdBy           String?           @db.Uuid
   updatedBy           String?           @db.Uuid
   createdAt           DateTime          @default(now())

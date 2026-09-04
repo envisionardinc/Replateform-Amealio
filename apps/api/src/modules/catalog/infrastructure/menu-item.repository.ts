@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import type {
+  CheckoutCatalogLine,
   ItemAvailabilityName,
   ItemChannelConfigRecord,
   ItemVariantRecord,
@@ -111,6 +112,63 @@ export class MenuItemRepository {
       },
     });
     return rows.map((r) => ({ ...r, channel: r.channel as OrderChannel }));
+  }
+
+  /**
+   * Server price authority for cart/checkout. Channel override wins when present.
+   * Returns null for a missing variant (caller rejects).
+   */
+  async findVariantForCheckout(
+    variantId: string,
+    channel?: OrderChannel,
+  ): Promise<CheckoutCatalogLine | null> {
+    try {
+      const row = await this.prisma.itemVariant.findUnique({
+        where: { id: variantId },
+        select: {
+          id: true,
+          size: true,
+          priceMinor: true,
+          currencyCode: true,
+          available: true,
+          menuItem: {
+            select: {
+              id: true,
+              restaurantId: true,
+              merchantId: true,
+              name: true,
+              availability: true,
+              isPublished: true,
+              deletedAt: true,
+              channelConfigs: {
+                where: channel ? { channel } : undefined,
+                select: { enabled: true, priceOverrideMinor: true },
+              },
+            },
+          },
+        },
+      });
+      if (!row) return null;
+      const cfg = row.menuItem.channelConfigs[0] ?? null;
+      return {
+        variantId: row.id,
+        menuItemId: row.menuItem.id,
+        restaurantId: row.menuItem.restaurantId,
+        merchantId: row.menuItem.merchantId,
+        name: row.menuItem.name,
+        size: row.size,
+        priceMinor: cfg?.priceOverrideMinor ?? row.priceMinor,
+        currencyCode: row.currencyCode,
+        availability: row.menuItem.availability as ItemAvailabilityName,
+        isPublished: row.menuItem.isPublished,
+        deletedAt: row.menuItem.deletedAt,
+        variantAvailable: row.available,
+        channelEnabled: cfg ? cfg.enabled : null,
+        channelPriceOverrideMinor: cfg?.priceOverrideMinor ?? null,
+      };
+    } catch {
+      return null;
+    }
   }
 
   /** Full item detail: variants + channel configs + add-on groups (with add-ons). */

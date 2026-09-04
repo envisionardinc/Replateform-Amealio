@@ -54,6 +54,9 @@ export interface CreateOrderInput {
   // validates the offer/coupon and calculates the discount; client-supplied
   // discount/total are NEVER trusted when this is present (P1.7.24).
   couponCode?: string | null;
+  checkoutIdempotencyKey?: string | null;
+  deferRedemption?: boolean;
+  status?: OrderStatusName;
 }
 
 export type RedemptionStatusName = 'ACTIVE' | 'REVERSED';
@@ -171,6 +174,7 @@ export interface OrderRecord {
   offerId: string | null;
   couponId: string | null;
   cancelReason: string | null;
+  checkoutIdempotencyKey: string | null;
   deliveryPersonId: string | null;
   items: OrderItemRecord[];
   statusEvents: OrderStatusEventRecord[];

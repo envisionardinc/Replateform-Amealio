@@ -72,6 +72,7 @@ interface CreateArgs {
   tipMinor: bigint;
   donationMinor: bigint;
   currencyCode: string;
+  checkoutIdempotencyKey?: string | null;
   items: Array<{
     menuItemId: string | null;
     nameSnapshot: string;
@@ -86,6 +87,7 @@ interface CreateArgs {
   actorType: string | null;
   actorId: string | null;
   redemption?: RedemptionDirective;
+  deferRedemption?: boolean;
 }
 
 /**
@@ -152,73 +154,196 @@ export class OrderRepository {
   }
 
   async createOrderWithItems(args: CreateArgs): Promise<OrderRecord> {
-    const created = await this.prisma.$transaction(async (tx) => {
-      const r = args.redemption;
-      if (r) {
-        await this.lockAndAssertRedemptionLimits(tx, r);
-      }
+    if (args.checkoutIdempotencyKey) {
+      const existing = await this.findByCheckoutIdempotencyKey(args.checkoutIdempotencyKey);
+      if (existing) return existing;
+    }
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const r = args.redemption;
+        if (r) {
+          await this.lockAndAssertRedemptionLimits(tx, r);
+        }
 
-      const order = await tx.order.create({
-        data: {
-          orderNumber: args.orderNumber,
-          merchantId: args.merchantId,
-          restaurantId: args.restaurantId,
-          userId: args.userId,
-          type: args.type,
-          status: args.status,
-          subtotalMinor: args.subtotalMinor,
-          taxTotalMinor: args.taxTotalMinor,
-          discountTotalMinor: args.discountTotalMinor,
-          feeTotalMinor: args.feeTotalMinor,
-          deliveryChargeMinor: args.deliveryChargeMinor,
-          grandTotalMinor: args.grandTotalMinor,
-          tipMinor: args.tipMinor,
-          donationMinor: args.donationMinor,
-          currencyCode: args.currencyCode,
-          offerId: r?.offerId ?? null,
-          couponId: r?.couponId ?? null,
-          placedAt: new Date(),
-          items: {
-            create: args.items.map((i) => ({
-              menuItemId: i.menuItemId,
-              nameSnapshot: i.nameSnapshot,
-              variantSnapshot: i.variantSnapshot,
-              unitPriceMinor: i.unitPriceMinor,
-              quantity: i.quantity,
-              lineTotalMinor: i.lineTotalMinor,
-              currencyCode: i.currencyCode,
-              customization: i.customization,
-              addOns: i.addOns,
-            })),
-          },
-          statusEvents: {
-            create: [
-              {
-                fromStatus: null,
-                toStatus: args.status,
-                actorType: args.actorType,
-                actorId: args.actorId,
-              },
-            ],
-          },
-        },
-        select: { id: true },
-      });
-
-      if (r) {
-        await tx.couponRedemption.create({
+        const order = await tx.order.create({
           data: {
-            couponId: r.couponId,
-            userId: r.userId,
-            orderId: order.id,
-            status: 'ACTIVE',
-            discountAppliedMinor: r.discountAppliedMinor,
+            orderNumber: args.orderNumber,
+            merchantId: args.merchantId,
+            restaurantId: args.restaurantId,
+            userId: args.userId,
+            type: args.type,
+            status: args.status,
+            subtotalMinor: args.subtotalMinor,
+            taxTotalMinor: args.taxTotalMinor,
+            discountTotalMinor: args.discountTotalMinor,
+            feeTotalMinor: args.feeTotalMinor,
+            deliveryChargeMinor: args.deliveryChargeMinor,
+            grandTotalMinor: args.grandTotalMinor,
+            tipMinor: args.tipMinor,
+            donationMinor: args.donationMinor,
+            currencyCode: args.currencyCode,
+            offerId: r?.offerId ?? null,
+            couponId: r?.couponId ?? null,
+            checkoutIdempotencyKey: args.checkoutIdempotencyKey ?? null,
+            placedAt: new Date(),
+            items: {
+              create: args.items.map((i) => ({
+                menuItemId: i.menuItemId,
+                nameSnapshot: i.nameSnapshot,
+                variantSnapshot: i.variantSnapshot,
+                unitPriceMinor: i.unitPriceMinor,
+                quantity: i.quantity,
+                lineTotalMinor: i.lineTotalMinor,
+                currencyCode: i.currencyCode,
+                customization: i.customization,
+                addOns: i.addOns,
+              })),
+            },
+            statusEvents: {
+              create: [
+                {
+                  fromStatus: null,
+                  toStatus: args.status,
+                  actorType: args.actorType,
+                  actorId: args.actorId,
+                },
+              ],
+            },
+          },
+          select: { id: true },
+        });
+
+        if (r && !args.deferRedemption) {
+          await tx.couponRedemption.create({
+            data: {
+              couponId: r.couponId,
+              userId: r.userId,
+              orderId: order.id,
+              status: 'ACTIVE',
+              discountAppliedMinor: r.discountAppliedMinor,
+            },
+          });
+        }
+        return order.id;
+      });
+      return this.findByIdOrThrow(created);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        if (args.checkoutIdempotencyKey) {
+          const winner = await this.findByCheckoutIdempotencyKey(args.checkoutIdempotencyKey);
+          if (winner) return winner;
+        }
+      }
+      throw e;
+    }
+  }
+
+  async findByCheckoutIdempotencyKey(key: string): Promise<OrderRecord | null> {
+    const row = await this.prisma.order.findUnique({
+      where: { checkoutIdempotencyKey: key },
+      include: ORDER_INCLUDE,
+    });
+    return row ? this.toRecord(row) : null;
+  }
+
+  /**
+   * Capture side-effect (doc 90). Compare-and-set INITIAL→PENDING, commit a
+   * deferred CouponRedemption exactly once, and clear the payer's cart.
+   * Already-PENDING / missing orders are no-ops (verify + webhook retries).
+   */
+  async promoteOnPaymentCapture(orderId: string): Promise<OrderRecord | null> {
+    const existing = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: ORDER_INCLUDE,
+    });
+    if (!existing) return null;
+
+    if (existing.status === 'INITIAL') {
+      await this.prisma.$transaction(async (tx) => {
+        const cas = await tx.order.updateMany({
+          where: { id: orderId, status: 'INITIAL' },
+          data: { status: 'PENDING' },
+        });
+        if (cas.count === 0) return;
+        await tx.orderStatusEvent.create({
+          data: {
+            orderId,
+            fromStatus: 'INITIAL',
+            toStatus: 'PENDING',
+            actorType: 'SYSTEM',
+            reason: 'PAYMENT_CAPTURED',
           },
         });
-      }
-      return order.id;
+        await this.commitDeferredRedemption(tx, {
+          id: existing.id,
+          userId: existing.userId,
+          couponId: existing.couponId,
+          offerId: existing.offerId,
+          discountTotalMinor: existing.discountTotalMinor,
+        });
+        if (existing.userId) {
+          await tx.cart.deleteMany({ where: { userId: existing.userId } });
+        }
+      });
+    } else {
+      await this.prisma.$transaction(async (tx) => {
+        await this.commitDeferredRedemption(tx, {
+          id: existing.id,
+          userId: existing.userId,
+          couponId: existing.couponId,
+          offerId: existing.offerId,
+          discountTotalMinor: existing.discountTotalMinor,
+        });
+        if (existing.userId && existing.status === 'PENDING') {
+          await tx.cart.deleteMany({ where: { userId: existing.userId } });
+        }
+      });
+    }
+    return this.findById(orderId);
+  }
+
+  private async commitDeferredRedemption(
+    tx: Prisma.TransactionClient,
+    existing: {
+      id: string;
+      userId: string | null;
+      couponId: string | null;
+      offerId: string | null;
+      discountTotalMinor: bigint;
+    },
+  ): Promise<void> {
+    if (!existing.couponId || !existing.offerId) return;
+    const already = await tx.couponRedemption.findFirst({
+      where: { orderId: existing.id, couponId: existing.couponId },
     });
-    return this.findByIdOrThrow(created);
+    if (already) return;
+
+    const offer = await tx.offer.findUnique({ where: { id: existing.offerId } });
+    if (!offer) return;
+    try {
+      await this.lockAndAssertRedemptionLimits(tx, {
+        offerId: offer.id,
+        couponId: existing.couponId,
+        userId: existing.userId,
+        discountAppliedMinor: existing.discountTotalMinor,
+        maxUsageLimit: offer.maxUsageLimit,
+        perUserLimit: offer.perUserLimit,
+        isGlobal: offer.isGlobal,
+        useLimit: offer.useLimit,
+        useFrequency: offer.useFrequency,
+      });
+    } catch {
+      return;
+    }
+    await tx.couponRedemption.create({
+      data: {
+        couponId: existing.couponId,
+        userId: existing.userId,
+        orderId: existing.id,
+        status: 'ACTIVE',
+        discountAppliedMinor: existing.discountTotalMinor,
+      },
+    });
   }
 
   async findRedemptionByOrder(orderId: string): Promise<RedemptionRecord | null> {
@@ -378,6 +503,7 @@ export class OrderRepository {
     offerId: string | null;
     couponId: string | null;
     cancelReason: string | null;
+    checkoutIdempotencyKey: string | null;
     items: Array<Omit<OrderItemRecord, 'quantity'> & { quantity: number }>;
     statusEvents: Array<{
       id: string;
@@ -410,6 +536,7 @@ export class OrderRepository {
       offerId: row.offerId,
       couponId: row.couponId,
       cancelReason: row.cancelReason,
+      checkoutIdempotencyKey: row.checkoutIdempotencyKey ?? null,
       deliveryPersonId: null,
       items: row.items as OrderItemRecord[],
       statusEvents: row.statusEvents.map((e): OrderStatusEventRecord => ({

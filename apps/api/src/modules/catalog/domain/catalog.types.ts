@@ -90,3 +90,21 @@ export interface MenuItemDetail extends MenuItemRecord {
   channelConfigs: ItemChannelConfigRecord[];
   addOnGroups: AddOnGroupRecord[];
 }
+
+/** Catalog line used to reprice cart/checkout (doc 90). Never trust client totals. */
+export interface CheckoutCatalogLine {
+  variantId: string;
+  menuItemId: string;
+  restaurantId: string;
+  merchantId: string;
+  name: string;
+  size: string | null;
+  priceMinor: bigint;
+  currencyCode: string;
+  availability: ItemAvailabilityName;
+  isPublished: boolean;
+  deletedAt: Date | null;
+  variantAvailable: boolean;
+  channelEnabled: boolean | null;
+  channelPriceOverrideMinor: bigint | null;
+}

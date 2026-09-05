@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import type { RestaurantRecord } from '../domain/merchant.types';
 
@@ -41,6 +42,29 @@ export class RestaurantRepository {
       where: { merchantId, deletedAt: null },
       select: RESTAURANT_SELECT,
       orderBy: { name: 'asc' },
+    });
+  }
+
+  /**
+   * Consumer discovery: ACTIVE + not deleted. Optional city / name filter.
+   * No geo ranking (FUTURE).
+   */
+  listDiscoverable(query: { city?: string; q?: string } = {}): Promise<RestaurantRecord[]> {
+    const where: Prisma.RestaurantWhereInput = {
+      deletedAt: null,
+      status: 'ACTIVE',
+    };
+    if (query.city?.trim()) {
+      where.city = { equals: query.city.trim(), mode: 'insensitive' };
+    }
+    if (query.q?.trim()) {
+      where.name = { contains: query.q.trim(), mode: 'insensitive' };
+    }
+    return this.prisma.restaurant.findMany({
+      where,
+      select: RESTAURANT_SELECT,
+      orderBy: { name: 'asc' },
+      take: 100,
     });
   }
 

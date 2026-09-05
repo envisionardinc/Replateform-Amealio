@@ -115,6 +115,82 @@ export class MenuItemRepository {
   }
 
   /**
+   * Consumer menu: published, not deleted. Includes variants for display prices.
+   */
+  async listPublishedByRestaurant(restaurantId: string) {
+    const rows = await this.prisma.menuItem.findMany({
+      where: { restaurantId, deletedAt: null, isPublished: true },
+      select: {
+        id: true,
+        restaurantId: true,
+        name: true,
+        description: true,
+        availability: true,
+        isPublished: true,
+        variants: {
+          select: {
+            id: true,
+            size: true,
+            priceMinor: true,
+            currencyCode: true,
+            available: true,
+          },
+          orderBy: { priceMinor: 'asc' },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      restaurantId: row.restaurantId,
+      name: row.name,
+      description: row.description,
+      availability: row.availability as ItemAvailabilityName,
+      isPublished: row.isPublished,
+      variants: row.variants,
+    }));
+  }
+
+  async findPublishedDetailById(id: string) {
+    try {
+      const row = await this.prisma.menuItem.findFirst({
+        where: { id, deletedAt: null, isPublished: true },
+        select: {
+          id: true,
+          restaurantId: true,
+          name: true,
+          description: true,
+          availability: true,
+          isPublished: true,
+          variants: {
+            select: {
+              id: true,
+              size: true,
+              priceMinor: true,
+              currencyCode: true,
+              available: true,
+            },
+            orderBy: { priceMinor: 'asc' },
+          },
+        },
+      });
+      return row
+        ? {
+            id: row.id,
+            restaurantId: row.restaurantId,
+            name: row.name,
+            description: row.description,
+            availability: row.availability as ItemAvailabilityName,
+            isPublished: row.isPublished,
+            variants: row.variants,
+          }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Server price authority for cart/checkout. Channel override wins when present.
    * Returns null for a missing variant (caller rejects).
    */

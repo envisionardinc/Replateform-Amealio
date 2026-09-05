@@ -126,7 +126,7 @@ async function main() {
   });
   const item = await prisma.menuItem.upsert({
     where: { legacyId: 'seed-item-1' },
-    update: {},
+    update: { isPublished: true, availability: 'AVAILABLE' },
     create: {
       legacyId: 'seed-item-1',
       merchantId: merchant.id,
@@ -135,6 +135,7 @@ async function main() {
       name: 'DEV Paneer Butter Masala',
       description: 'Synthetic dev item',
       availability: 'AVAILABLE',
+      isPublished: true,
     },
   });
   await prisma.itemVariant.upsert({

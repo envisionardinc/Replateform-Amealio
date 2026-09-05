@@ -53,8 +53,8 @@ export class PlatformCatalogRepository {
         ("name", "description", "cuisine_type", "status", "legacy_id", "source_payload", "created_by", "updated_by")
       VALUES
         (${input.name.trim()}, ${input.description ?? null}, ${input.cuisineType ?? null},
-         ${input.status ?? 'ACTIVE'}, ${input.legacyId ?? null}, ${input.sourcePayload ?? null},
-         ${input.createdBy ?? null}, ${input.createdBy ?? null})
+         ${input.status ?? 'ACTIVE'}, ${input.legacyId ?? null}, ${input.sourcePayload ?? null}::jsonb,
+         ${input.createdBy ?? null}::uuid, ${input.createdBy ?? null}::uuid)
       RETURNING
         "id", "legacy_id" AS "legacyId", "name", "description",
         "cuisine_type" AS "cuisineType", "status", "source_payload" AS "sourcePayload",
@@ -89,8 +89,8 @@ export class PlatformCatalogRepository {
         "description" = ${description},
         "cuisine_type" = ${cuisineType},
         "status" = ${status},
-        "source_payload" = ${sourcePayload ?? null},
-        "updated_by" = ${input.updatedBy ?? null},
+        "source_payload" = ${sourcePayload ?? null}::jsonb,
+        "updated_by" = ${input.updatedBy ?? null}::uuid,
         "updated_at" = CURRENT_TIMESTAMP
       WHERE "id" = ${input.catalogId}::uuid
       RETURNING
@@ -114,7 +114,7 @@ export class PlatformCatalogRepository {
         ("catalog_id", "name", "description", "sort_order", "legacy_id", "source_payload")
       VALUES
         (${input.catalogId}::uuid, ${input.name.trim()}, ${input.description ?? null},
-         ${input.sortOrder ?? 0}, ${input.legacyId ?? null}, ${input.sourcePayload ?? null})
+         ${input.sortOrder ?? 0}, ${input.legacyId ?? null}, ${input.sourcePayload ?? null}::jsonb)
       RETURNING
         "id", "catalog_id" AS "catalogId", "legacy_id" AS "legacyId", "name",
         "description", "sort_order" AS "sortOrder", "source_payload" AS "sourcePayload"
@@ -135,7 +135,7 @@ export class PlatformCatalogRepository {
         ("catalog_id", "category_id", "name", "description", "legacy_id", "source_payload")
       VALUES
         (${input.catalogId}::uuid, ${input.categoryId ?? null}::uuid, ${input.name.trim()},
-         ${input.description ?? null}, ${input.legacyId ?? null}, ${input.sourcePayload ?? null})
+         ${input.description ?? null}, ${input.legacyId ?? null}, ${input.sourcePayload ?? null}::jsonb)
       RETURNING
         "id", "catalog_id" AS "catalogId", "category_id" AS "categoryId", "legacy_id" AS "legacyId",
         "name", "description", "source_payload" AS "sourcePayload"

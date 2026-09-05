@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.repository';
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
 import { MenuRepository } from '../../catalog/infrastructure/menu.repository';
+import { CommercialQuoteService } from '../../catalog/application/commercial-quote.service';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
 import type { ConsumerCatalogItem, OrderChannel } from '../../catalog/domain/catalog.types';
 import type { ModifierGroupSelectionInput } from '../../catalog/domain/merchandise-configuration';
@@ -24,6 +25,7 @@ export class DiscoveryService {
     private readonly menus: MenuRepository,
     private readonly taxonomy: TaxonomyQuery,
     private readonly quotes: MerchandiseQuoteService,
+    private readonly commercial: CommercialQuoteService,
   ) {}
 
   getHome(query: { city?: string; q?: string; categoryId?: string }) {
@@ -125,12 +127,12 @@ export class DiscoveryService {
   }) {
     const quote = await this.quotes.quote(input);
     await this.requireDiscoverable(quote.restaurantId);
+    const commercial = this.commercial.fromMerchandise([quote], 0n);
+    const totals = this.commercial.serialize(commercial);
     return {
       variantId: quote.variantId,
       menuItemId: quote.menuItemId,
-      restaurantId: quote.restaurantId,
       quantity: quote.quantity,
-      currencyCode: quote.currencyCode,
       variantPriceMinor: quote.variantPriceMinor.toString(),
       modifierTotalMinor: quote.modifierTotalMinor.toString(),
       unitMerchandiseMinor: quote.unitMerchandiseMinor.toString(),
@@ -142,6 +144,7 @@ export class DiscoveryService {
         quantity: s.quantity,
         priceAdjustmentMinor: s.priceAdjustmentMinor.toString(),
       })),
+      ...totals,
     };
   }
 

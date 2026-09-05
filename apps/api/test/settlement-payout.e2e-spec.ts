@@ -357,12 +357,38 @@ describe('Settlement window & commission (P1.7.32)', () => {
     // ---- COMMISSION BASIS (P1.7.34) ----
     it('charges commission on the subtotal only, EXCLUDING tax/delivery/fees', async () => {
       const { merchantId, restaurantId } = await seedMR(1000); // 10%
-      // subtotal 10000; captured = 10000 + tax 2000 + delivery 1000 + fee 500 = 13500
-      await capture(merchantId, restaurantId, {
-        unitPriceMinor: 10000n,
-        taxTotalMinor: 2000n,
-        deliveryChargeMinor: 1000n,
-        feeTotalMinor: 500n,
+      // Stage D rejects caller tax/fee/delivery on OrderService. Persist a
+      // historical-shaped order so commission still excludes those columns.
+      const order = await prisma.order.create({
+        data: {
+          orderNumber: uniq('ORD'),
+          merchantId,
+          restaurantId,
+          type: 'HOME_DELIVERY',
+          status: 'INITIAL',
+          subtotalMinor: 10000n,
+          taxTotalMinor: 2000n,
+          feeTotalMinor: 500n,
+          deliveryChargeMinor: 1000n,
+          grandTotalMinor: 13500n,
+        },
+      });
+      const rzpOrder = uniq('order');
+      const intent = await payments.createIntent({ orderId: order.id, razorpayOrderId: rzpOrder });
+      const payId = uniq('pay');
+      await payments.verifyAndCapture({
+        razorpayOrderId: rzpOrder,
+        razorpayPaymentId: payId,
+        razorpaySignature: paySign(rzpOrder, payId),
+      });
+      const past = new Date(Date.now() - 6 * 24 * 3600_000);
+      await prisma.paymentAttempt.updateMany({
+        where: { paymentIntentId: intent.id, status: 'CAPTURED' },
+        data: { createdAt: past },
+      });
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'COMPLETED', updatedAt: past },
       });
       const s = await settlements.settleMerchant(superAdmin, { merchantId, restaurantId });
       expect(s.grossAmountMinor).toBe(13500n); // payout pool = captured

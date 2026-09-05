@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
+import { CommercialQuoteService } from '../../catalog/application/commercial-quote.service';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
+import { serializeCommercialQuote } from '../../catalog/domain/commercial-quote';
 import type { CheckoutCatalogLine } from '../../catalog/domain/catalog.types';
 import { CartRepository } from '../infrastructure/cart.repository';
 import type { OrderTypeName } from '../domain/ordering.types';
@@ -30,6 +32,20 @@ export interface PricedCart {
   type: OrderTypeName | null;
   currencyCode: string;
   subtotalMinor: string;
+  merchandiseSubtotalMinor: string;
+  discountMinor: string;
+  taxableSubtotalMinor: string;
+  taxes: Array<{ code: string; rateBps: number; mode: string; amountMinor: string }>;
+  taxTotalMinor: string;
+  fees: Array<{
+    type: string;
+    recipient: string;
+    amountMinor: string;
+    taxTreatment: string;
+  }>;
+  feeTotalMinor: string;
+  deliveryChargeMinor: string;
+  grandTotalMinor: string;
   items: PricedCartItem[];
 }
 
@@ -52,6 +68,7 @@ export class CartService {
     private readonly carts: CartRepository,
     private readonly menuItems: MenuItemRepository,
     private readonly quotes: MerchandiseQuoteService,
+    private readonly commercial: CommercialQuoteService,
   ) {}
 
   async getCart(userId: string): Promise<PricedCart> {
@@ -135,7 +152,7 @@ export class CartService {
     const cart = await this.carts.findById(cartId);
     if (!cart) throw new NotFoundException('Cart not found');
     const items: PricedCartItem[] = [];
-    let subtotal = 0n;
+    const merchandise = [];
     let currencyCode = 'INR';
     for (const it of cart.items) {
       if (!it.variantId) {
@@ -150,7 +167,7 @@ export class CartService {
           addOns: it.addOns,
         });
         if (quote.currencyCode) currencyCode = quote.currencyCode;
-        subtotal += quote.lineMerchandiseMinor;
+        merchandise.push(quote);
         items.push({
           id: it.id,
           menuItemId: quote.menuItemId,
@@ -174,13 +191,42 @@ export class CartService {
         });
       }
     }
+    const emptyTotals = {
+      merchandiseSubtotalMinor: '0',
+      discountMinor: '0',
+      taxableSubtotalMinor: '0',
+      taxes: [] as Array<{ code: string; rateBps: number; mode: string; amountMinor: string }>,
+      taxTotalMinor: '0',
+      fees: [] as Array<{
+        type: string;
+        recipient: string;
+        amountMinor: string;
+        taxTreatment: string;
+      }>,
+      feeTotalMinor: '0',
+      deliveryChargeMinor: '0',
+      grandTotalMinor: '0',
+    };
+    const commercial =
+      merchandise.length > 0
+        ? serializeCommercialQuote(this.commercial.fromMerchandise(merchandise, 0n))
+        : emptyTotals;
     return {
       id: cart.id,
       restaurantId: cart.restaurantId,
       merchantId: cart.merchantId,
       type: cart.type,
       currencyCode,
-      subtotalMinor: subtotal.toString(),
+      subtotalMinor: commercial.merchandiseSubtotalMinor,
+      merchandiseSubtotalMinor: commercial.merchandiseSubtotalMinor,
+      discountMinor: commercial.discountMinor,
+      taxableSubtotalMinor: commercial.taxableSubtotalMinor,
+      taxes: commercial.taxes,
+      taxTotalMinor: commercial.taxTotalMinor,
+      fees: commercial.fees,
+      feeTotalMinor: commercial.feeTotalMinor,
+      deliveryChargeMinor: commercial.deliveryChargeMinor,
+      grandTotalMinor: commercial.grandTotalMinor,
       items,
     };
   }

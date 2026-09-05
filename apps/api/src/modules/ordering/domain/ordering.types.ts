@@ -38,10 +38,11 @@ export interface CreateOrderInput {
   userId?: string | null; // optional customer attribution
   type: OrderTypeName;
   items: CreateOrderItemInput[];
-  // optional order-level money components (default 0); grandTotal is derived
+  // Stage D: tax/fee/delivery are server-derived. Non-zero caller values are rejected.
   taxTotalMinor?: bigint;
-  // discountTotalMinor: client-supplied ad-hoc discount. IGNORED when `couponCode`
+  // discountTotalMinor: staff/ad-hoc discount slot. IGNORED when `couponCode`
   // is supplied — the server computes the authoritative offer discount (P1.7.24).
+  // This is the Stage D quote discount boundary; Promotion Phase 2 is not wired.
   discountTotalMinor?: bigint;
   feeTotalMinor?: bigint;
   deliveryChargeMinor?: bigint;
@@ -177,6 +178,7 @@ export interface OrderRecord {
   checkoutIdempotencyKey: string | null;
   deliveryPersonId: string | null;
   deliveryPerson?: OrderDeliveryPersonSummary | null;
+  commercialSnapshot?: unknown | null;
   items: OrderItemRecord[];
   statusEvents: OrderStatusEventRecord[];
   paymentIntents: OrderPaymentSummary[];

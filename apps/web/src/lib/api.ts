@@ -161,6 +161,20 @@ export type ModifierGroupPayload = {
   selections: Array<{ modifierId: string; quantity?: number }>;
 };
 
+export type CommercialTaxLine = {
+  code: string;
+  rateBps: number;
+  mode: string;
+  amountMinor: string;
+};
+
+export type CommercialFeeLine = {
+  type: string;
+  recipient: string;
+  amountMinor: string;
+  taxTreatment: string;
+};
+
 export type MerchandiseQuote = {
   variantId: string;
   menuItemId: string;
@@ -171,6 +185,15 @@ export type MerchandiseQuote = {
   modifierTotalMinor: string;
   unitMerchandiseMinor: string;
   lineMerchandiseMinor: string;
+  merchandiseSubtotalMinor?: string;
+  discountMinor?: string;
+  taxableSubtotalMinor?: string;
+  taxes?: CommercialTaxLine[];
+  taxTotalMinor?: string;
+  fees?: CommercialFeeLine[];
+  feeTotalMinor?: string;
+  deliveryChargeMinor?: string;
+  grandTotalMinor?: string;
   selections: Array<{
     groupId: string;
     modifierId: string;
@@ -239,6 +262,15 @@ export type PricedCart = {
   type: string | null;
   currencyCode: string;
   subtotalMinor: string;
+  merchandiseSubtotalMinor?: string;
+  discountMinor?: string;
+  taxableSubtotalMinor?: string;
+  taxes?: CommercialTaxLine[];
+  taxTotalMinor?: string;
+  fees?: CommercialFeeLine[];
+  feeTotalMinor?: string;
+  deliveryChargeMinor?: string;
+  grandTotalMinor?: string;
   items: PricedCartItem[];
 };
 
@@ -273,6 +305,16 @@ export type Order = {
   feeTotalMinor: string;
   deliveryChargeMinor: string;
   grandTotalMinor: string;
+  commercialSnapshot?: {
+    schema?: string;
+    merchandiseSubtotalMinor?: string;
+    discountMinor?: string;
+    taxTotalMinor?: string;
+    feeTotalMinor?: string;
+    grandTotalMinor?: string;
+    taxes?: CommercialTaxLine[];
+    fees?: CommercialFeeLine[];
+  } | null;
   tipMinor: string;
   deliveryPersonId: string | null;
   deliveryPerson: OrderDeliveryPerson | null;

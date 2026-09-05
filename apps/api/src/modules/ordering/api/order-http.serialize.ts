@@ -19,6 +19,7 @@ export function serializeOrder(order: OrderRecord) {
     feeTotalMinor: order.feeTotalMinor.toString(),
     deliveryChargeMinor: order.deliveryChargeMinor.toString(),
     grandTotalMinor: order.grandTotalMinor.toString(),
+    commercialSnapshot: order.commercialSnapshot ?? null,
     tipMinor: order.tipMinor.toString(),
     donationMinor: order.donationMinor.toString(),
     offerId: order.offerId,

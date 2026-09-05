@@ -73,6 +73,7 @@ interface CreateArgs {
   feeTotalMinor: bigint;
   deliveryChargeMinor: bigint;
   grandTotalMinor: bigint;
+  commercialSnapshot?: Prisma.InputJsonValue | null;
   tipMinor: bigint;
   donationMinor: bigint;
   currencyCode: string;
@@ -183,6 +184,7 @@ export class OrderRepository {
             feeTotalMinor: args.feeTotalMinor,
             deliveryChargeMinor: args.deliveryChargeMinor,
             grandTotalMinor: args.grandTotalMinor,
+            commercialSnapshot: args.commercialSnapshot ?? undefined,
             tipMinor: args.tipMinor,
             donationMinor: args.donationMinor,
             currencyCode: args.currencyCode,
@@ -526,6 +528,7 @@ export class OrderRepository {
     checkoutIdempotencyKey: string | null;
     deliveryPersonId: string | null;
     deliveryPerson?: OrderDeliveryPersonSummary | null;
+    commercialSnapshot?: unknown | null;
     items: Array<Omit<OrderItemRecord, 'quantity'> & { quantity: number }>;
     statusEvents: Array<{
       id: string;
@@ -552,6 +555,7 @@ export class OrderRepository {
       feeTotalMinor: row.feeTotalMinor,
       deliveryChargeMinor: row.deliveryChargeMinor,
       grandTotalMinor: row.grandTotalMinor,
+      commercialSnapshot: row.commercialSnapshot ?? null,
       tipMinor: row.tipMinor,
       donationMinor: row.donationMinor,
       currencyCode: row.currencyCode,

@@ -7,6 +7,7 @@ import { CatalogService } from './application/catalog.service';
 import { CatalogWriteRepository } from './infrastructure/catalog-write.repository';
 import { CatalogWriteService } from './application/catalog-write.service';
 import { MerchandiseQuoteService } from './application/merchandise-quote.service';
+import { CommercialQuoteService } from './application/commercial-quote.service';
 import { CatalogController } from './catalog.controller';
 
 /**
@@ -25,6 +26,7 @@ import { CatalogController } from './catalog.controller';
     CatalogWriteRepository,
     CatalogWriteService,
     MerchandiseQuoteService,
+    CommercialQuoteService,
   ],
   exports: [
     MenuRepository,
@@ -33,6 +35,7 @@ import { CatalogController } from './catalog.controller';
     CatalogWriteRepository,
     CatalogWriteService,
     MerchandiseQuoteService,
+    CommercialQuoteService,
   ],
 })
 export class CatalogModule {}

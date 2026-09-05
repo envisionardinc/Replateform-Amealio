@@ -1049,6 +1049,9 @@ model Order {
   feeTotalMinor       BigInt            @default(0)
   deliveryChargeMinor BigInt            @default(0)
   grandTotalMinor     BigInt            @default(0)
+  // Stage D commercial quote snapshot (doc 107). Immutable historical totals /
+  // tax lines / fee lines. Null on pre-Stage-D rows — those keep scalar totals.
+  commercialSnapshot  Json?
   // Customer-funded tip (P1.7.36). Recorded canonically on the Order but held
   // OUTSIDE the order_total_integrity equation (grand = subtotal − discount + tax
   // + fee + delivery) and OUTSIDE the commissionable basis: a tip is not merchant

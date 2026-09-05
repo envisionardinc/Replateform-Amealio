@@ -5,6 +5,7 @@ import { Badge } from '../design-system/Badge';
 import { Banner } from '../design-system/Banner';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
+import { QuoteTotals } from '../components/QuoteTotals';
 import { cartApi, type PricedCart } from '../lib/api';
 import { formatMinor } from '../lib/money';
 import { isAuthenticated } from '../lib/session';
@@ -124,9 +125,14 @@ export function CartScreen() {
         ))}
         {cart ? (
           <Card>
-            <p className="price">
-              Server subtotal: {formatMinor(cart.subtotalMinor, cart.currencyCode)}
-            </p>
+            <QuoteTotals
+              currencyCode={cart.currencyCode}
+              merchandiseSubtotalMinor={cart.merchandiseSubtotalMinor ?? cart.subtotalMinor}
+              discountMinor={cart.discountMinor}
+              taxTotalMinor={cart.taxTotalMinor}
+              feeTotalMinor={cart.feeTotalMinor}
+              grandTotalMinor={cart.grandTotalMinor ?? cart.subtotalMinor}
+            />
           </Card>
         ) : null}
         {cart && cart.items.length > 0 ? (

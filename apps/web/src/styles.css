@@ -411,6 +411,25 @@ select:focus {
   color: var(--ame-navy);
 }
 
+.quote-totals {
+  margin: 0;
+}
+
+.quote-totals .row {
+  justify-content: space-between;
+  gap: var(--ame-space-3);
+}
+
+.quote-totals dt,
+.quote-totals dd {
+  margin: 0;
+}
+
+.quote-totals dd {
+  font-weight: 600;
+  color: var(--ame-navy);
+}
+
 .modifier-group {
   margin: 0 0 var(--ame-space-4);
 }

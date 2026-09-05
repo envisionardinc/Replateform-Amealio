@@ -139,6 +139,9 @@ export function ItemScreen() {
     : variant
       ? formatMinor(variant.priceMinor, variant.currencyCode)
       : null;
+  const payable = quote
+    ? formatMinor(quote.grandTotalMinor ?? quote.lineMerchandiseMinor, quote.currencyCode)
+    : merchandise;
 
   return (
     <section>
@@ -213,10 +216,13 @@ export function ItemScreen() {
             <StatusPanel error={actionError} />
 
             <p className="price" aria-live="polite">
-              {quoting && !quote ? 'Pricing…' : merchandise}
+              {quoting && !quote ? 'Pricing…' : payable}
             </p>
             <p className="lede">
-              Merchandise total is quoted by the server. This screen never sends a price.
+              {quote
+                ? `Items ${merchandise}${Number(quote.taxTotalMinor ?? 0) > 0 ? ` · Tax ${formatMinor(quote.taxTotalMinor, quote.currencyCode)}` : ''}${Number(quote.feeTotalMinor ?? 0) > 0 ? ` · Fees ${formatMinor(quote.feeTotalMinor, quote.currencyCode)}` : ''}.`
+                : null}{' '}
+              Quoted by the server. This screen never sends a price.
             </p>
 
             <div className="sticky-cta">

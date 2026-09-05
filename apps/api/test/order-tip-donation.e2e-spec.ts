@@ -196,14 +196,12 @@ describe('Order tip & donation model (P1.7.36)', () => {
       makeOrder(restaurantId, {
         tipMinor: 1500n,
         donationMinor: 2000n,
-        taxTotalMinor: 1800n,
-        feeTotalMinor: 500n,
       }),
     );
     expect(order.tipMinor).toBe(1500n);
     expect(order.donationMinor).toBe(2000n);
-    // grand = subtotal + tax + fee (tip/donation excluded) = 10000 + 1800 + 500
-    expect(order.grandTotalMinor).toBe(12300n);
+    // Stage D: tax/fee are server-derived (0). Tip/donation stay outside grand.
+    expect(order.grandTotalMinor).toBe(10000n);
   });
 
   // ---- 5. explicit zero values ----

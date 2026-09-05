@@ -5,8 +5,8 @@ import { Banner } from '../design-system/Banner';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
 import { Field } from '../design-system/Field';
+import { QuoteTotals } from '../components/QuoteTotals';
 import { cartApi, checkoutApi, type PricedCart } from '../lib/api';
-import { formatMinor } from '../lib/money';
 import { clearCheckoutKey, getOrCreateCheckoutKey, isAuthenticated } from '../lib/session';
 
 export function CheckoutScreen() {
@@ -79,9 +79,16 @@ export function CheckoutScreen() {
       >
         {cart && cart.items.length > 0 ? (
           <Card as="form" onSubmit={(e) => void onSubmit(e)}>
+            <QuoteTotals
+              currencyCode={cart.currencyCode}
+              merchandiseSubtotalMinor={cart.merchandiseSubtotalMinor ?? cart.subtotalMinor}
+              discountMinor={cart.discountMinor}
+              taxTotalMinor={cart.taxTotalMinor}
+              feeTotalMinor={cart.feeTotalMinor}
+              grandTotalMinor={cart.grandTotalMinor ?? cart.subtotalMinor}
+            />
             <p className="lede">
-              Server subtotal {formatMinor(cart.subtotalMinor, cart.currencyCode)}. Taxes, delivery
-              fee, and offers use the existing checkout engine — this UI does not invent rates.
+              Totals come from the server quote. This page never sends a price, tax, or fee.
             </p>
             <Field label="Settlement">
               <select

@@ -103,7 +103,7 @@ describe('Ordering foundation (integration)', () => {
 
     const order = await orders.createOrder(
       staffOf(merchantId),
-      baseInput(restaurantId, { userId: user.id, taxTotalMinor: 3250n, discountTotalMinor: 5000n }),
+      baseInput(restaurantId, { userId: user.id, discountTotalMinor: 5000n }),
     );
 
     // relationships
@@ -118,16 +118,16 @@ describe('Ordering foundation (integration)', () => {
     expect(paneer.unitPriceMinor).toBe(25000n);
     expect(paneer.quantity).toBe(2);
     expect(paneer.lineTotalMinor).toBe(50000n);
-    // subtotal = 25000*2 + 5000*3 = 65000; grand = 65000 - 5000 + 3250 = 63250
+    // subtotal = 25000*2 + 5000*3 = 65000; Stage D tax/fee are server-derived (0)
     expect(order.subtotalMinor).toBe(65000n);
-    expect(order.taxTotalMinor).toBe(3250n);
+    expect(order.taxTotalMinor).toBe(0n);
     expect(order.discountTotalMinor).toBe(5000n);
-    expect(order.grandTotalMinor).toBe(63250n);
+    expect(order.grandTotalMinor).toBe(60000n);
     expect(order.currencyCode).toBe('INR');
 
     // persisted values are exact BigInt (DB order_total_integrity CHECK satisfied)
     const persisted = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
-    expect(persisted.grandTotalMinor).toBe(63250n);
+    expect(persisted.grandTotalMinor).toBe(60000n);
     // payment/fulfillment remain SEPARATE default dimensions (not collapsed)
     expect(persisted.paymentStatus).toBe('CREATED');
     expect(persisted.fulfillmentStatus).toBe('UNFULFILLED');

@@ -162,8 +162,16 @@ export function OrderScreen() {
               </li>
             ))}
           </ul>
+          <p className="lede">
+            Subtotal {formatMinor(order.subtotalMinor, order.currencyCode)}
+            {Number(order.discountTotalMinor) > 0
+              ? ` · Discount −${formatMinor(order.discountTotalMinor, order.currencyCode)}`
+              : ''}
+            {` · Tax ${formatMinor(order.taxTotalMinor, order.currencyCode)}`}
+            {` · Fees ${formatMinor(order.feeTotalMinor, order.currencyCode)}`}
+          </p>
           <p className="price">
-            Grand total {formatMinor(order.grandTotalMinor, order.currencyCode)}
+            Total {formatMinor(order.grandTotalMinor, order.currencyCode)}
           </p>
           {order.paymentIntents.map((p) => (
             <p className="lede" key={p.id}>

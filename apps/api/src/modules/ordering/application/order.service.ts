@@ -10,6 +10,13 @@ import type { StaffPrincipal } from '../../identity/staff-authentication/staff-p
 import { MerchantScopeService } from '../../merchant/application/merchant-scope.service';
 import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.repository';
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
+import {
+  CommercialQuoteError,
+  assertCallerChargesNotAuthoritative,
+  composeCommercialQuote,
+  lineFromOrderItem,
+  snapshotCommercial,
+} from '../../catalog/domain/commercial-quote';
 import { OrderRepository } from '../infrastructure/order.repository';
 import { assertOfferEligible, calculateDiscountMinor } from '../domain/offer-discount';
 import { isAllowedTransition, isPickupLike } from '../domain/order-status-graph';
@@ -125,9 +132,15 @@ export class OrderService {
       });
     }
 
-    const taxTotalMinor = input.taxTotalMinor ?? 0n;
-    const feeTotalMinor = input.feeTotalMinor ?? 0n;
-    const deliveryChargeMinor = input.deliveryChargeMinor ?? 0n;
+    try {
+      assertCallerChargesNotAuthoritative({
+        taxTotalMinor: input.taxTotalMinor,
+        feeTotalMinor: input.feeTotalMinor,
+        deliveryChargeMinor: input.deliveryChargeMinor,
+      });
+    } catch (err) {
+      throw this.toCommercialHttp(err);
+    }
     const tipMinor = input.tipMinor ?? 0n;
     const donationMinor = input.donationMinor ?? 0n;
 
@@ -163,22 +176,35 @@ export class OrderService {
       discountTotalMinor = input.discountTotalMinor ?? 0n;
     }
 
-    if (
-      [
-        taxTotalMinor,
-        discountTotalMinor,
-        feeTotalMinor,
-        deliveryChargeMinor,
-        tipMinor,
-        donationMinor,
-      ].some((v) => v < 0n)
-    ) {
+    if ([discountTotalMinor, tipMinor, donationMinor].some((v) => v < 0n)) {
       throw new BadRequestException('money components must be >= 0');
     }
-    const grandTotalMinor =
-      subtotalMinor - discountTotalMinor + taxTotalMinor + feeTotalMinor + deliveryChargeMinor;
-    if (grandTotalMinor < 0n) {
-      throw new BadRequestException('discount cannot exceed subtotal + charges');
+
+    let commercial;
+    try {
+      commercial = composeCommercialQuote({
+        lines: items.map((it) =>
+          lineFromOrderItem({
+            menuItemId: it.menuItemId,
+            nameSnapshot: it.nameSnapshot,
+            variantSnapshot: it.variantSnapshot,
+            unitPriceMinor: it.unitPriceMinor,
+            quantity: it.quantity,
+            currencyCode,
+            merchantId: restaurant.merchantId,
+            restaurantId: input.restaurantId,
+          }),
+        ),
+        discountMinor: discountTotalMinor,
+        taxRules: [],
+        feeRules: [],
+        deliveryChargeMinor: 0n,
+        merchantId: restaurant.merchantId,
+        restaurantId: input.restaurantId,
+        currencyCode,
+      });
+    } catch (err) {
+      throw this.toCommercialHttp(err);
     }
 
     return this.orders.createOrderWithItems({
@@ -188,12 +214,13 @@ export class OrderService {
       userId,
       type: input.type,
       status: input.status ?? 'INITIAL',
-      subtotalMinor,
-      taxTotalMinor,
-      discountTotalMinor,
-      feeTotalMinor,
-      deliveryChargeMinor,
-      grandTotalMinor,
+      subtotalMinor: commercial.merchandiseSubtotalMinor,
+      taxTotalMinor: commercial.taxTotalMinor,
+      discountTotalMinor: commercial.discountMinor,
+      feeTotalMinor: commercial.feeTotalMinor,
+      deliveryChargeMinor: commercial.deliveryChargeMinor,
+      grandTotalMinor: commercial.grandTotalMinor,
+      commercialSnapshot: snapshotCommercial(commercial) as unknown as Prisma.InputJsonValue,
       tipMinor,
       donationMinor,
       currencyCode,
@@ -373,5 +400,15 @@ export class OrderService {
     if (actor.kind === 'CUSTOMER') return actor.actor.userId;
     if (actor.kind === 'DELIVERY') return actor.actor.deliveryPersonId;
     return actor.actor?.actorId ?? null;
+  }
+
+  private toCommercialHttp(err: unknown): never {
+    if (err instanceof CommercialQuoteError) {
+      throw new BadRequestException({
+        message: err.message,
+        code: err.code,
+      });
+    }
+    throw err;
   }
 }

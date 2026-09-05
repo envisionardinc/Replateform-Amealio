@@ -1,0 +1,92 @@
+import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { discoverApi, type HomeFeed } from '../lib/api';
+import { isAuthenticated } from '../lib/session';
+import { StatusPanel } from '../components/StatusPanel';
+
+export function HomeScreen() {
+  const [city, setCity] = useState('');
+  const [q, setQ] = useState('');
+  const [applied, setApplied] = useState({ city: '', q: '' });
+  const [feed, setFeed] = useState<HomeFeed | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await discoverApi.home({
+        city: applied.city || undefined,
+        q: applied.q || undefined,
+      });
+      setFeed(data);
+    } catch (err) {
+      setFeed(null);
+      setError(err instanceof Error ? err.message : 'Could not load restaurants');
+    } finally {
+      setLoading(false);
+    }
+  }, [applied]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  function onSearch(e: FormEvent) {
+    e.preventDefault();
+    setApplied({ city: city.trim(), q: q.trim() });
+  }
+
+  const restaurants = feed?.sections[0]?.restaurants ?? [];
+
+  return (
+    <section>
+      <h1>Restaurants</h1>
+      <p className="muted">
+        Canonical Home Page 1 discovery (<code>{feed?.source ?? 'CANONICAL'}</code>
+        ). Home Page V2 recommendations are not the default home and are not called from these
+        cards.
+        {isAuthenticated() ? ' You are signed in.' : ' Browse without signing in.'}
+      </p>
+      <form className="card" onSubmit={onSearch}>
+        <label>
+          City (optional — location denial does not block this list)
+          <input
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Pune"
+            name="city"
+          />
+        </label>
+        <label>
+          Restaurant name
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" name="q" />
+        </label>
+        <button type="submit">Search</button>
+      </form>
+      <StatusPanel
+        loading={loading}
+        error={error}
+        empty={!loading && !error && restaurants.length === 0 ? 'No restaurants found.' : null}
+        onRetry={() => void load()}
+      >
+        {restaurants.map((r) => (
+          <article className="card" key={r.id}>
+            <div className="row">
+              <div>
+                <h2>
+                  <Link to={`/restaurants/${r.id}`}>{r.name}</Link>
+                </h2>
+                <p className="muted">
+                  {r.city ?? 'City not set'} · {r.status}
+                </p>
+              </div>
+              <Link to={`/restaurants/${r.id}`}>Menu</Link>
+            </div>
+          </article>
+        ))}
+      </StatusPanel>
+    </section>
+  );
+}

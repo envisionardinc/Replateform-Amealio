@@ -1,6 +1,6 @@
 # 101 — Amealio Promotions Target Behavior Contract
 
-**Status:** CONTRACT — ARCHITECTURE ONLY (no implementation)  
+**Status:** CONTRACT + Phase 1 evaluation kernel implemented (quote only; no checkout/HTTP)  
 **Date:** 2026-09-05  
 **Brand:** amealio  
 **Rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  
@@ -443,9 +443,9 @@ Phase 1 may add **read** HTTP for quote. It must not add a nationwide offers fee
 
 ## 7. Exact next implementation slice
 
-**Phase 1 — promotion evaluation kernel (quote only).**
+**Phase 1 — promotion evaluation kernel (quote only).** Implemented: [102](./102-PROMOTION-EVALUATION-KERNEL.md).
 
-Smallest truthful slice:
+Smallest truthful slice (done):
 
 1. Domain function `evaluatePromotion(context)` (extract/extend `offer-discount.ts`).
 2. Resolve by `couponCode` **or** list automatic (code-less, active, in-window, in-scope) promotions for the cart’s restaurant/merchant.

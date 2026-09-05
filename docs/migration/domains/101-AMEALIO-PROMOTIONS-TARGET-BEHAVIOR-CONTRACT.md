@@ -1,6 +1,6 @@
 # 101 — Amealio Promotions Target Behavior Contract
 
-**Status:** CONTRACT + Phase 1 evaluation kernel implemented (quote only; no checkout/HTTP)  
+**Status:** CONTRACT + Phase 1 kernel + Phase 2 application ([108](./108-STAGE-E-PROMOTION-PHASE-2-APPLICATION-REDEMPTION.md))  
 **Date:** 2026-09-05  
 **Brand:** amealio  
 **Rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  

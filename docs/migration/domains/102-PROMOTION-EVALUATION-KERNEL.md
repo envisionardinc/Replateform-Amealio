@@ -1,6 +1,6 @@
 # 102 — Phase 1 Promotion Evaluation Kernel
 
-**Status:** IMPLEMENTED (quote only)  
+**Status:** IMPLEMENTED (quote only). Phase 2 application: [108](./108-STAGE-E-PROMOTION-PHASE-2-APPLICATION-REDEMPTION.md)  
 **Date:** 2026-09-05  
 **Contract:** [101](./101-AMEALIO-PROMOTIONS-TARGET-BEHAVIOR-CONTRACT.md)  
 **Browse forensic:** [99](./99-CONSUMER-OFFERS-COUPONS-TARGET-BEHAVIOR-CONTRACT.md) — do not implement
@@ -23,6 +23,6 @@ No Prisma schema/migration. No checkout, cart, payment, or order changes. No con
 
 Evaluation never reserves usage. Final redemption stays on the existing transactional checkout path (`createOrder` / `deferRedemption` / `promoteOnPaymentCapture`).
 
-## Phase 2 dependency
+## Phase 2
 
-Wire cart/checkout to `evaluate()` and the existing `couponCode` checkout field. Do not start that until this kernel is accepted.
+Cart/checkout/order now call `evaluate()` through `PromotionApplicationService` and feed `discountMinor` into the Stage D quote. The kernel itself remains read-only. See [108](./108-STAGE-E-PROMOTION-PHASE-2-APPLICATION-REDEMPTION.md).

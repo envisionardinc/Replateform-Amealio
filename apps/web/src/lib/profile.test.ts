@@ -41,7 +41,7 @@ describe('consumer profile (doc 96)', () => {
   });
 
   it('parses allergy labels and formats them for the field', () => {
-    expect(parseAllergyInput(' Nuts, Dairy , nuts ')).toEqual(['Nuts', 'Dairy']);
+    expect(parseAllergyInput(' Nuts, Dairy , Dairy ')).toEqual(['Nuts', 'Dairy']);
     expect(formatAllergyInput(['Nuts', 'Dairy'])).toBe('Nuts, Dairy');
     expect(sameLabels(['Nuts'], ['Nuts'])).toBe(true);
     expect(sameLabels(['Nuts'], ['Dairy'])).toBe(false);

@@ -1,0 +1,53 @@
+# Behavioral Reconciliation Rule
+
+**Applies to:** every major amealio domain on `replatform/backend-consolidation`  
+**Date recorded:** 2026-09-04
+
+## Rule
+
+Never treat legacy implementation as the automatic target specification.
+
+For every major business domain:
+
+1. Recover actual legacy behavior from code, APIs, data models, UI flows, and production evidence where available.
+2. Independently benchmark the workflow against current industry-standard practices and relevant authoritative documentation.
+3. Identify missing capabilities, unsafe behavior, ambiguous behavior, obsolete patterns, financial/data integrity risks, concurrency/idempotency risks, security/privacy risks, operational failure modes, and customer/merchant edge cases.
+4. Build a Legacy vs Industry Gap Matrix.
+5. Classify every gap: **PRESERVE** | **IMPROVE** | **CORRECT** | **OWNER DECISION** | **FUTURE**.
+6. Produce the proposed **TARGET BUSINESS/BEHAVIOR CONTRACT**.
+7. Only then implement the target.
+
+## Authority
+
+- Legacy implementation is **evidence**, not authority.
+- Industry practice is **evidence**, not authority.
+- Neither may silently override amealio business intent.
+- When evidence supports the decision, resolve it automatically.
+- Escalate only genuine product/business decisions.
+- Never invent business rules merely to fill a gap.
+
+## Classification
+
+| Class          | Meaning                                                      |
+| -------------- | ------------------------------------------------------------ |
+| PRESERVE       | amealio intent is clear and safe; keep it                    |
+| IMPROVE        | same intent, safer or clearer mechanism                      |
+| CORRECT        | legacy or industry pattern is unsafe / obsolete; do not copy |
+| OWNER DECISION | genuine product/finance choice; do not guess                 |
+| FUTURE         | out of the next implementation slice                         |
+
+## Current application
+
+- Merchant orders: [domains/88-MERCHANT-ORDER-MANAGEMENT-TARGET-BEHAVIOR-CONTRACT.md](./domains/88-MERCHANT-ORDER-MANAGEMENT-TARGET-BEHAVIOR-CONTRACT.md) (evidence: [87](./domains/87-MERCHANT-ORDER-MANAGEMENT-FORENSIC-RECONCILIATION.md))
+- Consumer ordering + payment: [domains/90-CONSUMER-ORDERING-PAYMENT-TARGET-BEHAVIOR-CONTRACT.md](./domains/90-CONSUMER-ORDERING-PAYMENT-TARGET-BEHAVIOR-CONTRACT.md)
+- Self-delivery: [domains/91-SELF-DELIVERY-TARGET-BEHAVIOR-CONTRACT.md](./domains/91-SELF-DELIVERY-TARGET-BEHAVIOR-CONTRACT.md)
+- User app + Home Page V2: [domains/92-USER-APP-HOME-PAGE-V2-TARGET-BEHAVIOR-CONTRACT.md](./domains/92-USER-APP-HOME-PAGE-V2-TARGET-BEHAVIOR-CONTRACT.md)
+- Frontend design system: [93-AMEALIO-FRONTEND-DESIGN-SYSTEM-RECONCILIATION.md](./93-AMEALIO-FRONTEND-DESIGN-SYSTEM-RECONCILIATION.md)
+- Home 1 taxonomy: [domains/94-HOME-1-TAXONOMY-TARGET-BEHAVIOR-CONTRACT.md](./domains/94-HOME-1-TAXONOMY-TARGET-BEHAVIOR-CONTRACT.md)
+- Next consumer surface (order tracking): [domains/95-NEXT-CONSUMER-SURFACE-TARGET-BEHAVIOR-CONTRACT.md](./domains/95-NEXT-CONSUMER-SURFACE-TARGET-BEHAVIOR-CONTRACT.md)
+- Consumer profile + dietary preferences: [domains/96-CONSUMER-PROFILE-DIETARY-PREFERENCES-TARGET-BEHAVIOR-CONTRACT.md](./domains/96-CONSUMER-PROFILE-DIETARY-PREFERENCES-TARGET-BEHAVIOR-CONTRACT.md)
+- Consumer favorites / saved: [domains/97-CONSUMER-FAVORITES-SAVED-TARGET-BEHAVIOR-CONTRACT.md](./domains/97-CONSUMER-FAVORITES-SAVED-TARGET-BEHAVIOR-CONTRACT.md)
+- Consumer saved addresses: [domains/98-CONSUMER-SAVED-ADDRESSES-TARGET-BEHAVIOR-CONTRACT.md](./domains/98-CONSUMER-SAVED-ADDRESSES-TARGET-BEHAVIOR-CONTRACT.md)
+- Consumer offers / coupons browse: [domains/99-CONSUMER-OFFERS-COUPONS-TARGET-BEHAVIOR-CONTRACT.md](./domains/99-CONSUMER-OFFERS-COUPONS-TARGET-BEHAVIOR-CONTRACT.md) — **DEFER — TARGET DEPENDENCY** (legacy browse-only; do not implement)
+- Amealio promotions / modern engine: [domains/101-AMEALIO-PROMOTIONS-TARGET-BEHAVIOR-CONTRACT.md](./domains/101-AMEALIO-PROMOTIONS-TARGET-BEHAVIOR-CONTRACT.md) — Phase 1 kernel: [102](./domains/102-PROMOTION-EVALUATION-KERNEL.md). Phase 2 application + redemption: [108](./domains/108-STAGE-E-PROMOTION-PHASE-2-APPLICATION-REDEMPTION.md).
+- Core commerce menu / product / pricing / merchandising: [domains/103-CORE-COMMERCE-MENU-PRODUCT-PRICING-MERCHANDISING-FORENSIC-RECONCILIATION.md](./domains/103-CORE-COMMERCE-MENU-PRODUCT-PRICING-MERCHANDISING-FORENSIC-RECONCILIATION.md) — Stage A: [104](./domains/104-STAGE-A-ITEM-VARIANT-MODIFIER-FOUNDATION.md). Stage B: [105](./domains/105-STAGE-B-MENU-MERCHANT-CATALOG-CONSISTENCY.md). Stage C: [106](./domains/106-STAGE-C-AVAILABILITY-FOUNDATION.md). Stage D: [107](./domains/107-STAGE-D-PRICING-TAX-FEES-SURCHARGES.md). Stage E Phase 2: [108](./domains/108-STAGE-E-PROMOTION-PHASE-2-APPLICATION-REDEMPTION.md). Stage F combo/bundle: [109](./domains/109-STAGE-F-COMBO-BUNDLE.md). Stage G upsell/cross-sell: [110](./domains/110-STAGE-G-UPSELL-CROSSSELL.md). Stage H personalization forensics: [111](./domains/111-STAGE-H-PERSONALIZATION.md) — **DEFER implementation. Do not start Stage H code without GO.** Stage I Global Item Catalog + merchant Add from Global: [112](./domains/112-STAGE-I-GLOBAL-MERCHANT-CATALOG-RECONCILIATION.md) — **smallest slice implemented.** Stage J consumer commerce completion forensics: [domains/114-STAGE-J-CONSUMER-COMMERCE-COMPLETION.md](./domains/114-STAGE-J-CONSUMER-COMMERCE-COMPLETION.md) — **first slice implemented: checkout address + delivery snapshot.** Do not expand J (guest cart, maps, prepaid verify UI, tip UI) without GO. Stage K celebration/event commerce forensics: [domains/113-STAGE-K-CELEBRATION-EVENT-COMMERCE-RECONCILIATION.md](./domains/113-STAGE-K-CELEBRATION-EVENT-COMMERCE-RECONCILIATION.md) — **DEFER implementation. Do not start Stage K code without GO.** Merchant catalog authoring & operations forensics: [domains/115-MERCHANT-CATALOG-AUTHORING-OPERATIONS-RECONCILIATION.md](./domains/115-MERCHANT-CATALOG-AUTHORING-OPERATIONS-RECONCILIATION.md) — **smallest slice implemented:** [domains/115-MERCHANT-CATALOG-AUTHORING-OPERATIONS-IMPLEMENTATION.md](./domains/115-MERCHANT-CATALOG-AUTHORING-OPERATIONS-IMPLEMENTATION.md). Dining / Reservations (unified Diner / Book a Table) forensics: [domains/116-DINING-RESERVATIONS-RECONCILIATION.md](./domains/116-DINING-RESERVATIONS-RECONCILIATION.md) — **official next domain after Stage 115** (P1.3 Phase F). Foundation remains docs [44](./domains/44-SEATING-TABLE-SETUP-RECONCILIATION.md)/[45](./domains/45-SEATING-CONFIGURATION-REQUEST-FOUNDATION.md). **Slice 1 implemented:** [domains/116-DINING-RESERVATIONS-IMPLEMENTATION.md](./domains/116-DINING-RESERVATIONS-IMPLEMENTATION.md) (consumer create/track/cancel + merchant accept/seat/complete). Do not start Slice 2, Stage H/K, or expand J, media, combo UI, or cross-sell UI without GO.

@@ -1,0 +1,243 @@
+{
+  "document": "111-STAGE-H-PERSONALIZATION",
+  "date": "2026-09-05",
+  "stage": "H",
+  "status": "forensic_only",
+  "acceptedHead": "51e8897acaa229f93d952e0221575b5e9ea4dbcb",
+  "implementation": "DEFER",
+  "classification": ["PRESERVE", "IMPROVE", "CORRECT", "OWNER_DECISION", "FUTURE"],
+  "unavailableRepos": ["Amealio-VendorApp", "Amealio-Homepage-V2-RAG-Server"],
+  "inspectedRepos": [
+    "amealio-vendordashboard",
+    "amealio_web_app",
+    "amealiodashboardmvp-",
+    "amealio-nestjs-backend",
+    "amealio-self-delivery-app",
+    "replateform-amealio"
+  ],
+  "layerDistinction": {
+    "merchandising": "Stage G CROSS_SELL / pairsWellWith / merchant tags",
+    "personalization": "Stage H customer+context ranking",
+    "discovery": "taxonomy / editorial / popularity / CANONICAL home",
+    "promotion": "Stage E",
+    "pricing": "Stage D",
+    "availability": "Stage C"
+  },
+  "pipeline": [
+    "candidate_generation",
+    "stage_c_eligibility",
+    "optional_safety_eligibility_after_OD_H_1",
+    "personalized_ranking",
+    "presentation",
+    "stage_d_and_e_only_on_quote_or_add"
+  ],
+  "signals": [
+    {
+      "id": "H-SIG-1",
+      "name": "dietary_preferences",
+      "available": true,
+      "persisted": true,
+      "authenticated": true,
+      "consumerOwned": true,
+      "usableByRecommendationLogic": false,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "explicit": true,
+      "usedForRanking": false,
+      "usedForFilteringLegacy": true,
+      "safetyVsRanking": "OWNER_DECISION",
+      "note": "Target labels only; no MenuItem healthTags"
+    },
+    {
+      "id": "H-SIG-2",
+      "name": "allergies",
+      "available": true,
+      "persisted": true,
+      "authenticated": true,
+      "consumerOwned": true,
+      "usableByRecommendationLogic": false,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "explicit": true,
+      "usedForRanking": false,
+      "usedForFilteringLegacy": true,
+      "safetyVsRanking": "SAFETY_ELIGIBILITY",
+      "note": "Do not treat as a rank boost. OD-H-1 + item allergy tags required"
+    },
+    {
+      "id": "H-SIG-3",
+      "name": "favorites_menu_item",
+      "available": true,
+      "persisted": true,
+      "authenticated": true,
+      "consumerOwned": true,
+      "usableByRecommendationLogic": true,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "explicit": true,
+      "legacyDefect": "personalisation-menu scores user.favourites (restaurant ids) against item _id",
+      "correctField": "Favourite.MENU_ITEM"
+    },
+    {
+      "id": "H-SIG-3b",
+      "name": "favorites_restaurant",
+      "available": true,
+      "persisted": true,
+      "authenticated": true,
+      "consumerOwned": true,
+      "usableByRecommendationLogic": true,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "note": "Saved list / optional later home rail; not item rank"
+    },
+    {
+      "id": "H-SIG-4",
+      "name": "cuisine_preference",
+      "available": false,
+      "persisted": "maybe_json",
+      "authenticated": false,
+      "consumerOwned": true,
+      "usableByRecommendationLogic": false,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "note": "Legacy filter +10. Not on Nest profile PATCH allowlist"
+    },
+    {
+      "id": "H-SIG-5",
+      "name": "order_history",
+      "available": true,
+      "persisted": true,
+      "authenticated": true,
+      "consumerOwned": true,
+      "usableByRecommendationLogic": false,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "note": "Last-ordered retrieval only. Do not infer from CANCELLED/REFUNDED/FAILED"
+    },
+    {
+      "id": "H-SIG-6",
+      "name": "inferred_affinity",
+      "available": false,
+      "persisted": false,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "note": "No RFM / frequently-ordered store"
+    },
+    {
+      "id": "H-SIG-7",
+      "name": "merchant_tags_bestseller_rating",
+      "available": "legacy_only",
+      "consumerOwned": false,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": false,
+      "layer": "merchandising_or_discovery",
+      "note": "Cart Recommended for You is not personalized"
+    },
+    {
+      "id": "H-SIG-8",
+      "name": "discovery_taxonomy",
+      "available": true,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": false,
+      "layer": "discovery",
+      "note": "Category chips / moods-cravings FUTURE"
+    },
+    {
+      "id": "H-SIG-9",
+      "name": "homepage_v2_rag",
+      "available": "client_only",
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "layer": "external_future_port",
+      "sendsDietaryFavoritesHistory": false,
+      "repoAvailable": false
+    },
+    {
+      "id": "H-SIG-10",
+      "name": "geo_time_search_cart_session",
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": true,
+      "note": "Contextual on Home 1 / V2 / availability; not personalisationScore"
+    },
+    {
+      "id": "H-SIG-11",
+      "name": "stage_g_cross_sell",
+      "available": true,
+      "currentlyUsedForPersonalization": false,
+      "appropriateLater": false,
+      "layer": "merchandising",
+      "note": "Do not mix into first H rank"
+    }
+  ],
+  "candidateSources": [
+    {"source": "restaurant_stage_c_catalog", "inPersonalization": true, "firstSlice": true},
+    {"source": "favourite_menu_item", "inPersonalization": true, "firstSlice": true},
+    {"source": "favourite_restaurant", "inPersonalization": false, "firstSlice": false, "layer": "discovery_or_saved"},
+    {"source": "order_history", "inPersonalization": false, "firstSlice": false, "class": "FUTURE"},
+    {"source": "discovery_taxonomy", "inPersonalization": false, "layer": "discovery"},
+    {"source": "editorial_moods_cravings", "inPersonalization": false, "class": "FUTURE"},
+    {"source": "popular_bestseller_tags", "inPersonalization": false, "layer": "merchandising_or_discovery"},
+    {"source": "stage_g_cross_sell", "inPersonalization": false, "layer": "merchandising"},
+    {"source": "rag_home_v2", "inPersonalization": false, "class": "FUTURE"}
+  ],
+  "gaps": [
+    {"id": "H-LAYER-1", "domain": "architecture", "class": "PRESERVE", "summary": "Keep merchandising / discovery / personalization / promo / price / availability distinct"},
+    {"id": "H-ENG-1", "domain": "just_for_you", "class": "PRESERVE", "summary": "Restaurant-scoped Just for You is the real L1 engine; port only after GO"},
+    {"id": "H-FAV-1", "domain": "favorites", "class": "CORRECT", "summary": "Legacy score compares restaurant favourites[] to item ids; use Favourite MENU_ITEM"},
+    {"id": "H-DIET-1", "domain": "dietary", "class": "OWNER_DECISION", "decision": "OD-H-1", "summary": "Legacy hard-filters healthTags; target has labels only"},
+    {"id": "H-ALLERGY-1", "domain": "allergies", "class": "OWNER_DECISION", "decision": "OD-H-1", "summary": "Legacy excludes allergy tags; treat as SAFETY not rank; no item tags on Nest"},
+    {"id": "H-CUISINE-1", "domain": "cuisine", "class": "FUTURE", "summary": "Legacy cuisine hard-filter +10; not on Nest profile HTTP"},
+    {"id": "H-HIST-1", "domain": "order_history", "class": "FUTURE", "summary": "Last-ordered is retrieval; do not rank from cancelled/refunded/failed"},
+    {"id": "H-DISC-1", "domain": "discovery", "class": "PRESERVE", "summary": "Default home remains CANONICAL"},
+    {"id": "H-RAG-1", "domain": "rag", "class": "FUTURE", "decision": "OD-H-8", "summary": "RAG server repo unavailable; V2 is a separate surface"},
+    {"id": "H-TAG-1", "domain": "merchandising", "class": "CORRECT", "summary": "Do not relabel tag/rating Recommended for You as personalization"},
+    {"id": "H-G-1", "domain": "merchandising", "class": "PRESERVE", "summary": "Stage G pairsWellWith stays merchant complementary"},
+    {"id": "H-C-1", "domain": "availability", "class": "CORRECT", "summary": "Any future rail must pass Stage C"},
+    {"id": "H-D-1", "domain": "pricing", "class": "PRESERVE", "summary": "Stage D quotes only on selection"},
+    {"id": "H-E-1", "domain": "promotion", "class": "PRESERVE", "summary": "Stage E remains the only promotion engine"},
+    {"id": "H-COLD-1", "domain": "cold_start", "class": "PRESERVE", "summary": "Guests and empty-signal users get no invented For You"},
+    {"id": "H-PRIV-1", "domain": "privacy", "class": "CORRECT", "summary": "Do not expose diner prefs/favorites/affinity to merchants"},
+    {"id": "H-OPT-1", "domain": "privacy", "class": "OWNER_DECISION", "decision": "OD-H-7", "summary": "No first-class personalization opt-out in L1"},
+    {"id": "H-NEG-1", "domain": "negative_signals", "class": "FUTURE", "summary": "No hide/dismiss/not-interested collection"},
+    {"id": "H-MULTI-1", "domain": "profiles", "class": "FUTURE", "summary": "Legacy profile_id; target UserProfile is 1:1"},
+    {"id": "H-UX-1", "domain": "explainability", "class": "CORRECT", "summary": "Do not copy fake match-percent from 0/10/100/110 scores"},
+    {"id": "H-PAGE-1", "domain": "ranking", "class": "IMPROVE", "summary": "Legacy paginates categories before scoring items"},
+    {"id": "H-EVENT-1", "domain": "tracking", "class": "FUTURE", "summary": "Do not invent view/skip event tracking for the first slice"}
+  ],
+  "resolvedDecisions": {
+    "OD-H-2": "order_history_not_in_first_rank",
+    "OD-H-3": "item_favorites_yes_correct_field",
+    "OD-H-4": "no_stage_g_in_first_h_rank",
+    "OD-H-5": "within_restaurant_first",
+    "OD-H-6": "no_guest_session_personalization",
+    "OD-H-9": "merchants_do_not_see_diner_signals",
+    "OD-H-10": "no_geo_time_in_first_h_rank"
+  },
+  "unresolvedOwnerDecisions": {
+    "OD-H-1": "dietary_and_allergy_ranking_vs_eligibility",
+    "OD-H-7": "personalization_opt_out_controls",
+    "OD-H-8": "eventual_ai_rag_on_consumer_surfaces"
+  },
+  "firstSlice": {
+    "decision": "DEFER",
+    "reason": [
+      "forensic_task_hard_stop",
+      "OD-H-1_unresolved_safety",
+      "catalog_tags_missing_for_legacy_filters",
+      "favorites_only_rail_would_overclaim_personalization_engine",
+      "rag_repo_unavailable",
+      "not_required_to_complete_commerce_money_path"
+    ],
+    "proposedAfterGoIfAccepted": {
+      "surface": "restaurant_menu_just_for_you",
+      "notSurfaces": ["home", "pairsWellWith"],
+      "candidates": "stage_c_orderable_items_at_restaurant",
+      "rank": "favourite_menu_item_then_sortOrder_name_id",
+      "exclude": ["dietary", "allergies", "cuisine", "orders", "geo", "rag", "cross_sell", "tags"],
+      "auth": "jwt_consumer",
+      "guest": "hide_rail",
+      "empty": "hide_rail"
+    }
+  },
+  "productionBehaviorChanged": false
+}

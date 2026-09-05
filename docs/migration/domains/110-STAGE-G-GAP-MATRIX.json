@@ -1,0 +1,44 @@
+{
+  "document": "110-STAGE-G-UPSELL-CROSSSELL",
+  "date": "2026-09-05",
+  "stage": "G",
+  "classification": ["PRESERVE", "IMPROVE", "CORRECT", "OWNER_DECISION", "FUTURE"],
+  "personalization": "not_started",
+  "gaps": [
+    {"id": "G-XSELL-1", "domain": "cross_sell", "class": "IMPROVE", "summary": "Replace coarse category-only complementary storage with item-to-item CROSS_SELL"},
+    {"id": "G-XSELL-2", "domain": "cross_sell", "class": "IMPROVE", "summary": "Consumer food app never read category complementary; compose onto item detail"},
+    {"id": "G-XSELL-3", "domain": "cross_sell", "class": "CORRECT", "summary": "First-class Prisma FKs with merchant/restaurant ownership; no Mongo/JSON blob"},
+    {"id": "G-XSELL-4", "domain": "cross_sell", "class": "IMPROVE", "summary": "Deterministic sortOrder then createdAt"},
+    {"id": "G-XSELL-5", "domain": "cross_sell", "class": "CORRECT", "summary": "Consumer recs must pass Stage C appearsOnConsumerMenu + isConsumerOrderable"},
+    {"id": "G-XSELL-6", "domain": "cross_sell", "class": "CORRECT", "summary": "Do not relabel tag/bestseller Recommended for You as cross-sell"},
+    {"id": "G-UPSELL-1", "domain": "upsell", "class": "FUTURE", "decision": "OD-UPSELL", "summary": "No true upsell engine; do not invent a relation that duplicates variant/modifier/combo"},
+    {"id": "G-CAT-1", "domain": "cross_sell", "class": "FUTURE", "summary": "Category-to-category authoring convenience preserved as a follow-up slice"},
+    {"id": "G-PLACE-1", "domain": "placement", "class": "PRESERVE", "summary": "First slice is item detail only"},
+    {"id": "G-PERS-1", "domain": "personalization", "class": "FUTURE", "summary": "Prefs/favorites/AI remain Stage H"},
+    {"id": "G-PRICE-1", "domain": "pricing", "class": "PRESERVE", "summary": "Recommendations use MerchandiseQuoteService / composeCommercialQuote only"},
+    {"id": "G-PROMO-1", "domain": "promotion", "class": "PRESERVE", "summary": "Stage E remains the only promotion engine"},
+    {"id": "G-COMBO-1", "domain": "combo", "class": "FUTURE", "summary": "Combos are not recommendation targets in Stage G"}
+  ],
+  "resolvedDecisions": {
+    "OD-G-1": "item_level_first",
+    "OD-G-2": "no_explicit_upsell_relation",
+    "OD-G-3": "no_after_add_to_cart",
+    "OD-G-4": "server_cap_8",
+    "OD-G-5": "no_placement_field",
+    "OD-G-6": "manual_sort_order",
+    "OD-G-7": "no_schedule",
+    "OD-G-8": "no_super_admin_reusable_relations",
+    "OD-G-9": "no_chain_inheritance",
+    "OD-G-10": "future_analytics_ranking"
+  },
+  "firstSlice": {
+    "model": "MerchandisingRelation",
+    "type": "CROSS_SELL",
+    "shape": "sourceMenuItem -> targetMenuItem",
+    "consumerPlacement": "item_detail",
+    "pricing": "existing_stage_d",
+    "promotions": "existing_stage_e",
+    "orderability": "existing_stage_c"
+  },
+  "unavailableRepos": ["Amealio-VendorApp", "Amealio-Homepage-V2-RAG-Server"]
+}

@@ -1,0 +1,133 @@
+{
+  "document": "113-STAGE-K-CELEBRATION-EVENT-COMMERCE-RECONCILIATION",
+  "date": "2026-09-05",
+  "stage": "K",
+  "status": "forensic_only",
+  "acceptedHead": "49c95c4bf047a8238517a58c0df41dab8d532e16",
+  "implementation": "DEFER",
+  "productionBehaviorChanged": false,
+  "celebrationsImplemented": false,
+  "stageJStarted": false,
+  "classification": ["PRESERVE", "IMPROVE", "CORRECT", "OWNER_DECISION", "FUTURE"],
+  "inspectedRepos": [
+    "amealio-vendordashboard",
+    "amealio_web_app",
+    "amealiodashboardmvp-",
+    "amealio-nestjs-backend",
+    "amealio-self-delivery-app",
+    "replateform-amealio"
+  ],
+  "unavailableRepos": ["Amealio-VendorApp", "Amealio-Homepage-V2-RAG-Server"],
+  "priorDocuments": [
+    "48-CELEBRATIONS-EXPERIENCES-RECONCILIATION",
+    "44-SEATING-TABLE-SETUP-RECONCILIATION",
+    "45-SEATING-CONFIGURATION-REQUEST-FOUNDATION",
+    "49-EXPERIENCE-CONFIGURATION-FOUNDATION",
+    "83-GLOBAL-EXPERIENCE-CATALOGUE-FORENSIC-CONTRACT",
+    "109-STAGE-F-COMBO-BUNDLE",
+    "112-STAGE-I-GLOBAL-MERCHANT-CATALOG-RECONCILIATION",
+    "14-CAPABILITY-MATRIX"
+  ],
+  "vocabulary": {
+    "combo": "Stage F food bundle",
+    "experiencePackageTiers": "Experience.packages[] embedded pricing tiers",
+    "experiencePackageMenuMode": "Experience.isPackage + Package[]",
+    "event": "Merchant events + eventHandler",
+    "experience": "Merchant experiences + expRequest",
+    "celebration": "UI label over ExpEventManagement type=EXPERIENCE",
+    "occasion": "UI route/label + booking free-text",
+    "festival": "UI/taxonomy copy only — no entity",
+    "admissionTicket": "eventHandler or expRequest booking",
+    "helpDeskTicket": "tickets collection",
+    "qrAdmission": "client JSON of booking ids",
+    "foodIncluded": "Experience is_food_included / serveFood — not on Events"
+  },
+  "legacyEntities": [
+    {"name": "Experience", "collection": "experiences", "owner": "merchant", "target": "Experience config implemented; booking GAP"},
+    {"name": "expRequest", "collection": "exprequests", "owner": "merchant+user", "target": "GAP"},
+    {"name": "Events", "collection": "events", "owner": "merchant", "target": "GAP"},
+    {"name": "eventHandler", "collection": "eventhandlers", "owner": "merchant+user", "target": "GAP"},
+    {"name": "ExpEventManagement", "collection": "exp-events", "owner": "super_admin", "target": "GAP"},
+    {"name": "exp_events", "collection": "exp_events", "owner": "platform_scraped", "target": "FUTURE"},
+    {"name": "ticket", "collection": "tickets", "owner": "support", "target": "keep separate — not admission"},
+    {"name": "Diner", "collection": "diners", "owner": "merchant+user", "target": "SeatingRequest (no experience/event link)"}
+  ],
+  "gaps": [
+    {"id": "K-SPLIT-1", "domain": "architecture", "class": "PRESERVE", "summary": "Experience and Event remain separate domains"},
+    {"id": "K-LABEL-1", "domain": "taxonomy", "class": "PRESERVE", "summary": "Celebration/Occasion/Festival are labels until OD-K-1"},
+    {"id": "K-PKG-1", "domain": "package", "class": "PRESERVE", "summary": "Package is not Combo"},
+    {"id": "K-PKG-2", "domain": "package", "class": "PRESERVE", "summary": "No Global/Chain package catalog; do not extend Stage I"},
+    {"id": "K-TIX-1", "domain": "ticket", "class": "CORRECT", "summary": "Mongo ticket is help-desk, not admission"},
+    {"id": "K-TIX-2", "domain": "ticket", "class": "IMPROVE", "summary": "Legacy stores pax on one booking, not N ticket rows"},
+    {"id": "K-QR-1", "domain": "qr", "class": "CORRECT", "summary": "Client JSON QR embeds IDs and attendee name"},
+    {"id": "K-QR-2", "domain": "qr", "class": "CORRECT", "summary": "No server redemption or duplicate-scan rejection"},
+    {"id": "K-INV-1", "domain": "inventory", "class": "CORRECT", "summary": "leftOverTB/RSVP decrement is not transactional"},
+    {"id": "K-SEAT-1", "domain": "seating", "class": "CORRECT", "summary": "Event seat UNAVAILABLE flip can race"},
+    {"id": "K-SEAT-2", "domain": "seating", "class": "PRESERVE", "summary": "Restaurant SeatingRequest ≠ Event table_setup"},
+    {"id": "K-FOOD-1", "domain": "food", "class": "OWNER_DECISION", "decision": "OD-K-6", "summary": "Merchant Events have no food fields"},
+    {"id": "K-FOOD-2", "domain": "food", "class": "IMPROVE", "summary": "Experience included food is text, not a catalog entitlement"},
+    {"id": "K-FOOD-3", "domain": "food", "class": "PRESERVE", "summary": "Experience extra food already uses menu/combo → Order"},
+    {"id": "K-PAY-1", "domain": "payment", "class": "IMPROVE", "summary": "Booking payment is not on PaymentIntent"},
+    {"id": "K-PROMO-1", "domain": "promotion", "class": "IMPROVE", "summary": "Events.coupon_code is not Stage E"},
+    {"id": "K-PRIV-1", "domain": "privacy", "class": "CORRECT", "summary": "Public GET /vendor/event-handler/:id returns booking"},
+    {"id": "K-XFER-1", "domain": "ticket", "class": "FUTURE", "summary": "No transfer workflow"},
+    {"id": "K-ROLE-1", "domain": "auth", "class": "FUTURE", "summary": "No check-in-operator role; reuse MERCHANT_STAFF"},
+    {"id": "K-SCRAPE-1", "domain": "discovery", "class": "FUTURE", "summary": "Scraped exp_events stay out of ticketing"},
+    {"id": "K-SETL-1", "domain": "settlement", "class": "FUTURE", "summary": "Do not redesign settlement for event revenue"},
+    {"id": "K-TARGET-1", "domain": "target", "class": "PRESERVE", "summary": "Target has Experience config only; Event/ticket/QR are gaps"}
+  ],
+  "resolvedDecisions": {
+    "OD-K-2": "general_admission_first_assigned_seating_optional",
+    "OD-K-4": "no_transfer_not_evidenced",
+    "OD-K-5": "purchaser_required_additional_attendees_optional",
+    "OD-K-9": "no_package_upgrades_not_evidenced",
+    "OD-K-12": "reuse_merchant_staff_for_scan",
+    "OD-K-13": "event_customer_seats_only_when_opted_in_experience_merchant_assigns_table",
+    "OD-K-14": "inventory_must_be_server_authoritative_correct_not_od"
+  },
+  "unresolvedOwnerDecisions": {
+    "OD-K-1": "celebration_occasion_festival_as_event_kinds_vs_experience_taxonomy_labels",
+    "OD-K-3": "one_pass_per_booking_vs_per_guest_vs_both",
+    "OD-K-6": "whether_merchant_events_gain_food_policy",
+    "OD-K-7": "food_extra_linked_cart_vs_ordinary_restaurant_order",
+    "OD-K-8": "merchant_embedded_packages_vs_reusable_package_catalog",
+    "OD-K-10": "event_cancellation_refund_policy",
+    "OD-K-11": "partial_guest_refund_on_one_booking"
+  },
+  "firstSlice": {
+    "decision": "DEFER",
+    "reason": [
+      "forensic_task_hard_stop",
+      "OD-K-1_changes_event_vs_experience_identity",
+      "OD-K-3_changes_pass_cardinality_and_qr",
+      "OD-K-6_changes_whether_events_touch_catalog",
+      "qr_security_must_not_copy_legacy_json",
+      "experience_booking_already_deferred_in_doc_48",
+      "do_not_fork_stage_d_e_payment"
+    ],
+    "proposedAfterGoIfAccepted": {
+      "include": [
+        "merchant_event",
+        "ticket_type_adult_child",
+        "transactional_ticket_inventory",
+        "event_booking",
+        "one_opaque_admission_pass_per_booking_pending_OD_K_3",
+        "general_admission"
+      ],
+      "exclude": [
+        "celebration_entity",
+        "festival_entity",
+        "assigned_seating_engine",
+        "event_food_until_OD_K_6",
+        "package_catalog",
+        "experience_booking_runtime",
+        "ticket_transfer",
+        "scanner_role",
+        "scraped_exp_events",
+        "stage_h",
+        "stage_j",
+        "settlement_redesign"
+      ]
+    }
+  }
+}

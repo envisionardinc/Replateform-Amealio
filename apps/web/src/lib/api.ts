@@ -157,12 +157,30 @@ export type PricedCart = {
   items: PricedCartItem[];
 };
 
+export type OrderStatusEvent = {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  actorType: string;
+  actorId: string | null;
+  reason: string | null;
+  createdAt: string;
+};
+
+export type OrderDeliveryPerson = {
+  id: string;
+  name: string;
+  phone: string | null;
+  isOnline: boolean;
+};
+
 export type Order = {
   id: string;
   orderNumber: string | null;
   restaurantId: string;
   status: string;
   type: string;
+  cancelReason: string | null;
   currencyCode: string;
   subtotalMinor: string;
   taxTotalMinor: string;
@@ -171,6 +189,8 @@ export type Order = {
   deliveryChargeMinor: string;
   grandTotalMinor: string;
   tipMinor: string;
+  deliveryPersonId: string | null;
+  deliveryPerson: OrderDeliveryPerson | null;
   items: Array<{
     id: string;
     nameSnapshot: string | null;
@@ -179,11 +199,13 @@ export type Order = {
     unitPriceMinor: string;
     lineTotalMinor: string;
   }>;
+  statusEvents: OrderStatusEvent[];
   paymentIntents: Array<{
     id: string;
     status: string;
     method: string;
     amountMinor: string;
+    currencyCode?: string;
     razorpayOrderId: string | null;
   }>;
 };
@@ -268,5 +290,16 @@ export const checkoutApi = {
 
 export const ordersApi = {
   get: (id: string) => api<Order>(`/api/v1/me/orders/${id}`),
-  list: () => api<{ data: Order[] }>('/api/v1/me/orders'),
+  list: (query: { lane?: 'active' | 'history'; status?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (query.lane) params.set('lane', query.lane);
+    if (query.status) params.set('status', query.status);
+    const qs = params.toString();
+    return api<{ data: Order[] }>(`/api/v1/me/orders${qs ? `?${qs}` : ''}`);
+  },
+  cancel: (id: string, body: { expectedStatus?: string; reason?: string }) =>
+    api<Order>(`/api/v1/me/orders/${id}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
 };

@@ -460,6 +460,31 @@ select:focus {
   }
 }
 
+.track-list {
+  list-style: none;
+  margin: 0 0 var(--ame-space-4);
+  padding: 0 0 0 var(--ame-space-4);
+  border-left: 2px solid var(--ame-border);
+}
+
+.track-list li {
+  position: relative;
+  padding: 0 0 var(--ame-space-3);
+  font: 400 var(--ame-fs-sm) / var(--ame-lh) var(--ame-font);
+  color: var(--ame-text);
+}
+
+.track-list li::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--ame-space-4) - 5px);
+  top: 0.35rem;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--ame-radius-pill);
+  background: var(--ame-blue);
+}
+
 .taxonomy-rail {
   margin: 0 0 var(--ame-space-4);
 }

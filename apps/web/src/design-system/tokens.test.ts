@@ -32,6 +32,7 @@ describe('amealio design tokens (doc 93)', () => {
     expect(stylesCss).toMatch(/\.banner\s*\{[^}]*font-family:\s*var\(--ame-font\)/s);
     expect(stylesCss).toMatch(/\.badge\s*\{[^}]*font-family:\s*var\(--ame-font\)/s);
     expect(stylesCss).toMatch(/\.chip\s*\{[^}]*var\(--ame-font\)/s);
+    expect(stylesCss).toMatch(/\.track-list li\s*\{[^}]*var\(--ame-font\)/s);
     expect(stylesCss).not.toMatch(/Mulish/i);
     expect(stylesCss).not.toMatch(/family=Mulish/i);
   });

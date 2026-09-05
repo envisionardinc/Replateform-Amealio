@@ -613,4 +613,50 @@ describe('Consumer ordering + payment (doc 90 HTTP e2e)', () => {
       await prisma.orderStatusEvent.count({ where: { orderId: cancelable.body.order.id } }),
     ).toBe(events);
   });
+
+  it('consumer tracking list lanes and statusEvents stay user-scoped', async () => {
+    const merch = await seedMerchant();
+    const consumer = await registerConsumer();
+    const placed = await checkout(
+      consumer.token,
+      {
+        settlement: 'COD',
+        type: 'HOME_DELIVERY',
+        items: [{ variantId: merch.variantId, quantity: 1 }],
+      },
+      uniq('idem'),
+    );
+    const id = placed.body.order.id as string;
+    const detail = await http()
+      .get(`/api/v1/me/orders/${id}`)
+      .set('Authorization', `Bearer ${consumer.token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.statusEvents.length).toBeGreaterThan(0);
+    expect(
+      detail.body.statusEvents.some((e: { toStatus: string }) => e.toStatus === 'PENDING'),
+    ).toBe(true);
+
+    const active = await http()
+      .get('/api/v1/me/orders')
+      .query({ lane: 'active' })
+      .set('Authorization', `Bearer ${consumer.token}`);
+    expect(active.status).toBe(200);
+    expect(active.body.data.map((o: { id: string }) => o.id)).toContain(id);
+
+    await http()
+      .patch(`/api/v1/me/orders/${id}/cancel`)
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({ expectedStatus: 'PENDING' });
+
+    const history = await http()
+      .get('/api/v1/me/orders')
+      .query({ lane: 'history' })
+      .set('Authorization', `Bearer ${consumer.token}`);
+    const after = await http()
+      .get('/api/v1/me/orders')
+      .query({ lane: 'active' })
+      .set('Authorization', `Bearer ${consumer.token}`);
+    expect(history.body.data.map((o: { id: string }) => o.id)).toContain(id);
+    expect(after.body.data.map((o: { id: string }) => o.id)).not.toContain(id);
+  });
 });

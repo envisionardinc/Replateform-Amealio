@@ -433,7 +433,10 @@ describe('merchandise configuration (Stage A)', () => {
     const snap = snapshotMerchandise(quote);
     expect(snap.schema).toBe('merchandise.v1');
     expect(snap.variantId).toBe(SMALL);
-    expect(snap.modifierGroups[0].selections[0].priceAdjustmentMinor).toBe('200');
+    const pepperoni = snap.modifierGroups
+      .flatMap((g) => g.selections)
+      .find((s) => s.modifierId === PEPPERONI);
+    expect(pepperoni?.priceAdjustmentMinor).toBe('200');
   });
 
   it('does not treat a Medium variant id as interchangeable with Small', () => {

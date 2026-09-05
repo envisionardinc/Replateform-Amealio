@@ -32,10 +32,10 @@ export class MerchandiseQuoteService {
     if (!loaded) {
       throw new BadRequestException('Unknown menu variant');
     }
-    const modifierGroups =
-      input.modifierGroups ??
-      (input.addOns !== undefined ? parseModifierGroupSelections(input.addOns) : []);
     try {
+      const modifierGroups =
+        input.modifierGroups ??
+        (input.addOns !== undefined ? parseModifierGroupSelections(input.addOns) : []);
       return quoteMerchandise(
         loaded.catalog,
         {

@@ -108,3 +108,17 @@ Lineage remains copy, not live inheritance.
 ## Out of scope (confirmed)
 
 Celebration Packages / Celebrations / Occasions / Festivals. Combos/bundles. Tax / GST / fees / surcharges. Promotion Phase 2. Upsell / cross-sell / AI. Recipe BOM. Apparel/alcohol enforcement. Delivery pricing.
+
+---
+
+## Validation (Stage A stop)
+
+- Domain unit tests: `merchandise-configuration.spec.ts` (20 cases) + catalog/controller/service specs + promotion kernel specs — pass.
+- Stage A e2e: `stage-a-merchandise.e2e-spec.ts` — pass (quote, tenant isolation, cart ignore client money, flat payload 400, schema CHECK/unique).
+- Regression e2e: `menu-item-write`, `menu-catalog`, `consumer-discovery`, `consumer-ordering-payment`, `consumer-experience-slice` — pass.
+- `npx tsc --noEmit` in `apps/api` — pass.
+- Full-repo `turbo test` / lint was **not** claimed green.
+
+Invalid merchandise payloads (including flat addon ids) map to HTTP 400 via `MerchandiseQuoteService`. Default required-group selections appear in the quote before optional toppings; assertions match by modifier id, not array index.
+
+**Stop.** Stage B (Menu + Merchant Catalog consistency) waits for explicit GO.

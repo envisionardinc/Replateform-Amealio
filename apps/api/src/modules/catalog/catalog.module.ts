@@ -8,6 +8,8 @@ import { CatalogWriteRepository } from './infrastructure/catalog-write.repositor
 import { CatalogWriteService } from './application/catalog-write.service';
 import { MerchandiseQuoteService } from './application/merchandise-quote.service';
 import { CommercialQuoteService } from './application/commercial-quote.service';
+import { ComboService } from './application/combo.service';
+import { ComboRepository } from './infrastructure/combo.repository';
 import { CatalogController } from './catalog.controller';
 
 /**
@@ -27,6 +29,8 @@ import { CatalogController } from './catalog.controller';
     CatalogWriteService,
     MerchandiseQuoteService,
     CommercialQuoteService,
+    ComboRepository,
+    ComboService,
   ],
   exports: [
     MenuRepository,
@@ -36,6 +40,8 @@ import { CatalogController } from './catalog.controller';
     CatalogWriteService,
     MerchandiseQuoteService,
     CommercialQuoteService,
+    ComboRepository,
+    ComboService,
   ],
 })
 export class CatalogModule {}

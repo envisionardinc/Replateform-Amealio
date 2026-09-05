@@ -1,11 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { OrderChannel } from '../domain/catalog.types';
+import type { ComboQuote } from '../domain/combo';
 import {
   CommercialQuoteError,
   composeCommercialQuote,
+  lineFromComboQuote,
   lineFromMerchandise,
   serializeCommercialQuote,
   snapshotCommercial,
+  type CommercialLineInput,
   type CommercialQuote,
   type CommercialSnapshot,
 } from '../domain/commercial-quote';
@@ -45,32 +48,61 @@ export class CommercialQuoteService {
   }
 
   fromMerchandise(quotes: MerchandiseQuote[], discountMinor = 0n): CommercialQuote {
-    if (quotes.length === 0) {
+    return this.fromParts({ items: quotes, discountMinor });
+  }
+
+  fromParts(input: {
+    items?: MerchandiseQuote[];
+    combos?: ComboQuote[];
+    discountMinor?: bigint;
+  }): CommercialQuote {
+    const items = input.items ?? [];
+    const combos = input.combos ?? [];
+    if (items.length === 0 && combos.length === 0) {
       throw new BadRequestException({
-        message: 'commercial quote requires merchandise lines',
+        message: 'commercial quote requires merchandise or combo lines',
         code: 'TAX_CONFIGURATION_INVALID',
       });
     }
-    const first = quotes[0];
+    const first = items[0] ?? combos[0]!;
+    const lines: CommercialLineInput[] = [
+      ...items.map((q) =>
+        lineFromMerchandise({
+          menuItemId: q.menuItemId,
+          variantId: q.variantId,
+          itemName: q.itemName,
+          variantSize: q.variantSize,
+          quantity: q.quantity,
+          variantPriceMinor: q.variantPriceMinor,
+          modifierTotalMinor: q.modifierTotalMinor,
+          unitMerchandiseMinor: q.unitMerchandiseMinor,
+          lineMerchandiseMinor: q.lineMerchandiseMinor,
+          currencyCode: q.currencyCode,
+          merchantId: q.merchantId,
+          restaurantId: q.restaurantId,
+        }),
+      ),
+      ...combos.map((q) =>
+        lineFromComboQuote({
+          comboId: q.comboId,
+          name: q.name,
+          quantity: q.quantity,
+          comboPriceMinor: q.comboPriceMinor,
+          lineMerchandiseMinor: q.lineMerchandiseMinor,
+          currencyCode: q.currencyCode,
+          merchantId: q.merchantId,
+          restaurantId: q.restaurantId,
+          components: q.components.map((component) => ({
+            menuItemId: component.menuItemId,
+            name: component.menuItemName,
+          })),
+        }),
+      ),
+    ];
     try {
       return composeCommercialQuote({
-        lines: quotes.map((q) =>
-          lineFromMerchandise({
-            menuItemId: q.menuItemId,
-            variantId: q.variantId,
-            itemName: q.itemName,
-            variantSize: q.variantSize,
-            quantity: q.quantity,
-            variantPriceMinor: q.variantPriceMinor,
-            modifierTotalMinor: q.modifierTotalMinor,
-            unitMerchandiseMinor: q.unitMerchandiseMinor,
-            lineMerchandiseMinor: q.lineMerchandiseMinor,
-            currencyCode: q.currencyCode,
-            merchantId: q.merchantId,
-            restaurantId: q.restaurantId,
-          }),
-        ),
-        discountMinor,
+        lines,
+        discountMinor: input.discountMinor ?? 0n,
         taxRules: [],
         feeRules: [],
         deliveryChargeMinor: 0n,

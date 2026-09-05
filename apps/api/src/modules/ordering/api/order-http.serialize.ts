@@ -33,6 +33,7 @@ export function serializeOrder(order: OrderRecord) {
       unitPriceMinor: i.unitPriceMinor.toString(),
       lineTotalMinor: i.lineTotalMinor.toString(),
       currencyCode: i.currencyCode,
+      addOns: i.addOns ?? null,
     })),
     statusEvents: order.statusEvents.map((e) => ({
       id: e.id,

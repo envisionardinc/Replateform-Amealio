@@ -5,6 +5,7 @@ import type { PaymentIntentRecord } from '../../payment/domain/payment.types';
 import { CartRepository } from '../infrastructure/cart.repository';
 import { OrderRepository } from '../infrastructure/order.repository';
 import type { CreateOrderItemInput, OrderRecord, OrderTypeName } from '../domain/ordering.types';
+import { ComboService } from '../../catalog/application/combo.service';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
 import { OrderService } from './order.service';
 
@@ -50,6 +51,7 @@ export class CheckoutService {
   constructor(
     private readonly carts: CartRepository,
     private readonly quotes: MerchandiseQuoteService,
+    private readonly combos: ComboService,
     private readonly restaurants: RestaurantRepository,
     private readonly orders: OrderService,
     private readonly orderRepo: OrderRepository,
@@ -75,18 +77,29 @@ export class CheckoutService {
       throw new BadRequestException('type is required');
     }
 
-    const sourceItems =
-      input.items && input.items.length > 0
-        ? input.items
-        : cart.items.map((it) => ({
-            variantId: it.variantId ?? '',
-            quantity: it.quantity,
-            customization: (it.customization as Record<string, unknown> | null) ?? null,
-            modifierGroups: undefined,
-            addOns: it.addOns,
-          }));
-    if (sourceItems.length === 0 || sourceItems.some((i) => !i.variantId)) {
-      throw new BadRequestException('checkout requires at least one catalog item');
+    const usingClientItems = Boolean(input.items && input.items.length > 0);
+    const sourceItems = usingClientItems
+      ? input.items!.map((it) => ({
+          variantId: it.variantId,
+          comboId: undefined as string | undefined,
+          quantity: it.quantity,
+          customization: it.customization ?? null,
+          modifierGroups: it.modifierGroups,
+          addOns: it.addOns,
+        }))
+      : cart.items.map((it) => ({
+          variantId: it.variantId ?? undefined,
+          comboId: it.comboId ?? undefined,
+          quantity: it.quantity,
+          customization: (it.customization as Record<string, unknown> | null) ?? null,
+          modifierGroups: undefined,
+          addOns: it.addOns,
+        }));
+    if (
+      sourceItems.length === 0 ||
+      sourceItems.some((i) => Boolean(i.variantId) === Boolean(i.comboId))
+    ) {
+      throw new BadRequestException('checkout requires at least one catalog item or combo');
     }
 
     const priced: CreateOrderItemInput[] = [];
@@ -95,8 +108,30 @@ export class CheckoutService {
       if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
         throw new BadRequestException('each item requires a positive integer quantity');
       }
+      if (it.comboId) {
+        const quote = await this.combos.quote({
+          comboId: it.comboId,
+          quantity: it.quantity,
+          channel: type,
+          selections: selectionsFromSnapshot(it.addOns),
+        });
+        if (!restaurantId) restaurantId = quote.restaurantId;
+        if (quote.restaurantId !== restaurantId) {
+          throw new BadRequestException('checkout items must belong to one restaurant');
+        }
+        priced.push({
+          menuItemId: null,
+          nameSnapshot: quote.name,
+          variantSnapshot: null,
+          unitPriceMinor: quote.unitMerchandiseMinor,
+          quantity: it.quantity,
+          customization: it.customization ?? null,
+          addOns: this.combos.snapshot(quote) as unknown as CreateOrderItemInput['addOns'],
+        });
+        continue;
+      }
       const quote = await this.quotes.quote({
-        variantId: it.variantId,
+        variantId: it.variantId!,
         quantity: it.quantity,
         channel: type,
         modifierGroups: it.modifierGroups,
@@ -191,4 +226,17 @@ export class CheckoutService {
       .toString()
       .padStart(6, '0')}`;
   }
+}
+
+function selectionsFromSnapshot(addOns: unknown) {
+  if (!addOns || typeof addOns !== 'object') return undefined;
+  const snap = addOns as {
+    schema?: string;
+    components?: Array<{ slotId?: string; menuItemId?: string }>;
+  };
+  if (snap.schema !== 'combo.v1' || !Array.isArray(snap.components)) return undefined;
+  const selections = snap.components
+    .filter((row) => typeof row.slotId === 'string' && typeof row.menuItemId === 'string')
+    .map((row) => ({ slotId: row.slotId!, menuItemId: row.menuItemId! }));
+  return selections.length > 0 ? selections : undefined;
 }

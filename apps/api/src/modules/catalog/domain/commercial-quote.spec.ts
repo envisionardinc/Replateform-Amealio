@@ -1,6 +1,7 @@
 import {
   assertCallerChargesNotAuthoritative,
   composeCommercialQuote,
+  lineFromComboQuote,
   lineFromOrderItem,
   snapshotCommercial,
   type CommercialLineInput,
@@ -254,5 +255,33 @@ describe('composeCommercialQuote (Stage D)', () => {
     expect(snap.fees).toEqual([]);
     expect(snap.grandTotalMinor).toBe('45000');
     expect(snap.lines[0]?.unitMerchandiseMinor).toBe('25000');
+  });
+
+  it('quotes a fixed combo as one merchandise line without a second calculator', () => {
+    const quote = composeCommercialQuote({
+      lines: [
+        lineFromComboQuote({
+          comboId: 'combo-1',
+          name: 'Meal',
+          quantity: 2,
+          comboPriceMinor: 29900n,
+          lineMerchandiseMinor: 59800n,
+          currencyCode: 'INR',
+          merchantId: MERCHANT,
+          restaurantId: RESTAURANT,
+          components: [{ menuItemId: 'pizza', name: 'Pizza' }],
+        }),
+      ],
+      discountMinor: 1000n,
+      merchantId: MERCHANT,
+      restaurantId: RESTAURANT,
+    });
+    expect(quote.merchandiseSubtotalMinor).toBe(59800n);
+    expect(quote.discountMinor).toBe(1000n);
+    expect(quote.taxableSubtotalMinor).toBe(58800n);
+    expect(quote.taxTotalMinor).toBe(0n);
+    expect(quote.feeTotalMinor).toBe(0n);
+    expect(quote.grandTotalMinor).toBe(58800n);
+    expect(snapshotCommercial(quote).lines[0]?.comboId).toBe('combo-1');
   });
 });

@@ -6,6 +6,8 @@ import { RequireStaffRoles } from '../identity/staff-authentication/authorizatio
 import type { RequestWithStaffPrincipal, StaffPrincipal as StaffPrincipalType } from '../identity/staff-authentication/staff-principal';
 import { CatalogService } from './application/catalog.service';
 import { CatalogWriteService } from './application/catalog-write.service';
+import { ComboService } from './application/combo.service';
+import type { CreateComboInput, UpdateComboInput } from './application/combo.service';
 import type {
   ChannelConfigInput,
   CreateItemInput,
@@ -31,6 +33,7 @@ export class CatalogController {
   constructor(
     private readonly catalog: CatalogService,
     private readonly writes: CatalogWriteService,
+    private readonly combos: ComboService,
   ) {}
 
   private principal(req: Request & RequestWithStaffPrincipal): StaffPrincipalType {
@@ -235,6 +238,45 @@ export class CatalogController {
   ) {
     return this.writes.setAddOnVariantPrice(this.principal(req), addOnId, normalizeMoney(input));
   }
+
+  @Get('restaurants/:restaurantId/combos')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  listCombos(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Param('restaurantId') restaurantId: string,
+  ) {
+    return this.combos
+      .listForRestaurant(this.principal(req), restaurantId)
+      .then((rows) => rows.map((row) => this.combos.serialize(row)));
+  }
+
+  @Get('combos/:comboId')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  getCombo(@Req() req: Request & RequestWithStaffPrincipal, @Param('comboId') comboId: string) {
+    return this.combos
+      .getForStaff(this.principal(req), comboId)
+      .then((row) => this.combos.serialize(row));
+  }
+
+  @Post('combos')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  createCombo(@Req() req: Request & RequestWithStaffPrincipal, @Body() input: CreateComboInput) {
+    return this.combos
+      .create(this.principal(req), normalizeMoney(input))
+      .then((row) => this.combos.serialize(row));
+  }
+
+  @Patch('combos/:comboId')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  updateCombo(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Param('comboId') comboId: string,
+    @Body() input: UpdateComboInput,
+  ) {
+    return this.combos
+      .update(this.principal(req), comboId, normalizeMoney(input))
+      .then((row) => this.combos.serialize(row));
+  }
 }
 
 type MoneyPayload = Record<string, unknown> & {
@@ -248,7 +290,7 @@ type MoneyPayload = Record<string, unknown> & {
 function normalizeMoney<T>(input: T): T {
   const source = input as unknown as MoneyPayload;
   const output: MoneyPayload = { ...source };
-  for (const key of ['priceMinor', 'priceOverrideMinor']) {
+  for (const key of ['priceMinor', 'priceOverrideMinor', 'comboPriceMinor']) {
     const value = output[key];
     if (value !== undefined && value !== null && typeof value !== 'bigint') {
       if (typeof value === 'number' && !Number.isSafeInteger(value)) {

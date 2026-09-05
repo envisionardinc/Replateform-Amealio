@@ -24,9 +24,22 @@ class QuoteModifierGroupDto {
   selections!: QuoteModifierSelectionDto[];
 }
 
-class MerchandiseQuoteDto {
+class ComboSelectionDto {
   @IsUUID()
-  variantId!: string;
+  slotId!: string;
+
+  @IsUUID()
+  menuItemId!: string;
+}
+
+class MerchandiseQuoteDto {
+  @IsOptional()
+  @IsUUID()
+  variantId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  comboId?: string;
 
   @Type(() => Number)
   @IsInt()
@@ -41,6 +54,11 @@ class MerchandiseQuoteDto {
   @ValidateNested({ each: true })
   @Type(() => QuoteModifierGroupDto)
   modifierGroups?: QuoteModifierGroupDto[];
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ComboSelectionDto)
+  selections?: ComboSelectionDto[];
 
   @IsOptional()
   @IsString()
@@ -96,6 +114,11 @@ export class DiscoveryController {
   @Get('items/:id')
   item(@Param('id', ParseUUIDPipe) id: string, @Query('type') type?: OrderChannel) {
     return this.discovery.getItem(id, parseChannel(type));
+  }
+
+  @Get('combos/:id')
+  combo(@Param('id', ParseUUIDPipe) id: string, @Query('type') type?: OrderChannel) {
+    return this.discovery.getCombo(id, parseChannel(type));
   }
 
   @Post('quote')

@@ -126,6 +126,7 @@ export interface OrderItemRecord {
   quantity: number;
   lineTotalMinor: bigint;
   currencyCode: string;
+  addOns?: unknown | null;
 }
 
 export interface OrderStatusEventRecord {

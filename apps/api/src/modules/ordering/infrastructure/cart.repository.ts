@@ -8,6 +8,7 @@ export interface CartItemRow {
   cartId: string;
   menuItemId: string | null;
   variantId: string | null;
+  comboId: string | null;
   quantity: number;
   customization: Prisma.JsonValue | null;
   addOns: Prisma.JsonValue | null;
@@ -69,8 +70,9 @@ export class CartRepository {
   async addItem(
     cartId: string,
     data: {
-      menuItemId: string;
-      variantId: string;
+      menuItemId?: string | null;
+      variantId?: string | null;
+      comboId?: string | null;
       quantity: number;
       customization?: Prisma.InputJsonValue;
       addOns?: Prisma.InputJsonValue;
@@ -79,8 +81,9 @@ export class CartRepository {
     const row = await this.prisma.cartItem.create({
       data: {
         cartId,
-        menuItemId: data.menuItemId,
-        variantId: data.variantId,
+        menuItemId: data.menuItemId ?? null,
+        variantId: data.variantId ?? null,
+        comboId: data.comboId ?? null,
         quantity: data.quantity,
         customization: data.customization,
         addOns: data.addOns,

@@ -53,9 +53,22 @@ export class ModifierGroupSelectionDto {
   selections!: ModifierSelectionDto[];
 }
 
-export class AddCartItemDto {
+export class ComboSelectionDto {
   @IsUUID()
-  variantId!: string;
+  slotId!: string;
+
+  @IsUUID()
+  menuItemId!: string;
+}
+
+export class AddCartItemDto {
+  @IsOptional()
+  @IsUUID()
+  variantId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  comboId?: string;
 
   @Type(() => Number)
   @IsInt()
@@ -78,6 +91,11 @@ export class AddCartItemDto {
   @ValidateNested({ each: true })
   @Type(() => ModifierGroupSelectionDto)
   modifierGroups?: ModifierGroupSelectionDto[];
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ComboSelectionDto)
+  selections?: ComboSelectionDto[];
 
   /** Accepted only when it is the Stage A structured snapshot. Flat ids are rejected. */
   @IsOptional()

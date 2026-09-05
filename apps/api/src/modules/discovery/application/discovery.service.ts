@@ -3,10 +3,12 @@ import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.r
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
 import { MenuRepository } from '../../catalog/infrastructure/menu.repository';
 import { CommercialQuoteService } from '../../catalog/application/commercial-quote.service';
+import { ComboService } from '../../catalog/application/combo.service';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
 import { PromotionApplicationService } from '../../offer/application/promotion-application.service';
 import { intentCouponCode, serializePromotion } from '../../offer/domain/promotion-application';
 import type { ConsumerCatalogItem, OrderChannel } from '../../catalog/domain/catalog.types';
+import type { ComboSelectionInput } from '../../catalog/domain/combo';
 import type { ModifierGroupSelectionInput } from '../../catalog/domain/merchandise-configuration';
 import { appearsOnConsumerMenu, isConsumerOrderable } from '../../catalog/domain/orderability';
 import type { RestaurantRecord } from '../../merchant/domain/merchant.types';
@@ -28,6 +30,7 @@ export class DiscoveryService {
     private readonly taxonomy: TaxonomyQuery,
     private readonly quotes: MerchandiseQuoteService,
     private readonly commercial: CommercialQuoteService,
+    private readonly combos: ComboService,
     private readonly promotions: PromotionApplicationService,
   ) {}
 
@@ -54,6 +57,7 @@ export class DiscoveryService {
   async getMenu(restaurantId: string, channel?: OrderChannel) {
     await this.requireDiscoverable(restaurantId);
     const items = await this.items.listConsumerItems({ restaurantId, channel });
+    const combos = await this.combos.listConsumer(restaurantId, channel);
     return {
       kind: 'STANDARD' as const,
       restaurantId,
@@ -61,6 +65,7 @@ export class DiscoveryService {
       items: items
         .filter((item) => appearsOnConsumerMenu(item, channel))
         .map(serializeConsumerItem),
+      combos,
     };
   }
 
@@ -97,6 +102,14 @@ export class DiscoveryService {
       list.push(item);
       bySection.set(item.menuSectionId, list);
     }
+    const combos = await this.combos.listConsumerForSections(sectionIds, channel);
+    const combosBySection = new Map(sectionIds.map((id) => [id, [] as typeof combos]));
+    for (const combo of combos) {
+      for (const sectionId of combo.sectionIds) {
+        const list = combosBySection.get(sectionId);
+        if (list) list.push(combo);
+      }
+    }
     return {
       kind: 'CUSTOM' as const,
       restaurantId: menu.restaurantId,
@@ -108,8 +121,10 @@ export class DiscoveryService {
         sortOrder: section.sortOrder,
         categoryId: section.categoryId,
         items: (bySection.get(section.id) ?? []).map(serializeConsumerItem),
+        combos: combosBySection.get(section.id) ?? [],
       })),
       items: visible.map(serializeConsumerItem),
+      combos,
     };
   }
 
@@ -122,41 +137,46 @@ export class DiscoveryService {
     return serializeConsumerItem(item);
   }
 
+  async getCombo(id: string, channel?: OrderChannel) {
+    const combo = await this.combos.getConsumer(id, channel);
+    await this.requireDiscoverable(combo.restaurantId);
+    return combo;
+  }
+
   async quoteItem(input: {
-    variantId: string;
+    variantId?: string;
+    comboId?: string;
     quantity: number;
     type?: OrderChannel;
     modifierGroups?: ModifierGroupSelectionInput[];
+    selections?: ComboSelectionInput[];
     couponCode?: string | null;
     userId?: string | null;
+    comboPriceMinor?: bigint;
+    discountMinor?: bigint;
+    grandTotalMinor?: bigint;
   }) {
-    const quote = await this.quotes.quote(input);
+    if (Boolean(input.variantId) === Boolean(input.comboId)) {
+      throw new BadRequestException('quote requires exactly one of variantId or comboId');
+    }
+    if (input.comboId) {
+      return this.quoteCombo(input);
+    }
+    const quote = await this.quotes.quote({
+      variantId: input.variantId!,
+      quantity: input.quantity,
+      channel: input.type,
+      modifierGroups: input.modifierGroups,
+    });
     await this.requireDiscoverable(quote.restaurantId);
-    if (intentCouponCode(input.couponCode) && !input.type) {
-      throw new BadRequestException({
-        message: 'type is required to apply a coupon',
-        code: 'NOT_ELIGIBLE',
-      });
-    }
-    let discountMinor = 0n;
-    let promotion = null;
-    if (input.type) {
-      try {
-        const resolved = await this.promotions.resolve({
-          restaurantId: quote.restaurantId,
-          merchantId: quote.merchantId,
-          orderType: input.type,
-          merchandiseSubtotalMinor: quote.lineMerchandiseMinor,
-          lines: [{ lineTotalMinor: quote.lineMerchandiseMinor }],
-          userId: input.userId ?? null,
-          couponCode: input.couponCode,
-        });
-        discountMinor = resolved.discountMinor;
-        promotion = resolved.promotion;
-      } catch (err) {
-        this.promotions.toHttp(err);
-      }
-    }
+    const { discountMinor, promotion } = await this.resolveDiscount({
+      restaurantId: quote.restaurantId,
+      merchantId: quote.merchantId,
+      lineMerchandiseMinor: quote.lineMerchandiseMinor,
+      type: input.type,
+      couponCode: input.couponCode,
+      userId: input.userId,
+    });
     const commercial = this.commercial.fromMerchandise([quote], discountMinor);
     const totals = this.commercial.serialize(commercial);
     return {
@@ -177,6 +197,79 @@ export class DiscoveryService {
       ...totals,
       promotion: serializePromotion(promotion),
     };
+  }
+
+  private async quoteCombo(input: {
+    comboId?: string;
+    quantity: number;
+    type?: OrderChannel;
+    selections?: ComboSelectionInput[];
+    couponCode?: string | null;
+    userId?: string | null;
+    comboPriceMinor?: bigint;
+    discountMinor?: bigint;
+    grandTotalMinor?: bigint;
+  }) {
+    const quote = await this.combos.quote({
+      comboId: input.comboId!,
+      quantity: input.quantity,
+      channel: input.type,
+      selections: input.selections,
+      comboPriceMinor: input.comboPriceMinor,
+      discountMinor: input.discountMinor,
+      grandTotalMinor: input.grandTotalMinor,
+    });
+    await this.requireDiscoverable(quote.restaurantId);
+    const { discountMinor, promotion } = await this.resolveDiscount({
+      restaurantId: quote.restaurantId,
+      merchantId: quote.merchantId,
+      lineMerchandiseMinor: quote.lineMerchandiseMinor,
+      type: input.type,
+      couponCode: input.couponCode,
+      userId: input.userId,
+    });
+    const commercial = this.commercial.fromParts({ combos: [quote], discountMinor });
+    return {
+      ...this.combos.serializeQuote(quote),
+      ...this.commercial.serialize(commercial),
+      promotion: serializePromotion(promotion),
+    };
+  }
+
+  private async resolveDiscount(input: {
+    restaurantId: string;
+    merchantId: string;
+    lineMerchandiseMinor: bigint;
+    type?: OrderChannel;
+    couponCode?: string | null;
+    userId?: string | null;
+  }) {
+    if (intentCouponCode(input.couponCode) && !input.type) {
+      throw new BadRequestException({
+        message: 'type is required to apply a coupon',
+        code: 'NOT_ELIGIBLE',
+      });
+    }
+    let discountMinor = 0n;
+    let promotion = null;
+    if (input.type) {
+      try {
+        const resolved = await this.promotions.resolve({
+          restaurantId: input.restaurantId,
+          merchantId: input.merchantId,
+          orderType: input.type,
+          merchandiseSubtotalMinor: input.lineMerchandiseMinor,
+          lines: [{ lineTotalMinor: input.lineMerchandiseMinor }],
+          userId: input.userId ?? null,
+          couponCode: input.couponCode,
+        });
+        discountMinor = resolved.discountMinor;
+        promotion = resolved.promotion;
+      } catch (err) {
+        this.promotions.toHttp(err);
+      }
+    }
+    return { discountMinor, promotion };
   }
 
   private async findPublishedConsumerItem(

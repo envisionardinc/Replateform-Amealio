@@ -65,6 +65,7 @@ export interface FeeRule {
 export interface CommercialLineInput {
   menuItemId: string | null;
   variantId?: string | null;
+  comboId?: string | null;
   name: string;
   variantSize?: string | null;
   quantity: number;
@@ -75,6 +76,7 @@ export interface CommercialLineInput {
   currencyCode: string;
   merchantId: string;
   restaurantId: string;
+  components?: readonly { menuItemId: string; name: string }[];
 }
 
 export interface CommercialTaxLine {
@@ -114,6 +116,7 @@ export interface CommercialSnapshot {
   lines: Array<{
     menuItemId: string | null;
     variantId: string | null;
+    comboId: string | null;
     name: string;
     variantSize: string | null;
     quantity: number;
@@ -121,6 +124,7 @@ export interface CommercialSnapshot {
     modifierTotalMinor: string;
     unitMerchandiseMinor: string;
     lineMerchandiseMinor: string;
+    components?: Array<{ menuItemId: string; name: string }>;
   }>;
   merchandiseSubtotalMinor: string;
   discountMinor: string;
@@ -254,6 +258,7 @@ export function snapshotCommercial(
     lines: quote.lines.map((line) => ({
       menuItemId: line.menuItemId,
       variantId: line.variantId ?? null,
+      comboId: line.comboId ?? null,
       name: line.name,
       variantSize: line.variantSize ?? null,
       quantity: line.quantity,
@@ -261,6 +266,7 @@ export function snapshotCommercial(
       modifierTotalMinor: line.modifierTotalMinor.toString(),
       unitMerchandiseMinor: line.unitMerchandiseMinor.toString(),
       lineMerchandiseMinor: line.lineMerchandiseMinor.toString(),
+      ...(line.components ? { components: [...line.components] } : {}),
     })),
     merchandiseSubtotalMinor: quote.merchandiseSubtotalMinor.toString(),
     discountMinor: quote.discountMinor.toString(),
@@ -321,6 +327,35 @@ export function lineFromMerchandise(input: {
     currencyCode: input.currencyCode,
     merchantId: input.merchantId,
     restaurantId: input.restaurantId,
+  };
+}
+
+export function lineFromComboQuote(input: {
+  comboId: string;
+  name: string;
+  quantity: number;
+  comboPriceMinor: bigint;
+  lineMerchandiseMinor: bigint;
+  currencyCode: string;
+  merchantId: string;
+  restaurantId: string;
+  components: readonly { menuItemId: string; name: string }[];
+}): CommercialLineInput {
+  return {
+    menuItemId: null,
+    variantId: null,
+    comboId: input.comboId,
+    name: input.name,
+    variantSize: null,
+    quantity: input.quantity,
+    variantPriceMinor: input.comboPriceMinor,
+    modifierTotalMinor: 0n,
+    unitMerchandiseMinor: input.comboPriceMinor,
+    lineMerchandiseMinor: input.lineMerchandiseMinor,
+    currencyCode: input.currencyCode,
+    merchantId: input.merchantId,
+    restaurantId: input.restaurantId,
+    components: input.components,
   };
 }
 

@@ -29,6 +29,7 @@ const ORDER_INCLUDE = {
       quantity: true,
       lineTotalMinor: true,
       currencyCode: true,
+      addOns: true,
     },
   },
   statusEvents: {

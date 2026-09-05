@@ -151,37 +151,43 @@ export class CatalogController {
 
   @Post('items/:menuItemId/variants')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  createVariant(
+  async createVariant(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuItemId') menuItemId: string,
     @Body() input: VariantInput,
   ) {
-    return this.writes.createVariant(this.principal(req), menuItemId, normalizeMoney(input));
+    return serializeCatalogMoney(
+      await this.writes.createVariant(this.principal(req), menuItemId, normalizeMoney(input)),
+    );
   }
 
   @Patch('variants/:variantId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  updateVariant(
+  async updateVariant(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('variantId') variantId: string,
     @Body() input: Partial<VariantInput>,
   ) {
-    return this.writes.updateVariant(this.principal(req), variantId, normalizeMoney(input));
+    return serializeCatalogMoney(
+      await this.writes.updateVariant(this.principal(req), variantId, normalizeMoney(input)),
+    );
   }
 
   @Patch('items/:menuItemId/channel-config')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  setChannelConfig(
+  async setChannelConfig(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuItemId') menuItemId: string,
     @Body() input: ChannelConfigInput,
   ) {
-    return this.writes.setChannelConfig(this.principal(req), menuItemId, normalizeMoney(input));
+    return serializeCatalogMoney(
+      await this.writes.setChannelConfig(this.principal(req), menuItemId, normalizeMoney(input)),
+    );
   }
 
   @Post('items/:menuItemId/add-on-groups')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  createAddOnGroup(
+  async createAddOnGroup(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuItemId') menuItemId: string,
     @Body() input: {
@@ -193,12 +199,12 @@ export class CatalogController {
       sortOrder?: number;
     },
   ) {
-    return this.writes.createAddOnGroup(this.principal(req), menuItemId, input);
+    return serializeCatalogMoney(await this.writes.createAddOnGroup(this.principal(req), menuItemId, input));
   }
 
   @Patch('add-on-groups/:groupId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  updateAddOnGroup(
+  async updateAddOnGroup(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('groupId') groupId: string,
     @Body() input: {
@@ -210,12 +216,12 @@ export class CatalogController {
       sortOrder?: number;
     },
   ) {
-    return this.writes.updateAddOnGroup(this.principal(req), groupId, input);
+    return serializeCatalogMoney(await this.writes.updateAddOnGroup(this.principal(req), groupId, input));
   }
 
   @Post('add-on-groups/:addOnGroupId/add-ons')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  createAddOn(
+  async createAddOn(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('addOnGroupId') addOnGroupId: string,
     @Body() input: {
@@ -227,12 +233,14 @@ export class CatalogController {
       sortOrder?: number;
     },
   ) {
-    return this.writes.createAddOn(this.principal(req), addOnGroupId, normalizeMoney(input));
+    return serializeCatalogMoney(
+      await this.writes.createAddOn(this.principal(req), addOnGroupId, normalizeMoney(input)),
+    );
   }
 
   @Patch('add-ons/:addOnId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  updateAddOn(
+  async updateAddOn(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('addOnId') addOnId: string,
     @Body() input: {
@@ -244,17 +252,21 @@ export class CatalogController {
       sortOrder?: number;
     },
   ) {
-    return this.writes.updateAddOn(this.principal(req), addOnId, normalizeMoney(input));
+    return serializeCatalogMoney(
+      await this.writes.updateAddOn(this.principal(req), addOnId, normalizeMoney(input)),
+    );
   }
 
   @Post('add-ons/:addOnId/variant-prices')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  setAddOnVariantPrice(
+  async setAddOnVariantPrice(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('addOnId') addOnId: string,
     @Body() input: { variantId: string; priceMinor: bigint },
   ) {
-    return this.writes.setAddOnVariantPrice(this.principal(req), addOnId, normalizeMoney(input));
+    return serializeCatalogMoney(
+      await this.writes.setAddOnVariantPrice(this.principal(req), addOnId, normalizeMoney(input)),
+    );
   }
 
   @Get('restaurants/:restaurantId/combos')

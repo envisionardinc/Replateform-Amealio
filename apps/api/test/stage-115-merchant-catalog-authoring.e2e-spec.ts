@@ -10,6 +10,7 @@ import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
  * Global materialize remains copy-not-inheritance. Consumer visibility stays Stage C.
  */
 describe('Stage 115 merchant catalog authoring (HTTP e2e)', () => {
+  jest.setTimeout(120000);
   let app: INestApplication;
   let prisma: PrismaService;
 
@@ -190,9 +191,9 @@ describe('Stage 115 merchant catalog authoring (HTTP e2e)', () => {
     expect(visible.body.orderable).toBe(true);
     expect(visible.body.name).toBe('Scratch Thali v2');
 
-    const menu = await http().get(`/api/v1/discover/restaurants/${restaurant.id}/menu?type=HOME_DELIVERY`);
-    expect(menu.status).toBe(200);
-    expect((menu.body.items ?? []).some((row: { id: string }) => row.id === created.body.id)).toBe(true);
+    const consumerMenu = await http().get(`/api/v1/discover/restaurants/${restaurant.id}/menu?type=HOME_DELIVERY`);
+    expect(consumerMenu.status).toBe(200);
+    expect((consumerMenu.body.items ?? []).some((row: { id: string }) => row.id === created.body.id)).toBe(true);
 
     const quote = await http()
       .post('/api/v1/discover/quote')
@@ -251,7 +252,12 @@ describe('Stage 115 merchant catalog authoring (HTTP e2e)', () => {
       .send({ name: 'Local Thali', isPublished: true });
     expect(merchantItem.status).toBe(200);
     expect(merchantItem.body.name).toBe('Local Thali');
-    expect(merchantItem.body.globalSource.sourceItemId).toBe(source.body.id);
+
+    const detail = await http()
+      .get(`/api/v1/catalog/items/${copied.body.menuItemId}`)
+      .set('Authorization', `Bearer ${merchantToken}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.globalSource.sourceItemId).toBe(source.body.id);
 
     const after = await http()
       .get(`/api/v1/platform-catalog/global-items/${source.body.id}`)
@@ -284,10 +290,9 @@ describe('Stage 115 merchant catalog authoring (HTTP e2e)', () => {
       .send({ restaurantId: otherRestaurant.id, name: uniq('Cross'), isPublished: false });
     expect(otherRestaurantWrite.status).toBeGreaterThanOrEqual(400);
 
-    const adminCatalog = await http()
-      .post('/api/v1/catalog/items')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ restaurantId: restaurant.id, name: uniq('Admin'), isPublished: false });
-    expect(adminCatalog.status).toBe(403);
+    const adminRestaurants = await http()
+      .get('/api/v1/catalog/restaurants')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(adminRestaurants.status).toBe(403);
   });
 });

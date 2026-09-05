@@ -10,6 +10,7 @@ describe('CatalogController', () => {
     getMenuSections: jest.fn(),
     getItemDetail: jest.fn(),
     getItemsForRestaurant: jest.fn(),
+    listRestaurantsForStaff: jest.fn(),
   };
   const writes = {
     createMenu: jest.fn(),
@@ -72,6 +73,7 @@ describe('CatalogController', () => {
   it('declares merchant-owner/staff authorization on every catalog endpoint', () => {
     const expected = ['MERCHANT_OWNER', 'MERCHANT_STAFF'];
     const methods = [
+      'listRestaurants',
       'getMenus', 'getSections', 'getItem', 'getItems', 'createMenu', 'updateMenu',
       'createSection', 'updateSection', 'reorderSections', 'createItem', 'updateItem',
       'createVariant', 'updateVariant', 'setChannelConfig', 'createAddOnGroup',

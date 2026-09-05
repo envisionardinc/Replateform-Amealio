@@ -47,6 +47,12 @@ export class CatalogController {
     return req.staffPrincipal;
   }
 
+  @Get('restaurants')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  listRestaurants(@Req() req: Request & RequestWithStaffPrincipal) {
+    return this.catalog.listRestaurantsForStaff(this.principal(req));
+  }
+
   @Get('restaurants/:restaurantId/menus')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
   getMenus(
@@ -65,8 +71,12 @@ export class CatalogController {
 
   @Get('items/:menuItemId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  getItem(@Req() req: Request & RequestWithStaffPrincipal, @Param('menuItemId') menuItemId: string) {
-    return this.catalog.getItemDetail(this.principal(req), menuItemId);
+  async getItem(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Param('menuItemId') menuItemId: string,
+  ) {
+    const detail = await this.catalog.getItemDetail(this.principal(req), menuItemId);
+    return serializeCatalogMoney(detail);
   }
 
   @Get('restaurants/:restaurantId/items')
@@ -123,18 +133,20 @@ export class CatalogController {
 
   @Post('items')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  createItem(@Req() req: Request & RequestWithStaffPrincipal, @Body() input: CreateItemInput) {
-    return this.writes.createItem(this.principal(req), normalizeMoney(input));
+  async createItem(@Req() req: Request & RequestWithStaffPrincipal, @Body() input: CreateItemInput) {
+    return serializeCatalogMoney(
+      await this.writes.createItem(this.principal(req), normalizeMoney(input)),
+    );
   }
 
   @Patch('items/:itemId')
   @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
-  updateItem(
+  async updateItem(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('itemId') itemId: string,
     @Body() input: UpdateItemInput,
   ) {
-    return this.writes.updateItem(this.principal(req), itemId, input);
+    return serializeCatalogMoney(await this.writes.updateItem(this.principal(req), itemId, input));
   }
 
   @Post('items/:menuItemId/variants')
@@ -342,6 +354,12 @@ type MoneyPayload = Record<string, unknown> & {
   addOnGroups?: Array<MoneyPayload & { addOns?: MoneyPayload[] }>;
   addOns?: MoneyPayload[];
 };
+
+function serializeCatalogMoney<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value, (_key, entry) => (typeof entry === 'bigint' ? entry.toString() : entry)),
+  ) as T;
+}
 
 /** JSON cannot carry bigint; normalize only the known money fields at the API boundary. */
 function normalizeMoney<T>(input: T): T {

@@ -155,6 +155,7 @@ export class PlatformCatalogController {
     return this.service.materializeGlobalItem(this.principal(req), {
       sourceItemId,
       restaurantId: String(body.restaurantId ?? ''),
+      catalogId: body.catalogId == null ? null : String(body.catalogId),
       menuSectionId: body.menuSectionId == null ? null : String(body.menuSectionId),
       nameOverride: body.nameOverride == null ? undefined : String(body.nameOverride),
       descriptionOverride:

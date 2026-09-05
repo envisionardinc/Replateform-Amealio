@@ -3,6 +3,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import type {
   CheckoutCatalogLine,
   ConsumerCatalogItem,
+  GlobalCatalogSourceInfo,
   ItemAvailabilityName,
   ItemChannelConfigRecord,
   ItemVariantRecord,
@@ -447,6 +448,34 @@ export class MenuItemRepository {
       }),
     ]);
     return { ...item, variants, channelConfigs, addOnGroups: groups };
+  }
+
+  /**
+   * Copy lineage for a merchant MenuItem. Absent when the item was created
+   * locally. This is source attribution ("Added from Global Catalog"), not a
+   * live sync relationship.
+   */
+  async findGlobalSourceByMenuItemId(
+    menuItemId: string,
+  ): Promise<GlobalCatalogSourceInfo | null> {
+    try {
+      const rows = await this.prisma.$queryRaw<GlobalCatalogSourceInfo[]>`
+        SELECT
+          i."id" AS "sourceItemId",
+          i."name" AS "sourceItemName",
+          c."id" AS "catalogId",
+          c."name" AS "catalogName"
+        FROM "platform_catalog_item_materializations" m
+        JOIN "platform_catalog_items" i ON i."id" = m."source_item_id"
+        JOIN "platform_catalogs" c ON c."id" = i."catalog_id"
+        WHERE m."menu_item_id" = ${menuItemId}::uuid
+        ORDER BY m."created_at" ASC
+        LIMIT 1
+      `;
+      return rows[0] ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /**

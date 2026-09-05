@@ -102,11 +102,24 @@ export interface MenuItemRecord {
   deletedAt: Date | null;
 }
 
+/** Lineage for a merchant item that was copied from the Global Item Catalog. */
+export interface GlobalCatalogSourceInfo {
+  sourceItemId: string;
+  sourceItemName: string;
+  catalogId: string;
+  catalogName: string;
+}
+
 /** A menu item with its full catalog sub-structure. */
 export interface MenuItemDetail extends MenuItemRecord {
   variants: ItemVariantRecord[];
   channelConfigs: ItemChannelConfigRecord[];
   addOnGroups: AddOnGroupRecord[];
+}
+
+/** Staff item detail plus optional Global Catalog lineage (copy, not live sync). */
+export interface StaffMenuItemDetail extends MenuItemDetail {
+  globalSource: GlobalCatalogSourceInfo | null;
 }
 
 /** Consumer-visible catalog projection (Stage B). Same shape for Standard and Custom. */

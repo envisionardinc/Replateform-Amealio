@@ -58,6 +58,23 @@ async function main() {
     },
   });
   const staffSecret = await bcrypt.hash('MerchantSecret123!', 10);
+  const adminId = await stableId('staff-super-admin', 'platform');
+  await prisma.staffMember.upsert({
+    where: { id: adminId },
+    update: { email: 'dev.admin@example.test', staffRole: 'SUPER_ADMIN', merchantId: null },
+    create: {
+      id: adminId,
+      merchantId: null,
+      name: 'DEV Super Admin',
+      email: 'dev.admin@example.test',
+      staffRole: 'SUPER_ADMIN',
+    },
+  });
+  await prisma.staffCredential.upsert({
+    where: { staffMemberId_type: { staffMemberId: adminId, type: 'PASSWORD' } },
+    update: { secretHash: staffSecret },
+    create: { staffMemberId: adminId, type: 'PASSWORD', secretHash: staffSecret },
+  });
   await prisma.staffCredential.upsert({
     where: { staffMemberId_type: { staffMemberId: staffId, type: 'PASSWORD' } },
     update: { secretHash: staffSecret },
@@ -629,11 +646,87 @@ async function main() {
     },
   });
 
+  const globalSourcePayload = {
+    product: {
+      variants: [
+        {
+          size: 'Regular',
+          sku: 'DEV-GLOBAL-THALI',
+          priceMinor: '29900',
+          currencyCode: 'INR',
+          isDefault: true,
+          available: true,
+        },
+      ],
+      addOnGroups: [
+        {
+          name: 'Raita',
+          minSelect: 0,
+          maxSelect: 1,
+          allowQuantity: false,
+          available: true,
+          addOns: [
+            {
+              name: 'Boondi',
+              priceMinor: '2000',
+              available: true,
+              variantPrices: [{ sku: 'DEV-GLOBAL-THALI', priceMinor: '2500' }],
+            },
+          ],
+        },
+      ],
+      channelConfigs: [{ channel: 'HOME_DELIVERY', enabled: true }],
+    },
+  };
+  const globalCatalogRows = await prisma.$queryRaw<Array<{ id: string }>>`
+    INSERT INTO "platform_catalogs"
+      ("legacy_id", "name", "description", "cuisine_type", "status", "created_by", "updated_by")
+    VALUES
+      ('seed-global-catalog-1', 'DEV Global North Indian', 'Synthetic Super Admin source catalog',
+       'North Indian', 'ACTIVE', ${adminId}::uuid, ${adminId}::uuid)
+    ON CONFLICT ("legacy_id") DO UPDATE
+      SET "name" = EXCLUDED."name",
+          "description" = EXCLUDED."description",
+          "updated_by" = EXCLUDED."updated_by",
+          "updated_at" = CURRENT_TIMESTAMP
+    RETURNING "id"
+  `;
+  const globalCatalogId = globalCatalogRows[0].id;
+  const globalCategoryRows = await prisma.$queryRaw<Array<{ id: string }>>`
+    INSERT INTO "platform_catalog_categories"
+      ("legacy_id", "catalog_id", "name", "description", "sort_order")
+    VALUES
+      ('seed-global-category-1', ${globalCatalogId}::uuid, 'Mains', 'Global mains', 1)
+    ON CONFLICT ("legacy_id") DO UPDATE
+      SET "name" = EXCLUDED."name",
+          "catalog_id" = EXCLUDED."catalog_id"
+    RETURNING "id"
+  `;
+  const globalCategoryId = globalCategoryRows[0].id;
+  const globalItemRows = await prisma.$queryRaw<Array<{ id: string }>>`
+    INSERT INTO "platform_catalog_items"
+      ("legacy_id", "catalog_id", "category_id", "name", "description", "source_payload")
+    VALUES
+      ('seed-global-item-1', ${globalCatalogId}::uuid, ${globalCategoryId}::uuid,
+       'DEV Global Thali', 'Reusable Super Admin source item',
+       ${JSON.stringify(globalSourcePayload)}::jsonb)
+    ON CONFLICT ("legacy_id") DO UPDATE
+      SET "name" = EXCLUDED."name",
+          "description" = EXCLUDED."description",
+          "source_payload" = EXCLUDED."source_payload",
+          "catalog_id" = EXCLUDED."catalog_id",
+          "category_id" = EXCLUDED."category_id"
+    RETURNING "id"
+  `;
+
   console.log('Seed complete (synthetic dev data):', {
     merchant: merchant.id,
     restaurant: restaurant.id,
     menuItem: item.id,
     user: user.id,
+    superAdmin: adminId,
+    globalCatalog: globalCatalogId,
+    globalItem: globalItemRows[0].id,
   });
 }
 

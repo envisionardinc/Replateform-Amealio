@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { StaffPrincipal } from '../identity/staff-authentication/staff-principal';
@@ -36,6 +37,8 @@ import { parseMaterializationProduct } from '../catalog/domain/materialization-p
  */
 @Injectable()
 export class PlatformCatalogService {
+  private readonly logger = new Logger(PlatformCatalogService.name);
+
   constructor(
     private readonly repo: PlatformCatalogRepository,
     private readonly scope: MerchantScopeService,
@@ -236,6 +239,7 @@ export class PlatformCatalogService {
     input: {
       sourceItemId: string;
       restaurantId: string;
+      catalogId?: string | null;
       menuSectionId?: string | null;
       nameOverride?: string;
       descriptionOverride?: string | null;
@@ -254,6 +258,15 @@ export class PlatformCatalogService {
 
     const source = await this.repo.findItem(input.sourceItemId);
     if (!source) throw new NotFoundException('Global catalogue item not found');
+    if (input.catalogId) {
+      assertUuid(input.catalogId, 'catalogId');
+      if (!(await this.repo.findCatalog(input.catalogId))) {
+        throw new NotFoundException('Global catalogue not found');
+      }
+      if (source.catalogId !== input.catalogId) {
+        throw new BadRequestException('source item does not belong to this catalogue');
+      }
+    }
 
     const restaurant = await this.restaurants.findById(input.restaurantId);
     if (!restaurant || restaurant.deletedAt !== null) {
@@ -272,7 +285,7 @@ export class PlatformCatalogService {
     const name = input.nameOverride ?? source.name;
     if (!nonEmpty(name)) throw new BadRequestException('materialized item name is required');
 
-    return this.repo.materializeItem({
+    const result = await this.repo.materializeItem({
       sourceItemId: source.id,
       merchantId: restaurant.merchantId,
       restaurantId: input.restaurantId,
@@ -281,6 +294,10 @@ export class PlatformCatalogService {
       description: input.descriptionOverride ?? source.description,
       product: parseMaterializationProduct(source.sourcePayload),
     });
+    this.logger.log(
+      `materialized global item ${source.id} to menu item ${result.menuItemId} by staff ${principal.staffMemberId} restaurant ${input.restaurantId}`,
+    );
+    return result;
   }
 
   private assertSuperAdmin(principal: StaffPrincipal): void {

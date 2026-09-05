@@ -29,8 +29,12 @@ describe('CatalogService tenant isolation', () => {
     findById: jest.fn(),
     findDetailById: jest.fn(),
     listByRestaurant: jest.fn(),
+    findGlobalSourceByMenuItemId: jest.fn(),
   };
-  const service = new CatalogService(scope as any, menus as any, items as any);
+  const restaurants = {
+    listByMerchant: jest.fn(),
+  };
+  const service = new CatalogService(scope as any, menus as any, items as any, restaurants as any);
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -77,5 +81,46 @@ describe('CatalogService tenant isolation', () => {
       ForbiddenException,
     );
     expect(items.findDetailById).not.toHaveBeenCalled();
+  });
+
+  it('lists restaurants from the authenticated merchant scope only', async () => {
+    restaurants.listByMerchant.mockResolvedValue([{ id: 'r1', merchantId: 'm1' }]);
+    await expect(service.listRestaurantsForStaff(merchantStaff('m1'))).resolves.toEqual([
+      { id: 'r1', merchantId: 'm1' },
+    ]);
+    expect(restaurants.listByMerchant).toHaveBeenCalledWith('m1');
+  });
+
+  it('rejects SUPER_ADMIN restaurant listing for the merchant catalog surface', async () => {
+    await expect(service.listRestaurantsForStaff(superAdmin)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(restaurants.listByMerchant).not.toHaveBeenCalled();
+  });
+
+  it('attaches Global Catalog lineage as source information, not a synced state', async () => {
+    items.findById.mockResolvedValue({ id: 'item-1', restaurantId: 'r1' });
+    scope.assertRestaurantInScope.mockResolvedValue(undefined);
+    items.findDetailById.mockResolvedValue({
+      id: 'item-1',
+      restaurantId: 'r1',
+      name: 'Paneer',
+      isPublished: false,
+      variants: [],
+      channelConfigs: [],
+      addOnGroups: [],
+    });
+    items.findGlobalSourceByMenuItemId.mockResolvedValue({
+      sourceItemId: 'g-1',
+      sourceItemName: 'Global Paneer',
+      catalogId: 'c-1',
+      catalogName: 'North Indian',
+    });
+    await expect(service.getItemDetail(merchantStaff('m1'), 'item-1')).resolves.toEqual(
+      expect.objectContaining({
+        id: 'item-1',
+        globalSource: expect.objectContaining({ sourceItemId: 'g-1', catalogName: 'North Indian' }),
+      }),
+    );
   });
 });

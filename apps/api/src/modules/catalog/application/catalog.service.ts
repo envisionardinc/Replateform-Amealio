@@ -4,7 +4,9 @@ import { isSuperAdmin } from '../../identity/staff-authentication/authorization/
 import { MerchantScopeService } from '../../merchant/application/merchant-scope.service';
 import { MenuRepository } from '../infrastructure/menu.repository';
 import { MenuItemRepository } from '../infrastructure/menu-item.repository';
-import type { MenuItemDetail, MenuRecord, MenuSectionRecord } from '../domain/catalog.types';
+import type { MenuRecord, MenuSectionRecord, StaffMenuItemDetail } from '../domain/catalog.types';
+import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.repository';
+import type { RestaurantRecord } from '../../merchant/domain/merchant.types';
 
 /**
  * Merchant-tenant-scoped catalog reads (P1.7.5). Catalog is restaurant-scoped;
@@ -20,7 +22,22 @@ export class CatalogService {
     private readonly scope: MerchantScopeService,
     private readonly menus: MenuRepository,
     private readonly items: MenuItemRepository,
+    private readonly restaurants: RestaurantRepository,
   ) {}
+
+  /**
+   * Restaurants owned by the authenticated merchant. Scope is the server
+   * principal — never a client-supplied merchantId.
+   */
+  async listRestaurantsForStaff(principal: StaffPrincipal): Promise<RestaurantRecord[]> {
+    if (isSuperAdmin(principal)) {
+      throw new ForbiddenException('merchant catalog restaurants require merchant staff scope');
+    }
+    if (!principal.merchantId) {
+      throw new ForbiddenException('merchant scope is required');
+    }
+    return this.restaurants.listByMerchant(principal.merchantId);
+  }
 
   /** Menus for a restaurant, after confirming the restaurant is in the staff's scope. */
   async getMenusForRestaurant(
@@ -44,11 +61,14 @@ export class CatalogService {
   async getItemDetail(
     principal: StaffPrincipal,
     menuItemId: string,
-  ): Promise<MenuItemDetail | null> {
+  ): Promise<StaffMenuItemDetail | null> {
     const item = await this.items.findById(menuItemId);
     if (!item) return null;
     await this.scope.assertRestaurantInScope(principal, item.restaurantId);
-    return this.items.findDetailById(menuItemId);
+    const detail = await this.items.findDetailById(menuItemId);
+    if (!detail) return null;
+    const globalSource = await this.items.findGlobalSourceByMenuItemId(menuItemId);
+    return { ...detail, globalSource };
   }
 
   /** Items for a restaurant in the staff's scope (optionally available-only). */

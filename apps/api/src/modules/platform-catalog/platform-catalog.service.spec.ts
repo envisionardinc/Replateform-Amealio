@@ -296,5 +296,51 @@ describe('PlatformCatalogService', () => {
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('rejects materialization when the source item belongs to another catalogue', async () => {
+      repo.findItem.mockResolvedValue({
+        id: UUID.item,
+        catalogId: UUID.catalog,
+        name: 'Paneer',
+        description: null,
+      });
+      repo.findCatalog.mockResolvedValue({ id: UUID.otherRestaurant });
+      await expect(
+        service.materializeGlobalItem(merchantStaff('m1'), {
+          sourceItemId: UUID.item,
+          restaurantId: UUID.restaurant,
+          catalogId: UUID.otherRestaurant,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.materializeItem).not.toHaveBeenCalled();
+    });
+
+    it('ignores a client-supplied merchantId and uses the restaurant owner', async () => {
+      repo.findItem.mockResolvedValue({
+        id: UUID.item,
+        catalogId: UUID.catalog,
+        name: 'Paneer',
+        description: null,
+      });
+      restaurants.findById.mockResolvedValue({
+        id: UUID.restaurant,
+        merchantId: 'm1',
+        deletedAt: null,
+      });
+      scope.assertRestaurantInScope.mockResolvedValue(undefined);
+      repo.materializeItem.mockResolvedValue({
+        menuItemId: 'item-1',
+        materializationId: 'link-1',
+      });
+
+      await service.materializeGlobalItem(merchantStaff('m1'), {
+        sourceItemId: UUID.item,
+        restaurantId: UUID.restaurant,
+        catalogId: UUID.catalog,
+      });
+      expect(repo.materializeItem).toHaveBeenCalledWith(
+        expect.objectContaining({ merchantId: 'm1', restaurantId: UUID.restaurant }),
+      );
+    });
   });
 });

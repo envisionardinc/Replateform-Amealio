@@ -50,7 +50,7 @@ export function CouponField({ applied, error, busy, onApply, onClear }: CouponFi
           {applied.couponCode ? ` · ${applied.couponCode}` : ''}
         </p>
       ) : null}
-      {error ? <Banner tone="danger">{error}</Banner> : null}
+      {error ? <Banner tone="error">{error}</Banner> : null}
     </div>
   );
 }

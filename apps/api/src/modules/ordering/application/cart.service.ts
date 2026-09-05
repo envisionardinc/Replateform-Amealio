@@ -229,7 +229,7 @@ export class CartService {
       feeTotalMinor: '0',
       deliveryChargeMinor: '0',
       grandTotalMinor: '0',
-      promotion: null as null,
+      promotion: null as ReturnType<typeof serializePromotion>,
     };
     let commercial = emptyTotals;
     if (merchandise.length > 0) {

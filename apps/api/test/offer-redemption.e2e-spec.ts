@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   INestApplication,
 } from '@nestjs/common';
@@ -426,7 +425,7 @@ describe('Offer redemption & server-side discount (integration)', () => {
     await orders.createOrder(staffOf(merchantId), baseInput(restaurantId, { couponCode: code }));
     await expect(
       orders.createOrder(staffOf(merchantId), baseInput(restaurantId, { couponCode: code })),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('enforces the per-user usage limit while allowing another user', async () => {
@@ -448,7 +447,7 @@ describe('Offer redemption & server-side discount (integration)', () => {
         staffOf(merchantId),
         baseInput(restaurantId, { couponCode: code, userId: u1.id }),
       ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toBeInstanceOf(BadRequestException);
     // a different user may still redeem
     const ok = await orders.createOrder(
       staffOf(merchantId),

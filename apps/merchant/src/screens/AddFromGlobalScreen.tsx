@@ -16,6 +16,12 @@ import {
   type MerchantSection,
 } from '../lib/api';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function usableSections(rows: MerchantSection[]): MerchantSection[] {
+  return rows.filter((section) => UUID_RE.test(section.id));
+}
+
 export function AddFromGlobalScreen() {
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState<MerchantRestaurant[]>([]);
@@ -116,9 +122,10 @@ export function AddFromGlobalScreen() {
       .sections(menuId)
       .then((rows) => {
         if (cancelled) return;
-        setSections(rows);
+        const next = usableSections(rows);
+        setSections(next);
         setMenuSectionId((current) =>
-          rows.some((section) => section.id === current) ? current : rows[0]?.id || '',
+          next.some((section) => section.id === current) ? current : next[0]?.id || '',
         );
       })
       .catch((err) => {

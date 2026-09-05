@@ -66,7 +66,7 @@ No single shared package. No `packages/ui` in the TurboRepo today.
 | Skeletons                        | Prefer over a lone spinner                       |
 | Sticky checkout CTA              | Cart/checkout primary action stays reachable     |
 | Bottom nav for 3–5 destinations  | Home / Cart / Orders on this slice               |
-| Filter chips                     | FUTURE (no taxonomy API)                         |
+| Filter chips                     | Home 1 Category rail (doc 94)                    |
 | Status timeline                  | FUTURE (poll + GET today)                        |
 | Contrast ≥ 4.5:1 for text        | Do not use `#8AC926` as text                     |
 
@@ -93,7 +93,7 @@ Do not copy competitor orange/red brand systems.
 | Empty/error      | inconsistent copy           | retry + plain language          | mixed                             | Banner tokens                               | **IMPROVE**                                              |
 | Success green    | `#8AC926`                   | AA contrast                     | fails as text                     | `#1B7A3A` text; lime decorative only        | **CORRECT**                                              |
 | Imagery          | photos in V2 cards          | required                        | no public image field             | Placeholder; real media FUTURE              | **FUTURE**                                               |
-| Chips / filters  | V2 chips                    | category rails                  | no taxonomy HTTP                  | Primitive exists; unused until APIs         | **FUTURE**                                               |
+| Chips / filters  | V2 chips                    | category rails                  | Category HTTP in doc 94           | Chip primitive + Home 1 rail                | **IMPROVE**                                              |
 | Modals / drawers | ReusableDrawer              | sheets                          | not needed this slice             | Tokens only                                 | **FUTURE**                                               |
 | Toasts           | notistack                   | transient confirm               | not needed                        | Token reserved                              | **FUTURE**                                               |
 | Logo mark        | SVG lockup                  | —                               | large asset                       | Wordmark text this slice                    | **OWNER DECISION** if full SVG lockup is required in-app |
@@ -182,7 +182,7 @@ Family: **Inter**, fallback `ui-sans-serif, system-ui, sans-serif`.
 | Field                  | label + input/select                                      |
 | Card                   | default, media (letter placeholder)                       |
 | Badge                  | neutral, info, warning, danger, success                   |
-| Chip                   | reserved; unused until taxonomy                           |
+| Chip                   | selected / unselected / unavailable (doc 94)              |
 | Banner                 | error, empty, warning, info                               |
 | Skeleton               | line / card                                               |
 | Header                 | navy, wordmark                                            |
@@ -199,11 +199,11 @@ Family: **Inter**, fallback `ui-sans-serif, system-ui, sans-serif`.
 
 Mulish remaining in this repo after the Inter correction:
 
-| Reference | Classification | Why it stays |
-| --------- | -------------- | ------------ |
-| This document §1.2, L3 legacy column, §4, §6 | 2. legacy forensic documentation | Records shipped consumer reality and the correction |
-| `apps/web/src/design-system/tokens.test.ts` negative `Mulish` assertions | 2. forensic / validation | Proves the runtime stylesheet does not load Mulish |
-| `apps/web` runtime CSS, tokens, HTML, package.json | 1. target runtime dependency | **Removed** — none remain |
+| Reference                                                                | Classification                   | Why it stays                                        |
+| ------------------------------------------------------------------------ | -------------------------------- | --------------------------------------------------- |
+| This document §1.2, L3 legacy column, §4, §6                             | 2. legacy forensic documentation | Records shipped consumer reality and the correction |
+| `apps/web/src/design-system/tokens.test.ts` negative `Mulish` assertions | 2. forensic / validation         | Proves the runtime stylesheet does not load Mulish  |
+| `apps/web` runtime CSS, tokens, HTML, package.json                       | 1. target runtime dependency     | **Removed** — none remain                           |
 
 No `apps/web` runtime file may import, token, or load Mulish.
 

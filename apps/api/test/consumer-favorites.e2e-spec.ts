@@ -262,9 +262,9 @@ describe('Consumer favorites (doc 97 HTTP e2e)', () => {
 
     const bList = await http().get('/api/v1/me/favorites').set(auth(b.token));
     expect(bList.body.data).toHaveLength(2);
-    expect(
-      bList.body.data.map((row: { userId?: string }) => row.userId).every((id) => id === undefined),
-    ).toBe(true);
+    expect(bList.body.data.every((row: { userId?: string }) => row.userId === undefined)).toBe(
+      true,
+    );
     const stored = await prisma.favourite.findMany({ where: { userId: b.userId } });
     expect(stored).toHaveLength(2);
   });

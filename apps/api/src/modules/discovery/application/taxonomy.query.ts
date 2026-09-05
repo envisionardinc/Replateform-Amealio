@@ -41,7 +41,7 @@ export class TaxonomyQuery {
     const categories = await this.prisma.category.findMany({
       where: {
         deletedAt: null,
-        OR: [{ code: { not: null } }, { menuSections: { some: {} } }],
+        code: { not: null },
       },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, type: true, status: true },

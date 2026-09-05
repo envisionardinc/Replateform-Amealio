@@ -108,7 +108,7 @@ Query: `city`, `q`, `categoryId` (optional UUID).
 }
 ```
 
-- `taxonomy.chips` = non-deleted `Category` rows that either have a `code` (platform catalog) or are referenced by a `MenuSection`. Name sort. Experience/e2e leftovers without a code or menu link are not Home 1 chips.
+- `taxonomy.chips` = non-deleted `Category` rows that have a `code` (platform catalog). Menu-section-only leftovers from other domains are not Home 1 chips. Filter still uses `MenuSection.categoryId`.
 - `available` is true iff at least one ACTIVE, not-deleted restaurant has a menu section in that category (or a child) with a published item.
 - `categoryId` filters `sections[0].restaurants` only. Unknown/unavailable id → empty restaurant list, chips unchanged.
 - Empty `chips` → UI empty banner; restaurant list still returns.

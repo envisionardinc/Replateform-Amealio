@@ -1,6 +1,7 @@
 const ACCESS_KEY = 'amealio.accessToken';
 const REFRESH_KEY = 'amealio.refreshToken';
 const CHECKOUT_KEY = 'amealio.checkoutIdempotencyKey';
+const COUPON_KEY = 'amealio.couponCode';
 
 export function getAccessToken(): string | null {
   return sessionStorage.getItem(ACCESS_KEY);
@@ -48,4 +49,18 @@ export function getOrCreateCheckoutKey(): string {
 
 export function clearCheckoutKey(): void {
   sessionStorage.removeItem(CHECKOUT_KEY);
+}
+
+export function getCouponCode(): string {
+  return sessionStorage.getItem(COUPON_KEY) ?? '';
+}
+
+export function setCouponCode(code: string): void {
+  const trimmed = code.trim();
+  if (trimmed) sessionStorage.setItem(COUPON_KEY, trimmed);
+  else sessionStorage.removeItem(COUPON_KEY);
+}
+
+export function clearCouponCode(): void {
+  sessionStorage.removeItem(COUPON_KEY);
 }

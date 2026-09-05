@@ -18,7 +18,8 @@ import {
   snapshotCommercial,
 } from '../../catalog/domain/commercial-quote';
 import { OrderRepository } from '../infrastructure/order.repository';
-import { assertOfferEligible, calculateDiscountMinor } from '../domain/offer-discount';
+import { PromotionApplicationService } from '../../offer/application/promotion-application.service';
+import { PromotionApplicationError } from '../../offer/domain/promotion-application';
 import { isAllowedTransition, isPickupLike } from '../domain/order-status-graph';
 import type {
   ConsumerActor,
@@ -60,6 +61,7 @@ export class OrderService {
     private readonly restaurants: RestaurantRepository,
     private readonly menuItems: MenuItemRepository,
     private readonly orders: OrderRepository,
+    private readonly promotions: PromotionApplicationService,
   ) {}
 
   async createOrder(
@@ -144,34 +146,56 @@ export class OrderService {
     const tipMinor = input.tipMinor ?? 0n;
     const donationMinor = input.donationMinor ?? 0n;
 
-    const couponCode = input.couponCode?.trim();
     let discountTotalMinor: bigint;
     let redemption: RedemptionDirective | undefined;
-    if (couponCode) {
-      const offer = await this.orders.findAppliedOfferByCouponCode(couponCode);
-      if (!offer) {
-        throw new BadRequestException('Invalid coupon code');
+    let appliedOfferId: string | null = null;
+    let appliedPromotion: {
+      offerId: string;
+      couponId: string | null;
+      couponCode: string | null;
+      title: string;
+      source: 'CODE' | 'AUTOMATIC';
+    } | null = null;
+
+    const couponIntent = input.couponCode?.trim() ? input.couponCode : null;
+    if (couponIntent || isCustomer) {
+      try {
+        const resolved = await this.promotions.resolve({
+          restaurantId: input.restaurantId,
+          merchantId: restaurant.merchantId,
+          orderType: input.type,
+          merchandiseSubtotalMinor: subtotalMinor,
+          lines: items.map((it) => ({ lineTotalMinor: it.lineTotalMinor })),
+          userId,
+          couponCode: couponIntent,
+        });
+        discountTotalMinor = resolved.discountMinor;
+        appliedPromotion = resolved.promotion;
+        appliedOfferId = resolved.promotion?.offerId ?? null;
+        if (resolved.promotion?.couponId && resolved.promotion.couponCode) {
+          const offer = await this.orders.findAppliedOfferByCouponCode(
+            resolved.promotion.couponCode,
+          );
+          if (offer) {
+            redemption = {
+              offerId: offer.offerId,
+              couponId: offer.couponId,
+              userId,
+              discountAppliedMinor: resolved.discountMinor,
+              maxUsageLimit: offer.maxUsageLimit,
+              perUserLimit: offer.perUserLimit,
+              isGlobal: offer.isGlobal,
+              useLimit: offer.useLimit,
+              useFrequency: offer.useFrequency,
+            };
+          }
+        }
+      } catch (err) {
+        if (err instanceof PromotionApplicationError) {
+          throw new BadRequestException({ message: err.message, code: err.code });
+        }
+        throw err;
       }
-      assertOfferEligible(
-        offer,
-        input.restaurantId,
-        restaurant.merchantId,
-        subtotalMinor,
-        input.type,
-        new Date(),
-      );
-      discountTotalMinor = calculateDiscountMinor(offer, subtotalMinor);
-      redemption = {
-        offerId: offer.offerId,
-        couponId: offer.couponId,
-        userId,
-        discountAppliedMinor: discountTotalMinor,
-        maxUsageLimit: offer.maxUsageLimit,
-        perUserLimit: offer.perUserLimit,
-        isGlobal: offer.isGlobal,
-        useLimit: offer.useLimit,
-        useFrequency: offer.useFrequency,
-      };
     } else {
       discountTotalMinor = input.discountTotalMinor ?? 0n;
     }
@@ -220,13 +244,17 @@ export class OrderService {
       feeTotalMinor: commercial.feeTotalMinor,
       deliveryChargeMinor: commercial.deliveryChargeMinor,
       grandTotalMinor: commercial.grandTotalMinor,
-      commercialSnapshot: snapshotCommercial(commercial) as unknown as Prisma.InputJsonValue,
+      commercialSnapshot: snapshotCommercial(
+        commercial,
+        appliedPromotion,
+      ) as unknown as Prisma.InputJsonValue,
       tipMinor,
       donationMinor,
       currencyCode,
       items,
       actorType: isCustomer ? 'CUSTOMER' : actor.actorType,
       actorId: isCustomer ? actor.userId : actor.staffMemberId,
+      offerId: appliedOfferId,
       redemption,
       checkoutIdempotencyKey: input.checkoutIdempotencyKey ?? null,
       deferRedemption: input.deferRedemption === true,

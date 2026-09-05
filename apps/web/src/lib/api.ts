@@ -14,6 +14,12 @@ export class ApiError extends Error {
   }
 }
 
+export function promoCodeFromError(err: unknown): string | null {
+  if (!(err instanceof ApiError) || !err.body || typeof err.body !== 'object') return null;
+  const code = (err.body as Record<string, unknown>).code;
+  return typeof code === 'string' && code.trim() ? code : null;
+}
+
 export function messageFromBody(body: unknown, fallback: string): string {
   if (body && typeof body === 'object') {
     const rec = body as Record<string, unknown>;
@@ -175,6 +181,14 @@ export type CommercialFeeLine = {
   taxTreatment: string;
 };
 
+export type AppliedPromotion = {
+  offerId: string;
+  couponId: string | null;
+  couponCode: string | null;
+  title: string;
+  source: 'CODE' | 'AUTOMATIC';
+};
+
 export type MerchandiseQuote = {
   variantId: string;
   menuItemId: string;
@@ -194,6 +208,7 @@ export type MerchandiseQuote = {
   feeTotalMinor?: string;
   deliveryChargeMinor?: string;
   grandTotalMinor?: string;
+  promotion?: AppliedPromotion | null;
   selections: Array<{
     groupId: string;
     modifierId: string;
@@ -271,6 +286,7 @@ export type PricedCart = {
   feeTotalMinor?: string;
   deliveryChargeMinor?: string;
   grandTotalMinor?: string;
+  promotion?: AppliedPromotion | null;
   items: PricedCartItem[];
 };
 
@@ -375,6 +391,7 @@ export const discoverApi = {
     quantity: number;
     type?: string;
     modifierGroups?: ModifierGroupPayload[];
+    couponCode?: string;
   }) =>
     api<MerchandiseQuote>('/api/v1/discover/quote', {
       method: 'POST',
@@ -402,21 +419,36 @@ export const authApi = {
   },
 };
 
+function cartPath(path: string, couponCode?: string) {
+  const code = couponCode?.trim();
+  if (!code) return path;
+  const join = path.includes('?') ? '&' : '?';
+  return `${path}${join}couponCode=${encodeURIComponent(code)}`;
+}
+
 export const cartApi = {
-  get: () => api<PricedCart>('/api/v1/cart'),
-  add: (body: {
-    variantId: string;
-    quantity: number;
-    restaurantId?: string;
-    type?: string;
-    modifierGroups?: ModifierGroupPayload[];
-  }) => api<PricedCart>('/api/v1/cart/items', { method: 'POST', body: JSON.stringify(body) }),
-  update: (id: string, quantity: number) =>
-    api<PricedCart>(`/api/v1/cart/items/${id}`, {
+  get: (couponCode?: string) => api<PricedCart>(cartPath('/api/v1/cart', couponCode)),
+  add: (
+    body: {
+      variantId: string;
+      quantity: number;
+      restaurantId?: string;
+      type?: string;
+      modifierGroups?: ModifierGroupPayload[];
+    },
+    couponCode?: string,
+  ) =>
+    api<PricedCart>(cartPath('/api/v1/cart/items', couponCode), {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  update: (id: string, quantity: number, couponCode?: string) =>
+    api<PricedCart>(cartPath(`/api/v1/cart/items/${id}`, couponCode), {
       method: 'PATCH',
       body: JSON.stringify({ quantity }),
     }),
-  remove: (id: string) => api<PricedCart>(`/api/v1/cart/items/${id}`, { method: 'DELETE' }),
+  remove: (id: string, couponCode?: string) =>
+    api<PricedCart>(cartPath(`/api/v1/cart/items/${id}`, couponCode), { method: 'DELETE' }),
 };
 
 export const checkoutApi = {

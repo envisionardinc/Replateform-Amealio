@@ -5,23 +5,27 @@ import { Badge } from '../design-system/Badge';
 import { Banner } from '../design-system/Banner';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
+import { CouponField } from '../components/CouponField';
 import { QuoteTotals } from '../components/QuoteTotals';
-import { cartApi, type PricedCart } from '../lib/api';
+import { cartApi, promoCodeFromError, type PricedCart } from '../lib/api';
 import { formatMinor } from '../lib/money';
-import { isAuthenticated } from '../lib/session';
+import { clearCouponCode, getCouponCode, isAuthenticated, setCouponCode } from '../lib/session';
 
 export function CartScreen() {
   const signedIn = isAuthenticated();
   const [cart, setCart] = useState<PricedCart | null>(null);
   const [loading, setLoading] = useState(signedIn);
   const [error, setError] = useState<string | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!isAuthenticated()) return;
     setLoading(true);
     setError(null);
     try {
-      setCart(await cartApi.get());
+      setCart(await cartApi.get(getCouponCode() || undefined));
+      setPromoError(null);
     } catch (err) {
       setCart(null);
       setError(err instanceof Error ? err.message : 'Could not load cart');
@@ -48,7 +52,7 @@ export function CartScreen() {
 
   async function changeQty(id: string, quantity: number) {
     try {
-      setCart(await cartApi.update(id, quantity));
+      setCart(await cartApi.update(id, quantity, getCouponCode() || undefined));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Update failed');
     }
@@ -56,9 +60,42 @@ export function CartScreen() {
 
   async function remove(id: string) {
     try {
-      setCart(await cartApi.remove(id));
+      setCart(await cartApi.remove(id, getCouponCode() || undefined));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Remove failed');
+    }
+  }
+
+  async function applyCoupon(code: string) {
+    setPromoBusy(true);
+    setPromoError(null);
+    try {
+      const next = await cartApi.get(code);
+      setCouponCode(code);
+      setCart(next);
+    } catch (err) {
+      setPromoError(
+        promoCodeFromError(err)
+          ? `${promoCodeFromError(err)} — ${err instanceof Error ? err.message : 'Invalid code'}`
+          : err instanceof Error
+            ? err.message
+            : 'Invalid code',
+      );
+    } finally {
+      setPromoBusy(false);
+    }
+  }
+
+  async function clearCoupon() {
+    setPromoBusy(true);
+    setPromoError(null);
+    clearCouponCode();
+    try {
+      setCart(await cartApi.get());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load cart');
+    } finally {
+      setPromoBusy(false);
     }
   }
 
@@ -125,6 +162,13 @@ export function CartScreen() {
         ))}
         {cart ? (
           <Card>
+            <CouponField
+              applied={cart.promotion}
+              error={promoError}
+              busy={promoBusy}
+              onApply={applyCoupon}
+              onClear={clearCoupon}
+            />
             <QuoteTotals
               currencyCode={cart.currencyCode}
               merchandiseSubtotalMinor={cart.merchandiseSubtotalMinor ?? cart.subtotalMinor}

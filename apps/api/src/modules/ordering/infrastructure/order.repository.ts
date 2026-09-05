@@ -91,6 +91,7 @@ interface CreateArgs {
   }>;
   actorType: string | null;
   actorId: string | null;
+  offerId?: string | null;
   redemption?: RedemptionDirective;
   deferRedemption?: boolean;
 }
@@ -188,7 +189,7 @@ export class OrderRepository {
             tipMinor: args.tipMinor,
             donationMinor: args.donationMinor,
             currencyCode: args.currencyCode,
-            offerId: r?.offerId ?? null,
+            offerId: r?.offerId ?? args.offerId ?? null,
             couponId: r?.couponId ?? null,
             checkoutIdempotencyKey: args.checkoutIdempotencyKey ?? null,
             placedAt: new Date(),

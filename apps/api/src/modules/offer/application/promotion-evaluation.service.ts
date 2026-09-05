@@ -20,7 +20,8 @@ import { PromotionEvaluationRepository } from '../infrastructure/promotion-evalu
  * Phase 1 quote/evaluate service (doc 101).
  *
  * READ-ONLY. Does not create CouponRedemption, reserve capacity, or mutate
- * Offer / Coupon / User / Order. Commit stays on the existing checkout path.
+ * Offer / Coupon / User / Order. Phase 2 callers feed discountMinor into Stage D;
+ * ledger writes stay on createOrder / promoteOnPaymentCapture.
  */
 @Injectable()
 export class PromotionEvaluationService {

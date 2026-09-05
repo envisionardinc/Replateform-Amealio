@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 import { DiscoveryService } from '../application/discovery.service';
 import type { OrderChannel } from '../../catalog/domain/catalog.types';
 
@@ -41,6 +41,10 @@ class MerchandiseQuoteDto {
   @ValidateNested({ each: true })
   @Type(() => QuoteModifierGroupDto)
   modifierGroups?: QuoteModifierGroupDto[];
+
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }
 
 /**

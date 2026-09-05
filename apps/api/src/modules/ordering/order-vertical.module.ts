@@ -5,6 +5,7 @@ import { ConsumerAuthModule } from '../identity/authentication/consumer-auth.mod
 import { StaffAuthModule } from '../identity/staff-authentication/staff-auth.module';
 import { MerchantModule } from '../merchant/merchant.module';
 import { PaymentModule } from '../payment/payment.module';
+import { OfferModule } from '../offer/offer.module';
 import { OrderingModule } from './ordering.module';
 import { CartRepository } from './infrastructure/cart.repository';
 import { CartService } from './application/cart.service';
@@ -28,6 +29,7 @@ import { OrdersController } from './api/orders.controller';
   imports: [
     OrderingModule,
     PaymentModule,
+    OfferModule,
     CatalogModule,
     MerchantModule,
     StaffAuthModule,

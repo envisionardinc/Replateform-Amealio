@@ -1,9 +1,11 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.repository';
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
 import { MenuRepository } from '../../catalog/infrastructure/menu.repository';
 import { CommercialQuoteService } from '../../catalog/application/commercial-quote.service';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
+import { PromotionApplicationService } from '../../offer/application/promotion-application.service';
+import { intentCouponCode, serializePromotion } from '../../offer/domain/promotion-application';
 import type { ConsumerCatalogItem, OrderChannel } from '../../catalog/domain/catalog.types';
 import type { ModifierGroupSelectionInput } from '../../catalog/domain/merchandise-configuration';
 import { appearsOnConsumerMenu, isConsumerOrderable } from '../../catalog/domain/orderability';
@@ -26,6 +28,7 @@ export class DiscoveryService {
     private readonly taxonomy: TaxonomyQuery,
     private readonly quotes: MerchandiseQuoteService,
     private readonly commercial: CommercialQuoteService,
+    private readonly promotions: PromotionApplicationService,
   ) {}
 
   getHome(query: { city?: string; q?: string; categoryId?: string }) {
@@ -124,10 +127,37 @@ export class DiscoveryService {
     quantity: number;
     type?: OrderChannel;
     modifierGroups?: ModifierGroupSelectionInput[];
+    couponCode?: string | null;
+    userId?: string | null;
   }) {
     const quote = await this.quotes.quote(input);
     await this.requireDiscoverable(quote.restaurantId);
-    const commercial = this.commercial.fromMerchandise([quote], 0n);
+    if (intentCouponCode(input.couponCode) && !input.type) {
+      throw new BadRequestException({
+        message: 'type is required to apply a coupon',
+        code: 'NOT_ELIGIBLE',
+      });
+    }
+    let discountMinor = 0n;
+    let promotion = null;
+    if (input.type) {
+      try {
+        const resolved = await this.promotions.resolve({
+          restaurantId: quote.restaurantId,
+          merchantId: quote.merchantId,
+          orderType: input.type,
+          merchandiseSubtotalMinor: quote.lineMerchandiseMinor,
+          lines: [{ lineTotalMinor: quote.lineMerchandiseMinor }],
+          userId: input.userId ?? null,
+          couponCode: input.couponCode,
+        });
+        discountMinor = resolved.discountMinor;
+        promotion = resolved.promotion;
+      } catch (err) {
+        this.promotions.toHttp(err);
+      }
+    }
+    const commercial = this.commercial.fromMerchandise([quote], discountMinor);
     const totals = this.commercial.serialize(commercial);
     return {
       variantId: quote.variantId,
@@ -145,6 +175,7 @@ export class DiscoveryService {
         priceAdjustmentMinor: s.priceAdjustmentMinor.toString(),
       })),
       ...totals,
+      promotion: serializePromotion(promotion),
     };
   }
 

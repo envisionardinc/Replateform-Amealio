@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MerchantModule } from '../merchant/merchant.module';
 import { CatalogModule } from '../catalog/catalog.module';
+import { OfferModule } from '../offer/offer.module';
 import { OrderRepository } from './infrastructure/order.repository';
 import { OrderService } from './application/order.service';
 
@@ -15,7 +16,7 @@ import { OrderService } from './application/order.service';
  * separate rider state machine (ON_THE_WAY/DELIVERED are native OrderStatus).
  */
 @Module({
-  imports: [MerchantModule, CatalogModule],
+  imports: [MerchantModule, CatalogModule, OfferModule],
   providers: [OrderRepository, OrderService],
   exports: [OrderService, OrderRepository],
 })

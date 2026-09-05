@@ -430,6 +430,15 @@ select:focus {
   color: var(--ame-navy);
 }
 
+.coupon-field {
+  margin: 0 0 var(--ame-space-4);
+}
+
+.coupon-field .row {
+  align-items: flex-end;
+  gap: var(--ame-space-3);
+}
+
 .modifier-group {
   margin: 0 0 var(--ame-space-4);
 }

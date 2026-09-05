@@ -4,6 +4,8 @@ import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repos
 import { CommercialQuoteService } from '../../catalog/application/commercial-quote.service';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
 import { serializeCommercialQuote } from '../../catalog/domain/commercial-quote';
+import { PromotionApplicationService } from '../../offer/application/promotion-application.service';
+import { serializePromotion } from '../../offer/domain/promotion-application';
 import type { CheckoutCatalogLine } from '../../catalog/domain/catalog.types';
 import { CartRepository } from '../infrastructure/cart.repository';
 import type { OrderTypeName } from '../domain/ordering.types';
@@ -46,6 +48,13 @@ export interface PricedCart {
   feeTotalMinor: string;
   deliveryChargeMinor: string;
   grandTotalMinor: string;
+  promotion: {
+    offerId: string;
+    couponId: string | null;
+    couponCode: string | null;
+    title: string;
+    source: 'CODE' | 'AUTOMATIC';
+  } | null;
   items: PricedCartItem[];
 }
 
@@ -60,6 +69,7 @@ export interface AddCartItemInput {
     selections: Array<{ modifierId: string; quantity?: number }>;
   }>;
   addOns?: unknown;
+  couponCode?: string | null;
 }
 
 @Injectable()
@@ -69,11 +79,12 @@ export class CartService {
     private readonly menuItems: MenuItemRepository,
     private readonly quotes: MerchandiseQuoteService,
     private readonly commercial: CommercialQuoteService,
+    private readonly promotions: PromotionApplicationService,
   ) {}
 
-  async getCart(userId: string): Promise<PricedCart> {
+  async getCart(userId: string, couponCode?: string | null): Promise<PricedCart> {
     const cart = await this.carts.getOrCreate(userId);
-    return this.price(cart.id);
+    return this.price(cart.id, { userId, couponCode });
   }
 
   async addItem(userId: string, input: AddCartItemInput): Promise<PricedCart> {
@@ -117,10 +128,15 @@ export class CartService {
       customization: (input.customization ?? undefined) as Prisma.InputJsonValue | undefined,
       addOns: this.quotes.snapshot(quote) as unknown as Prisma.InputJsonValue,
     });
-    return this.price(cart.id);
+    return this.price(cart.id, { userId, couponCode: input.couponCode });
   }
 
-  async updateItem(userId: string, itemId: string, quantity: number): Promise<PricedCart> {
+  async updateItem(
+    userId: string,
+    itemId: string,
+    quantity: number,
+    couponCode?: string | null,
+  ): Promise<PricedCart> {
     if (!Number.isInteger(quantity) || quantity <= 0) {
       throw new BadRequestException('quantity must be a positive integer');
     }
@@ -138,17 +154,24 @@ export class CartService {
     });
     const updated = await this.carts.updateItem(cart.id, itemId, quantity);
     if (!updated) throw new NotFoundException('Cart item not found');
-    return this.price(cart.id);
+    return this.price(cart.id, { userId, couponCode });
   }
 
-  async removeItem(userId: string, itemId: string): Promise<PricedCart> {
+  async removeItem(
+    userId: string,
+    itemId: string,
+    couponCode?: string | null,
+  ): Promise<PricedCart> {
     const cart = await this.carts.getOrCreate(userId);
     const removed = await this.carts.deleteItem(cart.id, itemId);
     if (!removed) throw new NotFoundException('Cart item not found');
-    return this.price(cart.id);
+    return this.price(cart.id, { userId, couponCode });
   }
 
-  async price(cartId: string): Promise<PricedCart> {
+  async price(
+    cartId: string,
+    opts?: { userId?: string | null; couponCode?: string | null },
+  ): Promise<PricedCart> {
     const cart = await this.carts.findById(cartId);
     if (!cart) throw new NotFoundException('Cart not found');
     const items: PricedCartItem[] = [];
@@ -206,11 +229,36 @@ export class CartService {
       feeTotalMinor: '0',
       deliveryChargeMinor: '0',
       grandTotalMinor: '0',
+      promotion: null as null,
     };
-    const commercial =
-      merchandise.length > 0
-        ? serializeCommercialQuote(this.commercial.fromMerchandise(merchandise, 0n))
-        : emptyTotals;
+    let commercial = emptyTotals;
+    if (merchandise.length > 0) {
+      let discountMinor = 0n;
+      let promotion = null;
+      if (cart.restaurantId && cart.merchantId && cart.type) {
+        try {
+          const composed = this.commercial.fromMerchandise(merchandise, 0n);
+          const resolved = await this.promotions.resolve({
+            restaurantId: cart.restaurantId,
+            merchantId: cart.merchantId,
+            orderType: cart.type,
+            merchandiseSubtotalMinor: composed.merchandiseSubtotalMinor,
+            lines: merchandise.map((q) => ({ lineTotalMinor: q.lineMerchandiseMinor })),
+            userId: opts?.userId ?? null,
+            couponCode: opts?.couponCode,
+          });
+          discountMinor = resolved.discountMinor;
+          promotion = resolved.promotion;
+        } catch (err) {
+          this.promotions.toHttp(err);
+        }
+      }
+      const quoted = this.commercial.fromMerchandise(merchandise, discountMinor);
+      commercial = {
+        ...serializeCommercialQuote(quoted),
+        promotion: serializePromotion(promotion),
+      };
+    }
     return {
       id: cart.id,
       restaurantId: cart.restaurantId,
@@ -227,6 +275,7 @@ export class CartService {
       feeTotalMinor: commercial.feeTotalMinor,
       deliveryChargeMinor: commercial.deliveryChargeMinor,
       grandTotalMinor: commercial.grandTotalMinor,
+      promotion: commercial.promotion,
       items,
     };
   }

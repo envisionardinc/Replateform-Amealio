@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -27,13 +28,17 @@ export class CartController {
   }
 
   @Get()
-  get(@CurrentUser() principal: Principal) {
-    return this.carts.getCart(this.userId(principal));
+  get(@CurrentUser() principal: Principal, @Query('couponCode') couponCode?: string) {
+    return this.carts.getCart(this.userId(principal), couponCode);
   }
 
   @Post('items')
-  add(@CurrentUser() principal: Principal, @Body() body: AddCartItemDto) {
-    return this.carts.addItem(this.userId(principal), body);
+  add(
+    @CurrentUser() principal: Principal,
+    @Body() body: AddCartItemDto,
+    @Query('couponCode') couponCode?: string,
+  ) {
+    return this.carts.addItem(this.userId(principal), { ...body, couponCode });
   }
 
   @Patch('items/:id')
@@ -41,12 +46,17 @@ export class CartController {
     @CurrentUser() principal: Principal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateCartItemDto,
+    @Query('couponCode') couponCode?: string,
   ) {
-    return this.carts.updateItem(this.userId(principal), id, body.quantity);
+    return this.carts.updateItem(this.userId(principal), id, body.quantity, couponCode);
   }
 
   @Delete('items/:id')
-  remove(@CurrentUser() principal: Principal, @Param('id', ParseUUIDPipe) id: string) {
-    return this.carts.removeItem(this.userId(principal), id);
+  remove(
+    @CurrentUser() principal: Principal,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('couponCode') couponCode?: string,
+  ) {
+    return this.carts.removeItem(this.userId(principal), id, couponCode);
   }
 }

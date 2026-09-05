@@ -141,6 +141,13 @@ export interface CommercialSnapshot {
   feeTotalMinor: string;
   deliveryChargeMinor: string;
   grandTotalMinor: string;
+  promotion?: {
+    offerId: string;
+    couponId: string | null;
+    couponCode: string | null;
+    title: string;
+    source: 'CODE' | 'AUTOMATIC';
+  } | null;
 }
 
 const FEE_TYPE_SET = new Set<string>(FEE_TYPES);
@@ -237,7 +244,10 @@ export function composeCommercialQuote(input: {
   };
 }
 
-export function snapshotCommercial(quote: CommercialQuote): CommercialSnapshot {
+export function snapshotCommercial(
+  quote: CommercialQuote,
+  promotion?: CommercialSnapshot['promotion'],
+): CommercialSnapshot {
   return {
     schema: COMMERCIAL_SNAPSHOT_SCHEMA,
     currencyCode: quote.currencyCode,
@@ -271,6 +281,7 @@ export function snapshotCommercial(quote: CommercialQuote): CommercialSnapshot {
     feeTotalMinor: quote.feeTotalMinor.toString(),
     deliveryChargeMinor: quote.deliveryChargeMinor.toString(),
     grandTotalMinor: quote.grandTotalMinor.toString(),
+    promotion: promotion ?? null,
   };
 }
 

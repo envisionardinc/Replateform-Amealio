@@ -5,9 +5,17 @@ import { Banner } from '../design-system/Banner';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
 import { Field } from '../design-system/Field';
+import { CouponField } from '../components/CouponField';
 import { QuoteTotals } from '../components/QuoteTotals';
-import { cartApi, checkoutApi, type PricedCart } from '../lib/api';
-import { clearCheckoutKey, getOrCreateCheckoutKey, isAuthenticated } from '../lib/session';
+import { cartApi, checkoutApi, promoCodeFromError, type PricedCart } from '../lib/api';
+import {
+  clearCheckoutKey,
+  clearCouponCode,
+  getCouponCode,
+  getOrCreateCheckoutKey,
+  isAuthenticated,
+  setCouponCode,
+} from '../lib/session';
 
 export function CheckoutScreen() {
   const navigate = useNavigate();
@@ -16,6 +24,8 @@ export function CheckoutScreen() {
   const [error, setError] = useState<string | null>(null);
   const [settlement, setSettlement] = useState<'COD' | 'PREPAID'>('COD');
   const [busy, setBusy] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!isAuthenticated()) {
@@ -25,7 +35,8 @@ export function CheckoutScreen() {
     setLoading(true);
     setError(null);
     try {
-      setCart(await cartApi.get());
+      setCart(await cartApi.get(getCouponCode() || undefined));
+      setPromoError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load cart');
     } finally {
@@ -49,10 +60,12 @@ export function CheckoutScreen() {
           restaurantId: cart.restaurantId ?? undefined,
           type: cart.type ?? 'HOME_DELIVERY',
           settlement,
+          couponCode: getCouponCode() || undefined,
         },
         key,
       );
       clearCheckoutKey();
+      clearCouponCode();
       navigate(`/orders/${result.order.id}`, { state: { checkout: result } });
     } catch (err) {
       setError(
@@ -79,6 +92,35 @@ export function CheckoutScreen() {
       >
         {cart && cart.items.length > 0 ? (
           <Card as="form" onSubmit={(e) => void onSubmit(e)}>
+            <CouponField
+              applied={cart.promotion}
+              error={promoError}
+              busy={promoBusy}
+              onApply={async (code) => {
+                setPromoBusy(true);
+                setPromoError(null);
+                try {
+                  const next = await cartApi.get(code);
+                  setCouponCode(code);
+                  setCart(next);
+                } catch (err) {
+                  setPromoError(
+                    promoCodeFromError(err)
+                      ? `${promoCodeFromError(err)} — ${err instanceof Error ? err.message : 'Invalid code'}`
+                      : err instanceof Error
+                        ? err.message
+                        : 'Invalid code',
+                  );
+                } finally {
+                  setPromoBusy(false);
+                }
+              }}
+              onClear={async () => {
+                clearCouponCode();
+                setPromoError(null);
+                setCart(await cartApi.get());
+              }}
+            />
             <QuoteTotals
               currencyCode={cart.currencyCode}
               merchandiseSubtotalMinor={cart.merchandiseSubtotalMinor ?? cart.subtotalMinor}

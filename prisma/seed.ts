@@ -7,6 +7,7 @@
  * menu, menu item.
  */
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -43,16 +44,35 @@ async function main() {
   });
 
   // --- Staff ---
+  const staffId = await stableId('staff-owner', merchant.id);
   await prisma.staffMember.upsert({
-    where: { id: await stableId('staff-owner', merchant.id) },
+    where: { id: staffId },
     update: {},
     create: {
-      id: await stableId('staff-owner', merchant.id),
+      id: staffId,
       merchantId: merchant.id,
       name: 'DEV Owner',
       email: 'dev.owner@example.test',
       staffRole: 'MERCHANT_OWNER',
       roleId: role.id,
+    },
+  });
+  const staffSecret = await bcrypt.hash('MerchantSecret123!', 10);
+  await prisma.staffCredential.upsert({
+    where: { staffMemberId_type: { staffMemberId: staffId, type: 'PASSWORD' } },
+    update: { secretHash: staffSecret },
+    create: { staffMemberId: staffId, type: 'PASSWORD', secretHash: staffSecret },
+  });
+  const riderId = await stableId('rider-1', merchant.id);
+  await prisma.deliveryPerson.upsert({
+    where: { id: riderId },
+    update: { isOnline: true, merchantId: merchant.id },
+    create: {
+      id: riderId,
+      merchantId: merchant.id,
+      name: 'DEV Rider',
+      phone: '+910000000099',
+      isOnline: true,
     },
   });
 

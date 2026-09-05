@@ -371,4 +371,26 @@ describe('Self delivery order handoff (doc 91 HTTP e2e)', () => {
       (await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).deliveryPersonId,
     ).toBe(r2.id);
   });
+
+  it('lists only the authenticated merchant delivery people', async () => {
+    const a = await seedMerchant();
+    const b = await seedMerchant();
+    const mine = await seedRider(a.merchant.id, { name: 'Mine' });
+    const theirs = await seedRider(b.merchant.id, { name: 'Theirs' });
+    const token = await loginStaff(a.email);
+    const other = await loginStaff(b.email);
+
+    const res = await http().get('/api/v1/delivery/people').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const ids = res.body.data.map((r: { id: string }) => r.id);
+    expect(ids).toContain(mine.id);
+    expect(ids).not.toContain(theirs.id);
+
+    const otherList = await http()
+      .get('/api/v1/delivery/people')
+      .set('Authorization', `Bearer ${other}`);
+    expect(otherList.body.data.map((r: { id: string }) => r.id)).toContain(theirs.id);
+    expect(otherList.body.data.map((r: { id: string }) => r.id)).not.toContain(mine.id);
+    expect((await http().get('/api/v1/delivery/people')).status).toBe(401);
+  });
 });

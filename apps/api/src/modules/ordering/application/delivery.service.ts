@@ -108,6 +108,30 @@ export class DeliveryService {
     return next;
   }
 
+  async listPeople(principal: StaffPrincipal) {
+    if (!principal.merchantId) return [];
+    const riders = await this.prisma.deliveryPerson.findMany({
+      where: { merchantId: principal.merchantId, deletedAt: null },
+      orderBy: { name: 'asc' },
+    });
+    const occupied = await this.prisma.order.findMany({
+      where: {
+        merchantId: principal.merchantId,
+        deliveryPersonId: { in: riders.map((r) => r.id) },
+        status: { in: OCCUPIED_STATUSES },
+      },
+      select: { deliveryPersonId: true },
+    });
+    const busy = new Set(occupied.map((row) => row.deliveryPersonId).filter(Boolean));
+    return riders.map((rider) => ({
+      id: rider.id,
+      name: rider.name,
+      phone: rider.phone,
+      isOnline: rider.isOnline,
+      occupied: busy.has(rider.id),
+    }));
+  }
+
   async riderTransition(
     principal: DeliveryPrincipal | undefined,
     orderId: string,

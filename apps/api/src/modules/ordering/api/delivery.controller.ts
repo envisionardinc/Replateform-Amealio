@@ -27,6 +27,14 @@ import { serializeOrder } from './order-http.serialize';
 export class DeliveryController {
   constructor(private readonly delivery: DeliveryService) {}
 
+  @Get('people')
+  @UseGuards(JwtStaffGuard, StaffAuthorizationGuard)
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  listPeople(@CurrentStaff() principal: StaffPrincipal) {
+    if (!principal) throw new UnauthorizedException('Staff authentication required');
+    return this.delivery.listPeople(principal).then((data) => ({ data }));
+  }
+
   @Post('sessions')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtStaffGuard, StaffAuthorizationGuard)

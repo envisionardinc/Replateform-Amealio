@@ -63,10 +63,26 @@ async function main() {
     update: { secretHash: staffSecret },
     create: { staffMemberId: staffId, type: 'PASSWORD', secretHash: staffSecret },
   });
-  const riderId = await stableId('rider-1', merchant.id);
+  const riderId = rfcUuid(await stableId('rider-1', merchant.id));
+  const staleRiders = await prisma.deliveryPerson.findMany({
+    where: {
+      merchantId: merchant.id,
+      name: 'DEV Rider',
+      id: { not: riderId },
+    },
+  });
+  if (staleRiders.length) {
+    await prisma.order.updateMany({
+      where: { deliveryPersonId: { in: staleRiders.map((r) => r.id) } },
+      data: { deliveryPersonId: null },
+    });
+    await prisma.deliveryPerson.deleteMany({
+      where: { id: { in: staleRiders.map((r) => r.id) } },
+    });
+  }
   await prisma.deliveryPerson.upsert({
     where: { id: riderId },
-    update: { isOnline: true, merchantId: merchant.id },
+    update: { isOnline: true, merchantId: merchant.id, name: 'DEV Rider' },
     create: {
       id: riderId,
       merchantId: merchant.id,
@@ -334,6 +350,12 @@ async function stableId(label: string, scope: string): Promise<string> {
   const h = createHash('sha1').update(`${label}:${scope}`).digest('hex');
   // format as UUID
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
+
+/** class-validator @IsUUID() rejects sha1-as-UUID (invalid version/variant). */
+function rfcUuid(value: string): string {
+  const hex = value.replace(/-/g, '').slice(0, 32).padEnd(32, '0');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 main()

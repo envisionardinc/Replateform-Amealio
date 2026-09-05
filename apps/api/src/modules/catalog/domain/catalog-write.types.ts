@@ -46,6 +46,7 @@ export interface UpdateSectionInput {
 // ---- Item + children ----
 export interface VariantInput {
   size?: string | null;
+  sku?: string | null;
   uomId?: string | null;
   priceMinor: bigint;
   currencyCode?: string;
@@ -63,11 +64,17 @@ export interface AddOnInput {
   name: string;
   priceMinor?: bigint;
   currencyCode?: string;
+  available?: boolean;
+  isDefault?: boolean;
+  sortOrder?: number;
 }
 export interface AddOnGroupInput {
   name: string;
   minSelect?: number;
   maxSelect?: number | null;
+  allowQuantity?: boolean;
+  available?: boolean;
+  sortOrder?: number;
   addOns?: AddOnInput[];
 }
 export interface CreateItemInput {
@@ -115,6 +122,7 @@ export interface ItemVariantRecord {
   id: string;
   menuItemId: string;
   size: string | null;
+  sku: string | null;
   uomId: string | null;
   priceMinor: bigint;
   currencyCode: string;
@@ -129,12 +137,22 @@ export interface ChannelConfigRecord {
   enabled: boolean;
   priceOverrideMinor: bigint | null;
 }
+export interface AddOnVariantPriceRecord {
+  id: string;
+  addOnId: string;
+  variantId: string;
+  priceMinor: bigint;
+}
 export interface AddOnRecord {
   id: string;
   addOnGroupId: string;
   name: string;
   priceMinor: bigint;
   currencyCode: string;
+  available: boolean;
+  isDefault: boolean;
+  sortOrder: number;
+  variantPrices: AddOnVariantPriceRecord[];
 }
 export interface AddOnGroupRecord {
   id: string;
@@ -142,6 +160,9 @@ export interface AddOnGroupRecord {
   name: string;
   minSelect: number;
   maxSelect: number | null;
+  allowQuantity: boolean;
+  available: boolean;
+  sortOrder: number;
   addOns: AddOnRecord[];
 }
 export interface ItemRecord {

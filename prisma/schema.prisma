@@ -787,6 +787,7 @@ model ItemVariant {
   menuItemId   String         @db.Uuid
   menuItem     MenuItem       @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   size         String?
+  sku          String?
   uomId        String?        @db.Uuid
   uom          UnitOfMeasure? @relation(fields: [uomId], references: [id])
   priceMinor   BigInt
@@ -799,6 +800,8 @@ model ItemVariant {
   available    Boolean        @default(true)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+
+  addOnPrices AddOnVariantPrice[]
 
   @@index([menuItemId])
 }
@@ -816,13 +819,20 @@ model ItemChannelConfig {
 }
 
 model AddOnGroup {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  menuItemId String   @db.Uuid
-  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  name       String
-  minSelect  Int      @default(0)
-  maxSelect  Int?
-  addOns     AddOn[]
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  menuItemId    String   @db.Uuid
+  menuItem      MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name          String
+  // Explicit selection rules (doc 103 Stage A). Do not infer from display names.
+  // required  <=> minSelect >= 1
+  // single    <=> maxSelect == 1
+  // multiple  <=> maxSelect is null or > 1
+  minSelect     Int      @default(0)
+  maxSelect     Int?
+  allowQuantity Boolean  @default(false)
+  available     Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  addOns        AddOn[]
 
   @@index([menuItemId])
 }
@@ -832,10 +842,34 @@ model AddOn {
   addOnGroupId String     @db.Uuid
   addOnGroup   AddOnGroup @relation(fields: [addOnGroupId], references: [id], onDelete: Cascade)
   name         String
+  // Default price adjustment. Variant-specific overrides live on AddOnVariantPrice.
+  // A priced modifier is NOT a child sellable SKU.
   priceMinor   BigInt     @default(0)
   currencyCode String     @default("INR")
+  available    Boolean    @default(true)
+  isDefault    Boolean    @default(false)
+  sortOrder    Int        @default(0)
+
+  variantPrices AddOnVariantPrice[]
 
   @@index([addOnGroupId])
+}
+
+// Variant-specific modifier price (doc 103 G-MOD-3). Same Pepperoni modifier,
+// different adjustment per pizza size — not three unrelated products.
+model AddOnVariantPrice {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  addOnId    String      @db.Uuid
+  addOn      AddOn       @relation(fields: [addOnId], references: [id], onDelete: Cascade)
+  variantId  String      @db.Uuid
+  variant    ItemVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  priceMinor BigInt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([addOnId, variantId])
+  @@index([variantId])
+  @@index([addOnId])
 }
 
 // =====================================================================

@@ -1,5 +1,47 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
 import { DiscoveryService } from '../application/discovery.service';
+import type { OrderChannel } from '../../catalog/domain/catalog.types';
+
+class QuoteModifierSelectionDto {
+  @IsUUID()
+  modifierId!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantity?: number;
+}
+
+class QuoteModifierGroupDto {
+  @IsUUID()
+  groupId!: string;
+
+  @ValidateNested({ each: true })
+  @Type(() => QuoteModifierSelectionDto)
+  selections!: QuoteModifierSelectionDto[];
+}
+
+class MerchandiseQuoteDto {
+  @IsUUID()
+  variantId!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+
+  @IsOptional()
+  @IsIn(['DINE_IN', 'TAKE_AWAY', 'CURB_SIDE', 'SKIP_LINE', 'HOME_DELIVERY', 'CATERING'])
+  type?: OrderChannel;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => QuoteModifierGroupDto)
+  modifierGroups?: QuoteModifierGroupDto[];
+}
 
 /**
  * Public consumer discovery (doc 92). Reuses Restaurant + MenuItem repositories.
@@ -40,5 +82,10 @@ export class DiscoveryController {
   @Get('items/:id')
   item(@Param('id', ParseUUIDPipe) id: string) {
     return this.discovery.getItem(id);
+  }
+
+  @Post('quote')
+  quote(@Body() body: MerchandiseQuoteDto) {
+    return this.discovery.quoteItem(body);
   }
 }

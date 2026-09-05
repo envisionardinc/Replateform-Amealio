@@ -5,7 +5,7 @@ import type { PaymentIntentRecord } from '../../payment/domain/payment.types';
 import { CartRepository } from '../infrastructure/cart.repository';
 import { OrderRepository } from '../infrastructure/order.repository';
 import type { CreateOrderItemInput, OrderRecord, OrderTypeName } from '../domain/ordering.types';
-import { CartService } from './cart.service';
+import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
 import { OrderService } from './order.service';
 
 export type CheckoutSettlement = 'PREPAID' | 'COD' | 'PAY_LATER';
@@ -21,6 +21,10 @@ export interface CheckoutInput {
     variantId: string;
     quantity: number;
     customization?: Record<string, unknown> | null;
+    modifierGroups?: Array<{
+      groupId: string;
+      selections: Array<{ modifierId: string; quantity?: number }>;
+    }>;
     addOns?: unknown;
   }>;
   idempotencyKey?: string | null;
@@ -45,7 +49,7 @@ const ORDER_TYPES = new Set<OrderTypeName>([
 export class CheckoutService {
   constructor(
     private readonly carts: CartRepository,
-    private readonly cartService: CartService,
+    private readonly quotes: MerchandiseQuoteService,
     private readonly restaurants: RestaurantRepository,
     private readonly orders: OrderService,
     private readonly orderRepo: OrderRepository,
@@ -78,6 +82,7 @@ export class CheckoutService {
             variantId: it.variantId ?? '',
             quantity: it.quantity,
             customization: (it.customization as Record<string, unknown> | null) ?? null,
+            modifierGroups: undefined,
             addOns: it.addOns,
           }));
     if (sourceItems.length === 0 || sourceItems.some((i) => !i.variantId)) {
@@ -90,19 +95,25 @@ export class CheckoutService {
       if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
         throw new BadRequestException('each item requires a positive integer quantity');
       }
-      const line = await this.cartService.requireSellableVariant(it.variantId, type);
-      if (!restaurantId) restaurantId = line.restaurantId;
-      if (line.restaurantId !== restaurantId) {
+      const quote = await this.quotes.quote({
+        variantId: it.variantId,
+        quantity: it.quantity,
+        channel: type,
+        modifierGroups: it.modifierGroups,
+        addOns: it.modifierGroups ? undefined : it.addOns,
+      });
+      if (!restaurantId) restaurantId = quote.restaurantId;
+      if (quote.restaurantId !== restaurantId) {
         throw new BadRequestException('checkout items must belong to one restaurant');
       }
       priced.push({
-        menuItemId: line.menuItemId,
-        nameSnapshot: line.name,
-        variantSnapshot: line.size,
-        unitPriceMinor: line.priceMinor,
+        menuItemId: quote.menuItemId,
+        nameSnapshot: quote.itemName,
+        variantSnapshot: quote.variantSize,
+        unitPriceMinor: quote.unitMerchandiseMinor,
         quantity: it.quantity,
         customization: it.customization ?? null,
-        addOns: it.addOns ?? null,
+        addOns: this.quotes.snapshot(quote) as unknown as CreateOrderItemInput['addOns'],
       });
     }
     if (!restaurantId) {

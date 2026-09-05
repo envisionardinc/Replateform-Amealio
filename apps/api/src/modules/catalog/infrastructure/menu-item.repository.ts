@@ -9,6 +9,7 @@ import type {
   MenuItemRecord,
   OrderChannel,
 } from '../domain/catalog.types';
+import type { CatalogMerchandiseItem } from '../domain/merchandise-configuration';
 
 const ITEM_SELECT = {
   id: true,
@@ -90,10 +91,13 @@ export class MenuItemRepository {
         id: true,
         menuItemId: true,
         size: true,
+        sku: true,
         uomId: true,
         priceMinor: true,
         currencyCode: true,
         pax: true,
+        isDefault: true,
+        available: true,
       },
       orderBy: { priceMinor: 'asc' },
     });
@@ -166,11 +170,41 @@ export class MenuItemRepository {
             select: {
               id: true,
               size: true,
+              sku: true,
               priceMinor: true,
               currencyCode: true,
               available: true,
             },
             orderBy: { priceMinor: 'asc' },
+          },
+          addOnGroups: {
+            where: { available: true },
+            select: {
+              id: true,
+              name: true,
+              minSelect: true,
+              maxSelect: true,
+              allowQuantity: true,
+              available: true,
+              sortOrder: true,
+              addOns: {
+                where: { available: true },
+                select: {
+                  id: true,
+                  name: true,
+                  priceMinor: true,
+                  currencyCode: true,
+                  available: true,
+                  isDefault: true,
+                  sortOrder: true,
+                  variantPrices: {
+                    select: { variantId: true, priceMinor: true },
+                  },
+                },
+                orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+              },
+            },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
           },
         },
       });
@@ -183,6 +217,27 @@ export class MenuItemRepository {
             availability: row.availability as ItemAvailabilityName,
             isPublished: row.isPublished,
             variants: row.variants,
+            modifierGroups: row.addOnGroups.map((g) => ({
+              id: g.id,
+              name: g.name,
+              minSelect: g.minSelect,
+              maxSelect: g.maxSelect,
+              allowQuantity: g.allowQuantity,
+              available: g.available,
+              sortOrder: g.sortOrder,
+              required: g.minSelect >= 1,
+              singleSelect: g.maxSelect === 1,
+              modifiers: g.addOns.map((a) => ({
+                id: a.id,
+                name: a.name,
+                priceMinor: a.priceMinor,
+                currencyCode: a.currencyCode,
+                available: a.available,
+                isDefault: a.isDefault,
+                sortOrder: a.sortOrder,
+                variantPrices: a.variantPrices,
+              })),
+            })),
           }
         : null;
     } catch {
@@ -262,6 +317,9 @@ export class MenuItemRepository {
           name: true,
           minSelect: true,
           maxSelect: true,
+          allowQuantity: true,
+          available: true,
+          sortOrder: true,
           addOns: {
             select: {
               id: true,
@@ -269,13 +327,120 @@ export class MenuItemRepository {
               name: true,
               priceMinor: true,
               currencyCode: true,
+              available: true,
+              isDefault: true,
+              sortOrder: true,
+              variantPrices: {
+                select: { id: true, addOnId: true, variantId: true, priceMinor: true },
+              },
             },
-            orderBy: { name: 'asc' },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
           },
         },
-        orderBy: { name: 'asc' },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
     ]);
     return { ...item, variants, channelConfigs, addOnGroups: groups };
+  }
+
+  /**
+   * Catalog snapshot used to quote a variant + modifiers. Channel override
+   * applies to the variant base only (per-variant channel price remains deferred).
+   */
+  async findMerchandiseCatalog(
+    variantId: string,
+    channel?: OrderChannel,
+  ): Promise<{ catalog: CatalogMerchandiseItem; itemName: string } | null> {
+    try {
+      const row = await this.prisma.itemVariant.findUnique({
+        where: { id: variantId },
+        select: {
+          id: true,
+          size: true,
+          priceMinor: true,
+          currencyCode: true,
+          available: true,
+          menuItem: {
+            select: {
+              id: true,
+              name: true,
+              restaurantId: true,
+              merchantId: true,
+              availability: true,
+              isPublished: true,
+              deletedAt: true,
+              channelConfigs: {
+                where: channel ? { channel } : undefined,
+                select: { enabled: true, priceOverrideMinor: true },
+              },
+              addOnGroups: {
+                select: {
+                  id: true,
+                  name: true,
+                  minSelect: true,
+                  maxSelect: true,
+                  allowQuantity: true,
+                  available: true,
+                  addOns: {
+                    select: {
+                      id: true,
+                      addOnGroupId: true,
+                      name: true,
+                      priceMinor: true,
+                      available: true,
+                      isDefault: true,
+                      variantPrices: {
+                        where: { variantId },
+                        select: { priceMinor: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!row) return null;
+      const cfg = row.menuItem.channelConfigs[0] ?? null;
+      return {
+        itemName: row.menuItem.name,
+        catalog: {
+          menuItemId: row.menuItem.id,
+          merchantId: row.menuItem.merchantId,
+          restaurantId: row.menuItem.restaurantId,
+          isPublished: row.menuItem.isPublished,
+          deletedAt: row.menuItem.deletedAt,
+          availability: row.menuItem.availability as CatalogMerchandiseItem['availability'],
+          variant: {
+            id: row.id,
+            size: row.size,
+            priceMinor: cfg?.priceOverrideMinor ?? row.priceMinor,
+            available: row.available,
+            currencyCode: row.currencyCode,
+          },
+          channelEnabled: cfg ? cfg.enabled : null,
+          groups: row.menuItem.addOnGroups.map((g) => ({
+            id: g.id,
+            name: g.name,
+            minSelect: g.minSelect,
+            maxSelect: g.maxSelect,
+            available: g.available,
+            allowQuantity: g.allowQuantity,
+            modifiers: g.addOns.map((a) => ({
+              id: a.id,
+              groupId: a.addOnGroupId,
+              name: a.name,
+              defaultPriceMinor: a.priceMinor,
+              available: a.available,
+              isDefault: a.isDefault,
+              variantPriceMinor: a.variantPrices[0]?.priceMinor ?? null,
+            })),
+          })),
+        },
+      };
+    } catch {
+      return null;
+    }
   }
 }

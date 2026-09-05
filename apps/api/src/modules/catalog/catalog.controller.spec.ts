@@ -26,6 +26,7 @@ describe('CatalogController', () => {
     updateAddOnGroup: jest.fn(),
     createAddOn: jest.fn(),
     updateAddOn: jest.fn(),
+    setAddOnVariantPrice: jest.fn(),
   };
   const controller = new CatalogController(catalog as any, writes as any);
 
@@ -59,7 +60,7 @@ describe('CatalogController', () => {
       'getMenus', 'getSections', 'getItem', 'getItems', 'createMenu', 'updateMenu',
       'createSection', 'updateSection', 'reorderSections', 'createItem', 'updateItem',
       'createVariant', 'updateVariant', 'setChannelConfig', 'createAddOnGroup',
-      'updateAddOnGroup', 'createAddOn', 'updateAddOn',
+      'updateAddOnGroup', 'createAddOn', 'updateAddOn', 'setAddOnVariantPrice',
     ] as const;
 
     for (const method of methods) {

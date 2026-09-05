@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
+import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
 import type { CheckoutCatalogLine } from '../../catalog/domain/catalog.types';
 import { CartRepository } from '../infrastructure/cart.repository';
 import type { OrderTypeName } from '../domain/ordering.types';
@@ -14,6 +15,8 @@ export interface PricedCartItem {
   quantity: number;
   unitPriceMinor: string;
   lineTotalMinor: string;
+  variantPriceMinor: string;
+  modifierTotalMinor: string;
   currencyCode: string;
   available: boolean;
   customization: unknown;
@@ -36,6 +39,7 @@ export interface AddCartItemInput {
   restaurantId?: string;
   type?: OrderTypeName;
   customization?: Record<string, unknown> | null;
+  modifierGroups?: Array<{ groupId: string; selections: Array<{ modifierId: string; quantity?: number }> }>;
   addOns?: unknown;
 }
 
@@ -44,6 +48,7 @@ export class CartService {
   constructor(
     private readonly carts: CartRepository,
     private readonly menuItems: MenuItemRepository,
+    private readonly quotes: MerchandiseQuoteService,
   ) {}
 
   async getCart(userId: string): Promise<PricedCart> {
@@ -55,24 +60,30 @@ export class CartService {
     if (!Number.isInteger(input.quantity) || input.quantity <= 0) {
       throw new BadRequestException('quantity must be a positive integer');
     }
-    const line = await this.requireSellableVariant(input.variantId, input.type);
-    if (input.restaurantId && input.restaurantId !== line.restaurantId) {
+    const quote = await this.quotes.quote({
+      variantId: input.variantId,
+      quantity: input.quantity,
+      channel: input.type,
+      modifierGroups: input.modifierGroups,
+      addOns: input.modifierGroups ? undefined : input.addOns,
+    });
+    if (input.restaurantId && input.restaurantId !== quote.restaurantId) {
       throw new BadRequestException('variant does not belong to restaurantId');
     }
 
     let cart = await this.carts.getOrCreate(userId);
-    if (cart.restaurantId && cart.restaurantId !== line.restaurantId) {
+    if (cart.restaurantId && cart.restaurantId !== quote.restaurantId) {
       cart = await this.carts.replaceForRestaurant(
         cart.id,
-        line.restaurantId,
-        line.merchantId,
+        quote.restaurantId,
+        quote.merchantId,
         input.type ?? cart.type,
       );
     } else if (!cart.restaurantId) {
       cart = await this.carts.replaceForRestaurant(
         cart.id,
-        line.restaurantId,
-        line.merchantId,
+        quote.restaurantId,
+        quote.merchantId,
         input.type ?? cart.type,
       );
     } else if (input.type && cart.type !== input.type) {
@@ -80,11 +91,11 @@ export class CartService {
     }
 
     await this.carts.addItem(cart.id, {
-      menuItemId: line.menuItemId,
-      variantId: line.variantId,
+      menuItemId: quote.menuItemId,
+      variantId: quote.variantId,
       quantity: input.quantity,
       customization: (input.customization ?? undefined) as Prisma.InputJsonValue | undefined,
-      addOns: (input.addOns ?? undefined) as Prisma.InputJsonValue | undefined,
+      addOns: this.quotes.snapshot(quote) as unknown as Prisma.InputJsonValue,
     });
     return this.price(cart.id);
   }
@@ -113,28 +124,41 @@ export class CartService {
     let subtotal = 0n;
     let currencyCode = 'INR';
     for (const it of cart.items) {
-      const line = it.variantId
-        ? await this.menuItems.findVariantForCheckout(it.variantId, cart.type ?? undefined)
-        : null;
-      const available = !!line && this.isSellable(line);
-      const unit = line?.priceMinor ?? 0n;
-      const lineTotal = unit * BigInt(it.quantity);
-      if (available) subtotal += lineTotal;
-      if (line?.currencyCode) currencyCode = line.currencyCode;
-      items.push({
-        id: it.id,
-        menuItemId: it.menuItemId,
-        variantId: it.variantId,
-        name: line?.name ?? null,
-        variantSnapshot: line?.size ?? null,
-        quantity: it.quantity,
-        unitPriceMinor: unit.toString(),
-        lineTotalMinor: lineTotal.toString(),
-        currencyCode: line?.currencyCode ?? 'INR',
-        available,
-        customization: it.customization,
-        addOns: it.addOns,
-      });
+      if (!it.variantId) {
+        items.push(unpricedLine(it));
+        continue;
+      }
+      try {
+        const quote = await this.quotes.quote({
+          variantId: it.variantId,
+          quantity: it.quantity,
+          channel: cart.type ?? undefined,
+          addOns: it.addOns,
+        });
+        if (quote.currencyCode) currencyCode = quote.currencyCode;
+        subtotal += quote.lineMerchandiseMinor;
+        items.push({
+          id: it.id,
+          menuItemId: quote.menuItemId,
+          variantId: quote.variantId,
+          name: quote.itemName,
+          variantSnapshot: quote.variantSize,
+          quantity: it.quantity,
+          unitPriceMinor: quote.unitMerchandiseMinor.toString(),
+          lineTotalMinor: quote.lineMerchandiseMinor.toString(),
+          variantPriceMinor: quote.variantPriceMinor.toString(),
+          modifierTotalMinor: quote.modifierTotalMinor.toString(),
+          currencyCode: quote.currencyCode,
+          available: true,
+          customization: it.customization,
+          addOns: this.quotes.snapshot(quote),
+        });
+      } catch {
+        items.push({
+          ...unpricedLine(it),
+          available: false,
+        });
+      }
     }
     return {
       id: cart.id,
@@ -170,4 +194,30 @@ export class CartService {
       line.variantAvailable
     );
   }
+}
+
+function unpricedLine(it: {
+  id: string;
+  menuItemId: string | null;
+  variantId: string | null;
+  quantity: number;
+  customization: unknown;
+  addOns: unknown;
+}): PricedCartItem {
+  return {
+    id: it.id,
+    menuItemId: it.menuItemId,
+    variantId: it.variantId,
+    name: null,
+    variantSnapshot: null,
+    quantity: it.quantity,
+    unitPriceMinor: '0',
+    lineTotalMinor: '0',
+    variantPriceMinor: '0',
+    modifierTotalMinor: '0',
+    currencyCode: 'INR',
+    available: false,
+    customization: it.customization,
+    addOns: it.addOns,
+  };
 }

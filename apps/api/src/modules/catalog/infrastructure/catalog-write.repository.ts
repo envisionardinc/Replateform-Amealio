@@ -23,7 +23,7 @@ import type {
 const ITEM_INCLUDE = {
   variants: true,
   channelConfigs: true,
-  addOnGroups: { include: { addOns: true } },
+  addOnGroups: { include: { addOns: { include: { variantPrices: true } } } },
 } as const;
 
 /**
@@ -97,17 +97,21 @@ export class CatalogWriteRepository {
   }
   async addOnRestaurant(
     id: string,
-  ): Promise<{ addOnGroupId: string; restaurantId: string } | null> {
+  ): Promise<{ addOnGroupId: string; restaurantId: string; menuItemId: string } | null> {
     try {
       const a = await this.prisma.addOn.findUnique({
         where: { id },
         select: {
           addOnGroupId: true,
-          addOnGroup: { select: { menuItem: { select: { restaurantId: true } } } },
+          addOnGroup: { select: { menuItemId: true, menuItem: { select: { restaurantId: true } } } },
         },
       });
       return a
-        ? { addOnGroupId: a.addOnGroupId, restaurantId: a.addOnGroup.menuItem.restaurantId }
+        ? {
+            addOnGroupId: a.addOnGroupId,
+            menuItemId: a.addOnGroup.menuItemId,
+            restaurantId: a.addOnGroup.menuItem.restaurantId,
+          }
         : null;
     } catch {
       return null;
@@ -227,6 +231,9 @@ export class CatalogWriteRepository {
                   name: g.name,
                   ...(g.minSelect !== undefined ? { minSelect: g.minSelect } : {}),
                   maxSelect: g.maxSelect ?? null,
+                  ...(g.allowQuantity !== undefined ? { allowQuantity: g.allowQuantity } : {}),
+                  ...(g.available !== undefined ? { available: g.available } : {}),
+                  ...(g.sortOrder !== undefined ? { sortOrder: g.sortOrder } : {}),
                   ...(g.addOns && g.addOns.length
                     ? {
                         addOns: {
@@ -236,6 +243,9 @@ export class CatalogWriteRepository {
                             ...(a.currencyCode !== undefined
                               ? { currencyCode: a.currencyCode }
                               : {}),
+                            ...(a.available !== undefined ? { available: a.available } : {}),
+                            ...(a.isDefault !== undefined ? { isDefault: a.isDefault } : {}),
+                            ...(a.sortOrder !== undefined ? { sortOrder: a.sortOrder } : {}),
                           })),
                         },
                       }
@@ -284,6 +294,7 @@ export class CatalogWriteRepository {
       where: { id },
       data: {
         ...(input.size !== undefined ? { size: input.size } : {}),
+        ...(input.sku !== undefined ? { sku: input.sku } : {}),
         ...(input.uomId !== undefined ? { uomId: input.uomId } : {}),
         ...(input.priceMinor !== undefined ? { priceMinor: input.priceMinor } : {}),
         ...(input.currencyCode !== undefined ? { currencyCode: input.currencyCode } : {}),
@@ -333,7 +344,14 @@ export class CatalogWriteRepository {
   // ---- Add-ons ----
   async createAddOnGroup(
     menuItemId: string,
-    data: { name: string; minSelect?: number; maxSelect?: number | null },
+    data: {
+      name: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+    },
   ): Promise<AddOnGroupRecord> {
     const row = await this.prisma.addOnGroup.create({
       data: {
@@ -341,14 +359,24 @@ export class CatalogWriteRepository {
         name: data.name,
         ...(data.minSelect !== undefined ? { minSelect: data.minSelect } : {}),
         maxSelect: data.maxSelect ?? null,
+        ...(data.allowQuantity !== undefined ? { allowQuantity: data.allowQuantity } : {}),
+        ...(data.available !== undefined ? { available: data.available } : {}),
+        ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
       },
-      include: { addOns: true },
+      include: { addOns: { include: { variantPrices: true } } },
     });
     return toGroup(row);
   }
   async updateAddOnGroup(
     id: string,
-    data: { name?: string; minSelect?: number; maxSelect?: number | null },
+    data: {
+      name?: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+    },
   ): Promise<AddOnGroupRecord> {
     const row = await this.prisma.addOnGroup.update({
       where: { id },
@@ -356,14 +384,24 @@ export class CatalogWriteRepository {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.minSelect !== undefined ? { minSelect: data.minSelect } : {}),
         ...(data.maxSelect !== undefined ? { maxSelect: data.maxSelect } : {}),
+        ...(data.allowQuantity !== undefined ? { allowQuantity: data.allowQuantity } : {}),
+        ...(data.available !== undefined ? { available: data.available } : {}),
+        ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
       },
-      include: { addOns: true },
+      include: { addOns: { include: { variantPrices: true } } },
     });
     return toGroup(row);
   }
   async createAddOn(
     addOnGroupId: string,
-    data: { name: string; priceMinor?: bigint; currencyCode?: string },
+    data: {
+      name: string;
+      priceMinor?: bigint;
+      currencyCode?: string;
+      available?: boolean;
+      isDefault?: boolean;
+      sortOrder?: number;
+    },
   ): Promise<AddOnRecord> {
     const row = await this.prisma.addOn.create({
       data: {
@@ -371,14 +409,24 @@ export class CatalogWriteRepository {
         name: data.name,
         ...(data.priceMinor !== undefined ? { priceMinor: data.priceMinor } : {}),
         ...(data.currencyCode !== undefined ? { currencyCode: data.currencyCode } : {}),
+        ...(data.available !== undefined ? { available: data.available } : {}),
+        ...(data.isDefault !== undefined ? { isDefault: data.isDefault } : {}),
+        ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
       },
-      select: ADDON_SELECT,
+      include: { variantPrices: true },
     });
-    return row as AddOnRecord;
+    return toAddOn(row);
   }
   async updateAddOn(
     id: string,
-    data: { name?: string; priceMinor?: bigint; currencyCode?: string },
+    data: {
+      name?: string;
+      priceMinor?: bigint;
+      currencyCode?: string;
+      available?: boolean;
+      isDefault?: boolean;
+      sortOrder?: number;
+    },
   ): Promise<AddOnRecord> {
     const row = await this.prisma.addOn.update({
       where: { id },
@@ -386,10 +434,30 @@ export class CatalogWriteRepository {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.priceMinor !== undefined ? { priceMinor: data.priceMinor } : {}),
         ...(data.currencyCode !== undefined ? { currencyCode: data.currencyCode } : {}),
+        ...(data.available !== undefined ? { available: data.available } : {}),
+        ...(data.isDefault !== undefined ? { isDefault: data.isDefault } : {}),
+        ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
       },
-      select: ADDON_SELECT,
+      include: { variantPrices: true },
     });
-    return row as AddOnRecord;
+    return toAddOn(row);
+  }
+
+  async upsertAddOnVariantPrice(
+    addOnId: string,
+    variantId: string,
+    priceMinor: bigint,
+  ): Promise<AddOnRecord> {
+    await this.prisma.addOnVariantPrice.upsert({
+      where: { addOnId_variantId: { addOnId, variantId } },
+      create: { addOnId, variantId, priceMinor },
+      update: { priceMinor },
+    });
+    const row = await this.prisma.addOn.findUniqueOrThrow({
+      where: { id: addOnId },
+      include: { variantPrices: true },
+    });
+    return toAddOn(row);
   }
 }
 
@@ -415,6 +483,7 @@ const VARIANT_SELECT = {
   id: true,
   menuItemId: true,
   size: true,
+  sku: true,
   uomId: true,
   priceMinor: true,
   currencyCode: true,
@@ -422,17 +491,11 @@ const VARIANT_SELECT = {
   isDefault: true,
   available: true,
 } as const;
-const ADDON_SELECT = {
-  id: true,
-  addOnGroupId: true,
-  name: true,
-  priceMinor: true,
-  currencyCode: true,
-} as const;
 
 function variantData(input: VariantInput) {
   return {
     size: input.size ?? null,
+    sku: input.sku ?? null,
     uomId: input.uomId ?? null,
     priceMinor: input.priceMinor,
     ...(input.currencyCode !== undefined ? { currencyCode: input.currencyCode } : {}),
@@ -479,6 +542,25 @@ function toItem(row: any): ItemRecord {
   };
 }
 
+function toAddOn(row: any): AddOnRecord {
+  return {
+    id: row.id,
+    addOnGroupId: row.addOnGroupId,
+    name: row.name,
+    priceMinor: row.priceMinor,
+    currencyCode: row.currencyCode,
+    available: row.available,
+    isDefault: row.isDefault,
+    sortOrder: row.sortOrder,
+    variantPrices: (row.variantPrices ?? []).map((p: any) => ({
+      id: p.id,
+      addOnId: p.addOnId,
+      variantId: p.variantId,
+      priceMinor: p.priceMinor,
+    })),
+  };
+}
+
 function toGroup(row: any): AddOnGroupRecord {
   return {
     id: row.id,
@@ -486,12 +568,9 @@ function toGroup(row: any): AddOnGroupRecord {
     name: row.name,
     minSelect: row.minSelect,
     maxSelect: row.maxSelect,
-    addOns: (row.addOns ?? []).map((a: any) => ({
-      id: a.id,
-      addOnGroupId: a.addOnGroupId,
-      name: a.name,
-      priceMinor: a.priceMinor,
-      currencyCode: a.currencyCode,
-    })),
+    allowQuantity: row.allowQuantity,
+    available: row.available,
+    sortOrder: row.sortOrder,
+    addOns: (row.addOns ?? []).map(toAddOn),
   };
 }

@@ -33,6 +33,26 @@ const STATUSES = [
   'RETURNED',
 ] as const;
 
+export class ModifierSelectionDto {
+  @IsUUID()
+  modifierId!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantity?: number;
+}
+
+export class ModifierGroupSelectionDto {
+  @IsUUID()
+  groupId!: string;
+
+  @ValidateNested({ each: true })
+  @Type(() => ModifierSelectionDto)
+  selections!: ModifierSelectionDto[];
+}
+
 export class AddCartItemDto {
   @IsUUID()
   variantId!: string;
@@ -54,6 +74,12 @@ export class AddCartItemDto {
   @IsObject()
   customization?: Record<string, unknown>;
 
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ModifierGroupSelectionDto)
+  modifierGroups?: ModifierGroupSelectionDto[];
+
+  /** Accepted only when it is the Stage A structured snapshot. Flat ids are rejected. */
   @IsOptional()
   addOns?: unknown;
 }
@@ -77,6 +103,11 @@ export class CheckoutItemDto {
   @IsOptional()
   @IsObject()
   customization?: Record<string, unknown>;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ModifierGroupSelectionDto)
+  modifierGroups?: ModifierGroupSelectionDto[];
 
   @IsOptional()
   addOns?: unknown;

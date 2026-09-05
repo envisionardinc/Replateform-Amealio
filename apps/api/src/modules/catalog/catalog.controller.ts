@@ -163,7 +163,14 @@ export class CatalogController {
   createAddOnGroup(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('menuItemId') menuItemId: string,
-    @Body() input: { name: string; minSelect?: number; maxSelect?: number | null },
+    @Body() input: {
+      name: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+    },
   ) {
     return this.writes.createAddOnGroup(this.principal(req), menuItemId, input);
   }
@@ -173,7 +180,14 @@ export class CatalogController {
   updateAddOnGroup(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('groupId') groupId: string,
-    @Body() input: { name?: string; minSelect?: number; maxSelect?: number | null },
+    @Body() input: {
+      name?: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+    },
   ) {
     return this.writes.updateAddOnGroup(this.principal(req), groupId, input);
   }
@@ -183,7 +197,14 @@ export class CatalogController {
   createAddOn(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('addOnGroupId') addOnGroupId: string,
-    @Body() input: { name: string; priceMinor?: bigint; currencyCode?: string },
+    @Body() input: {
+      name: string;
+      priceMinor?: bigint;
+      currencyCode?: string;
+      available?: boolean;
+      isDefault?: boolean;
+      sortOrder?: number;
+    },
   ) {
     return this.writes.createAddOn(this.principal(req), addOnGroupId, normalizeMoney(input));
   }
@@ -193,9 +214,26 @@ export class CatalogController {
   updateAddOn(
     @Req() req: Request & RequestWithStaffPrincipal,
     @Param('addOnId') addOnId: string,
-    @Body() input: { name?: string; priceMinor?: bigint; currencyCode?: string },
+    @Body() input: {
+      name?: string;
+      priceMinor?: bigint;
+      currencyCode?: string;
+      available?: boolean;
+      isDefault?: boolean;
+      sortOrder?: number;
+    },
   ) {
     return this.writes.updateAddOn(this.principal(req), addOnId, normalizeMoney(input));
+  }
+
+  @Post('add-ons/:addOnId/variant-prices')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  setAddOnVariantPrice(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Param('addOnId') addOnId: string,
+    @Body() input: { variantId: string; priceMinor: bigint },
+  ) {
+    return this.writes.setAddOnVariantPrice(this.principal(req), addOnId, normalizeMoney(input));
   }
 }
 

@@ -202,7 +202,14 @@ export class CatalogWriteService {
   async createAddOnGroup(
     principal: StaffPrincipal,
     menuItemId: string,
-    input: { name: string; minSelect?: number; maxSelect?: number | null },
+    input: {
+      name: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+    },
   ): Promise<AddOnGroupRecord> {
     await this.assertItem(principal, menuItemId);
     if (!nonEmpty(input.name)) throw new BadRequestException('name is required');
@@ -213,7 +220,14 @@ export class CatalogWriteService {
   async updateAddOnGroup(
     principal: StaffPrincipal,
     groupId: string,
-    input: { name?: string; minSelect?: number; maxSelect?: number | null },
+    input: {
+      name?: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+    },
   ): Promise<AddOnGroupRecord> {
     const g = await this.repo.groupRestaurant(groupId);
     if (!g) throw new NotFoundException('Add-on group not found');
@@ -228,7 +242,14 @@ export class CatalogWriteService {
   async createAddOn(
     principal: StaffPrincipal,
     addOnGroupId: string,
-    input: { name: string; priceMinor?: bigint; currencyCode?: string },
+    input: {
+      name: string;
+      priceMinor?: bigint;
+      currencyCode?: string;
+      available?: boolean;
+      isDefault?: boolean;
+      sortOrder?: number;
+    },
   ): Promise<AddOnRecord> {
     const g = await this.repo.groupRestaurant(addOnGroupId);
     if (!g) throw new NotFoundException('Add-on group not found');
@@ -243,7 +264,14 @@ export class CatalogWriteService {
   async updateAddOn(
     principal: StaffPrincipal,
     addOnId: string,
-    input: { name?: string; priceMinor?: bigint; currencyCode?: string },
+    input: {
+      name?: string;
+      priceMinor?: bigint;
+      currencyCode?: string;
+      available?: boolean;
+      isDefault?: boolean;
+      sortOrder?: number;
+    },
   ): Promise<AddOnRecord> {
     const a = await this.repo.addOnRestaurant(addOnId);
     if (!a) throw new NotFoundException('Add-on not found');
@@ -255,6 +283,23 @@ export class CatalogWriteService {
       throw new BadRequestException('priceMinor must be >= 0');
     }
     return this.repo.updateAddOn(addOnId, input);
+  }
+
+  async setAddOnVariantPrice(
+    principal: StaffPrincipal,
+    addOnId: string,
+    input: { variantId: string; priceMinor: bigint },
+  ): Promise<AddOnRecord> {
+    const a = await this.repo.addOnRestaurant(addOnId);
+    if (!a) throw new NotFoundException('Add-on not found');
+    await this.assertRestaurant(principal, a.restaurantId);
+    if (input.priceMinor < 0n) throw new BadRequestException('priceMinor must be >= 0');
+    const v = await this.repo.variantRestaurant(input.variantId);
+    if (!v) throw new NotFoundException('Variant not found');
+    if (v.menuItemId !== a.menuItemId) {
+      throw new BadRequestException('variant does not belong to the same item as this modifier');
+    }
+    return this.repo.upsertAddOnVariantPrice(addOnId, input.variantId, input.priceMinor);
   }
 
   // ---- tenancy helpers ----

@@ -84,7 +84,19 @@ export function CartScreen() {
                 <p className="lede">
                   {line.variantSnapshot ?? ''} ·{' '}
                   {formatMinor(line.unitPriceMinor, line.currencyCode)} × {line.quantity}
+                  {line.modifierTotalMinor && Number(line.modifierTotalMinor) > 0
+                    ? ` · customizations ${formatMinor(line.modifierTotalMinor, line.currencyCode)}`
+                    : ''}
                 </p>
+                {line.addOns?.modifierGroups?.some((g) => (g.selections?.length ?? 0) > 0) ? (
+                  <p className="lede">
+                    {line.addOns.modifierGroups.reduce(
+                      (n, g) => n + (g.selections?.length ?? 0),
+                      0,
+                    )}{' '}
+                    selected option(s)
+                  </p>
+                ) : null}
                 {!line.available ? (
                   <Badge tone="warning">Unavailable — not in subtotal</Badge>
                 ) : null}

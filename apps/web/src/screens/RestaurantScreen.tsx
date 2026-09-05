@@ -59,8 +59,10 @@ export function RestaurantScreen() {
           <Banner tone="empty">This restaurant has no published items.</Banner>
         ) : null}
         {items.map((item) => {
-          const variant = item.variants[0];
+          const variant = item.variants.find((row) => row.available) ?? item.variants[0];
           const sellable = item.availability === 'AVAILABLE' && variant?.available;
+          const configurable =
+            item.variants.length > 1 || (item.modifierGroups ?? []).some((g) => g.available);
           return (
             <Card key={item.id} media={item.name}>
               <div className="row">
@@ -71,13 +73,14 @@ export function RestaurantScreen() {
                   <p className="lede">{item.description || item.availability}</p>
                   {variant ? (
                     <p className="price">
+                      {configurable ? 'From ' : ''}
                       {formatMinor(variant.priceMinor, variant.currencyCode)}
                       {variant.size ? ` · ${variant.size}` : ''}
                     </p>
                   ) : null}
                   {!sellable ? <Badge tone="warning">Unavailable</Badge> : null}
                 </div>
-                <Link to={`/items/${item.id}`}>Details</Link>
+                <Link to={`/items/${item.id}`}>{configurable ? 'Customize' : 'Details'}</Link>
               </div>
             </Card>
           );

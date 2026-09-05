@@ -89,9 +89,34 @@ export type Restaurant = {
 export type ItemVariant = {
   id: string;
   size: string | null;
+  sku?: string | null;
   priceMinor: string;
   currencyCode: string;
   available: boolean;
+};
+
+export type CatalogModifier = {
+  id: string;
+  name: string;
+  priceMinor: string;
+  currencyCode: string;
+  available: boolean;
+  isDefault: boolean;
+  sortOrder: number;
+  variantPrices: Array<{ variantId: string; priceMinor: string }>;
+};
+
+export type CatalogModifierGroup = {
+  id: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number | null;
+  allowQuantity: boolean;
+  available: boolean;
+  sortOrder: number;
+  required: boolean;
+  singleSelect: boolean;
+  modifiers: CatalogModifier[];
 };
 
 export type MenuItem = {
@@ -102,6 +127,37 @@ export type MenuItem = {
   availability: string;
   isPublished: boolean;
   variants: ItemVariant[];
+  modifierGroups?: CatalogModifierGroup[];
+};
+
+export type ModifierGroupPayload = {
+  groupId: string;
+  selections: Array<{ modifierId: string; quantity?: number }>;
+};
+
+export type MerchandiseQuote = {
+  variantId: string;
+  menuItemId: string;
+  restaurantId: string;
+  quantity: number;
+  currencyCode: string;
+  variantPriceMinor: string;
+  modifierTotalMinor: string;
+  unitMerchandiseMinor: string;
+  lineMerchandiseMinor: string;
+  selections: Array<{
+    groupId: string;
+    modifierId: string;
+    name: string;
+    quantity: number;
+    priceAdjustmentMinor: string;
+  }>;
+};
+
+export type MerchandiseSnapshot = {
+  schema?: string;
+  variantId?: string;
+  modifierGroups?: ModifierGroupPayload[];
 };
 
 export type TaxonomyChip = {
@@ -143,8 +199,11 @@ export type PricedCartItem = {
   quantity: number;
   unitPriceMinor: string;
   lineTotalMinor: string;
+  variantPriceMinor?: string;
+  modifierTotalMinor?: string;
   currencyCode: string;
   available: boolean;
+  addOns?: MerchandiseSnapshot | null;
 };
 
 export type PricedCart = {
@@ -236,6 +295,16 @@ export const discoverApi = {
   menu: (id: string) =>
     api<{ restaurantId: string; items: MenuItem[] }>(`/api/v1/discover/restaurants/${id}/menu`),
   item: (id: string) => api<MenuItem>(`/api/v1/discover/items/${id}`),
+  quote: (body: {
+    variantId: string;
+    quantity: number;
+    type?: string;
+    modifierGroups?: ModifierGroupPayload[];
+  }) =>
+    api<MerchandiseQuote>('/api/v1/discover/quote', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
 
 export const authApi = {
@@ -260,8 +329,13 @@ export const authApi = {
 
 export const cartApi = {
   get: () => api<PricedCart>('/api/v1/cart'),
-  add: (body: { variantId: string; quantity: number; restaurantId?: string; type?: string }) =>
-    api<PricedCart>('/api/v1/cart/items', { method: 'POST', body: JSON.stringify(body) }),
+  add: (body: {
+    variantId: string;
+    quantity: number;
+    restaurantId?: string;
+    type?: string;
+    modifierGroups?: ModifierGroupPayload[];
+  }) => api<PricedCart>('/api/v1/cart/items', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, quantity: number) =>
     api<PricedCart>(`/api/v1/cart/items/${id}`, {
       method: 'PATCH',

@@ -411,6 +411,44 @@ select:focus {
   color: var(--ame-navy);
 }
 
+.modifier-group {
+  margin: 0 0 var(--ame-space-4);
+}
+
+.modifier-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--ame-space-2);
+  margin-bottom: var(--ame-space-2);
+}
+
+.modifier-group-head h2 {
+  margin: 0;
+  font-size: var(--ame-fs-md);
+}
+
+.modifier-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ame-space-2);
+}
+
+.modifier-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ame-space-1);
+  font: 600 var(--ame-fs-sm) / 1 var(--ame-font);
+  color: var(--ame-navy);
+}
+
+.modifier-qty .btn {
+  min-height: var(--ame-touch);
+  min-width: var(--ame-touch);
+  padding: 0;
+}
+
 .sticky-cta {
   position: sticky;
   bottom: calc(var(--ame-tabbar) + var(--ame-space-2));

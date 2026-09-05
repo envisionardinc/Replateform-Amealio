@@ -122,3 +122,48 @@ Celebration Packages / Celebrations / Occasions / Festivals. Combos/bundles. Tax
 Invalid merchandise payloads (including flat addon ids) map to HTTP 400 via `MerchandiseQuoteService`. Default required-group selections appear in the quote before optional toppings; assertions match by modifier id, not array index.
 
 **Stop.** Stage B (Menu + Merchant Catalog consistency) waits for explicit GO.
+
+---
+
+## Part L — UX adaptation map
+
+Target UX follows the canonical contract, not frozen legacy visual parity. The UI is never the price/validation authority.
+
+Existing target apps: `apps/web` (consumer) and `apps/merchant` (order operations only). There is **no** Super Admin or Merchant catalog UI in the TurboRepo yet.
+
+### Consumer / User (`apps/web`)
+
+| Surface | Class | Stage A action |
+|---|---|---|
+| Item: variant/size selection | **IMPROVE** | Replaced `<select>` with design-system chips. Size remains the evidenced variant axis. |
+| Item: modifier groups + rules | **CORRECT** / **NEW** | Legacy/target item page sent variant only. Required groups would now 400. Screen now configures groups, respects required/min/max/single/multi/qty/availability in UX, and submits structured `modifierGroups`. Server still validates. |
+| Item: live merchandise price | **CORRECT** | Catalog variant price is no longer presented as the payable total. `POST /discover/quote` is the displayed merchandise price. Client never sends money. |
+| Restaurant list starting price | **IMPROVE** | Shows “From …” / Customize when variants or modifier groups exist. Does not add-to-cart from the list. |
+| Cart line merchandise | **IMPROVE** | Still server-priced. Shows modifier adjustment + selected-option count from `merchandise.v1`. |
+| Checkout / payment / tip / tax | **PRESERVE** | Unchanged. Existing checkout engine; this slice does not invent rates. |
+| Guest cart | **FUTURE** | Still sign-in required. |
+| Full customization sheet / photos / taste sliders | **FUTURE** | Unpriced `customization` JSON remains available; no UI yet. |
+
+### Merchant Catalog / Menu Management (`apps/merchant`)
+
+| Surface | Class | Stage A action |
+|---|---|---|
+| Order list / kitchen transitions | **PRESERVE** | Out of Stage A. No catalog screens exist here. |
+| Item / variant / modifier authoring | **NEW** | Required later: create item, variants, modifier groups, selection rules, defaults, availability, channel config. |
+| Variant-specific modifier pricing | **NEW** | Required later: explicit override UI (`POST /catalog/add-ons/:id/variant-prices`). Do not encode prices in names. |
+| Standard vs Custom Menu | **FUTURE** | Stage B. Same orderability rules on both surfaces. |
+| Combo / package / celebration config | **FUTURE** | Later stages. |
+
+Do **not** build a merchant catalog SPA in this slice. The write API is the contract those screens will use.
+
+### Super Admin Global Catalog
+
+| Surface | Class | Stage A action |
+|---|---|---|
+| Global catalogue / item admin | **FUTURE** | `apps/api` `platform-catalog` is unchanged. No target Super Admin app exists. |
+| Global variants + reusable modifier groups | **NEW** | Later Super Admin must author variants and modifier groups (not flatten modifiers into child SKUs). |
+| Materialize → merchant catalog | **PRESERVE** (lineage) / **NEW** (fields) | Copy, not live inheritance. Later copy: variant `sku`, group rules, modifier defaults, `AddOnVariantPrice`. |
+
+### Design system
+
+Consumer Stage A uses existing `apps/web` tokens, Inter, Chip/Button/Card/Banner/Badge. No legacy visual clone.

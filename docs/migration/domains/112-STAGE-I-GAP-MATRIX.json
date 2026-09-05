@@ -2,7 +2,7 @@
   "document": "112-STAGE-I-GLOBAL-MERCHANT-CATALOG-RECONCILIATION",
   "date": "2026-09-05",
   "stage": "I",
-  "status": "forensic_only",
+  "status": "slice_implemented",
   "acceptedHead": "a5645e0d6636e8d7067c764c0e2dc2d4cc7c3e1a",
   "implementation": "DEFER",
   "classification": ["PRESERVE", "IMPROVE", "CORRECT", "OWNER_DECISION", "FUTURE"],
@@ -54,7 +54,7 @@
     "experienceMigration": "prisma/migrations/20260904180000_platform_experience_catalogue/migration.sql",
     "experienceMapper": "apps/api/src/modules/experience/domain/platform-folder-media.mapper.ts",
     "merchantCatalog": "apps/api/src/modules/catalog",
-    "merchantUiCatalog": false
+    "merchantUiCatalog": true
   },
   "itemFieldMap": [
     {"field": "identity", "class": "TRANSFORM"},
@@ -105,7 +105,7 @@
     {"id": "I-A-9", "domain": "global_item", "class": "OWNER_DECISION", "decision": "OD-I-DUP", "summary": "Legacy name-per-vendor vs target multi-copy"},
     {"id": "I-A-10", "domain": "global_item", "class": "OWNER_DECISION", "decision": "OD-I-TEMP", "summary": "Temp-local + commit path absent on Nest"},
     {"id": "I-B-1", "domain": "merchant_item", "class": "PRESERVE", "summary": "Existing MenuItem graph is the operational catalog"},
-    {"id": "I-B-2", "domain": "merchant_item", "class": "IMPROVE", "summary": "No merchant catalog / add-from-global UI"},
+    {"id": "I-B-2", "domain": "merchant_item", "class": "IMPROVE", "summary": "Merchant catalog + add-from-global UI on apps/merchant"},
     {"id": "I-C-1", "domain": "chain", "class": "FUTURE", "summary": "Legacy chain catalogue exists; not in target"},
     {"id": "I-D-1", "domain": "experience_folder", "class": "PRESERVE", "summary": "Platform folder + URL media API exists"},
     {"id": "I-D-2", "domain": "experience_folder", "class": "PRESERVE", "summary": "No server Experience clone"},
@@ -133,7 +133,7 @@
     "OD-I-TEMP": "require_temp_local_two_phase_on_nest"
   },
   "firstSlice": {
-    "decision": "DEFER",
+    "decision": "IMPLEMENTED",
     "reason": [
       "forensic_hard_stop",
       "server_foundations_already_exist",
@@ -147,7 +147,7 @@
       "exclude": ["chain", "temp_local", "delete", "upload", "experience_server_clone", "celebrations", "stage_h", "stage_j"]
     }
   },
-  "productionBehaviorChanged": false,
+  "productionBehaviorChanged": true,
   "celebrationsChanged": false,
   "stageJStarted": false
 }

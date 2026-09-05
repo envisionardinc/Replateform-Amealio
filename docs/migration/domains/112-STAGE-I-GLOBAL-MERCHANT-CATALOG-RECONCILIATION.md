@@ -1,14 +1,15 @@
 # 112 — Stage I: Global / Merchant Catalog + Global Experience Catalogue
 
-**Status:** FORENSIC ONLY — L1–L4 contract. **No implementation in this task.**  
+**Status:** FORENSIC COMPLETE + smallest justified slice IMPLEMENTED.  
 **Date:** 2026-09-05  
-**Accepted HEAD at start:** `a5645e0d6636e8d7067c764c0e2dc2d4cc7c3e1a`  
+**Accepted HEAD at forensic start:** `a5645e0d6636e8d7067c764c0e2dc2d4cc7c3e1a`  
+**Implementation start HEAD:** `6704b296e54e1ffb1fc738750e4bc87550cd5088`  
 **Governing rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  
 **Authoritative prior forensics:** [75](./75-PLATFORM-CATALOG-REALITY-RECONCILIATION.md) (supersedes doc 34 “no Global Catalog”) · [76](./76-GLOBAL-CATALOG-MATERIALIZATION-FORENSIC-MAP.md) · [77](./77-GLOBAL-ITEM-FIELD-PRESERVATION-MAP.md) · [78](./78-GLOBAL-CATALOG-API-CONTRACT-FORENSIC-TRACE.md) · [82](./82-GLOBAL-ITEM-CATALOGUE-TARGET-VALIDATION.md) · [83](./83-GLOBAL-EXPERIENCE-CATALOGUE-FORENSIC-CONTRACT.md) · [84](./84-MERCHANT-EXPERIENCE-MEDIA-RECONCILIATION.md) · [85](./85-MERCHANT-EXPERIENCE-NEST-CUTOVER.md) · [86](./86-EXPERIENCE-UPLOAD-ASSETS-FORENSIC-CONTRACT.md)  
 **Do not merge with:** Stage G merchandising · Stage H personalization (DEFERRED) · Celebration Packages  
 **Machine-readable matrix:** [112-STAGE-I-GAP-MATRIX.json](./112-STAGE-I-GAP-MATRIX.json)
 
-**Hard stop:** this pass produces the Stage I contract only. Do not implement UI, delete, temp-local, chain, upload, live sync, or Celebration work here. Do not start Stage J.
+**Implementation slice:** Super Admin Global Item Catalog UI and merchant Add from Global, hosted as role-gated routes on the existing staff app (`apps/merchant`). No new frontend application. No Chain Catalog, temp-local, Global Item PATCH/DELETE, Experience, Celebration, Stage H, or Stage J.
 
 ---
 
@@ -399,35 +400,27 @@ Legacy onboarding uses preview then commit. Target direct materialize is the oth
 
 ## 14. Implementation recommendation
 
-### Decision: **B. DEFER** (this task)
+### Decision: **smallest justified slice implemented**
 
-Do not implement in this forensic pass.
+The forensic contract is unchanged. The following production slice is now live on the existing target:
 
-**Why**
+1. Super Admin Global Catalog list / create / detail / create category / create item (existing POST/GET/PATCH catalog; no item PATCH; no delete). Hosted at `/global-catalog` on `apps/merchant` for `SUPER_ADMIN` only.  
+2. Merchant Add from Global calling existing `materialize` (unpublished copy + `sourcePayload.product`).  
+3. Merchant catalog list/detail via existing `/catalog` plus `GET /catalog/restaurants` (principal merchant only).  
+4. Optional `catalogId` on materialize validates source ownership. Duplicate copies remain allowed (`source_item_id`, `menu_item_id`). No temp-local.  
+5. **Still out:** chain, temp-local, delete, upload, Experience UI/clone, celebrations, Stage H/J, Global Item PATCH.
 
-1. The prompt requires a hard stop after L1–L4.  
-2. Contracts A/B/D/E **already have server foundations** (migrations `20260903160000_global_catalog_source`, `20260904180000_platform_experience_catalogue`; modules + tests). Building parallel systems would be wrong.  
-3. Remaining work is mostly **UI** plus optional completeness (delete, dup rule, temp-local). OD-I-DUP and OD-I-TEMP still sit in front of “merchant import complete.”  
-4. Implementing UI now would change production behavior without a reviewed GO on this Stage I contract.  
-5. Celebration and Stage J are out of bounds.
-
-### Proposed slice — next GO only (do not build now)
-
-If reviewers accept “exercise existing APIs, no new domain”:
-
-1. Super Admin Global Catalog list / create / detail / create item (existing POST/GET/PATCH).  
-2. Merchant “add from global” calling existing `materialize` (unpublished copy + optional `sourcePayload.product`).  
-3. Merchant sees the copy via existing `/catalog`; edits via existing write APIs; consumer still only sees published Stage C items.  
-4. Tests already on platform-catalog + experience catalogue remain the regression base; add UI e2e only if UI ships.  
-5. **Still out:** chain, temp-local, delete, upload, Experience server clone, celebrations, Stage H/J.
-
-If reviewers want import-complete first: resolve OD-I-DUP (and optionally OD-I-TEMP) before UI.
+OD-I-DUP and OD-I-TEMP remain unresolved owner decisions and were not assumed.
 
 ---
 
 ## 15. Confirmation
 
-- No Prisma / API / UI / ranking / Stage G / Stage H changes in this task  
-- Celebration Packages **not** investigated beyond the hard boundary  
+- Schema unchanged (no migration). Existing `platform_catalog_*` tables reused.  
+- Super Admin UI is role-gated on `apps/merchant` (`/global-catalog`). No `apps/admin`.  
+- Merchant Add from Global uses existing `POST /platform-catalog/global-items/:id/materialize`.  
+- `GET /catalog/restaurants` lists restaurants from the authenticated merchant principal only.  
+- Optional materialize `catalogId` validates source ownership; it does not change OD-I-DUP.  
+- No Chain Catalog, temp-local, Global delete, Global Item PATCH, Experience, Celebration, Stage H, or Stage J.  
 - Stage J **not** started  
 - Upload contract (86) **untouched**

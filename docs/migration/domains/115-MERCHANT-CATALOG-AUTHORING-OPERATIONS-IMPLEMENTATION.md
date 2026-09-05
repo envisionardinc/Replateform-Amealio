@@ -18,7 +18,7 @@ Accepted prior slices at that HEAD: Stages A–G implemented; Stage I Global →
 
 ## 2. Final HEAD
 
-Documentation commit on `replatform/backend-consolidation`. A follow-up stamp records this file's commit SHA in §2.
+`9cafccee96bc8c6480349a249850b537cfffc386` on `replatform/backend-consolidation`.
 
 ## 3. Commits
 

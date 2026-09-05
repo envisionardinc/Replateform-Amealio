@@ -124,7 +124,13 @@ describe('merchandise selection (consumer Stage A)', () => {
       required: true,
       singleSelect: true,
       modifiers: [
-        modifier({ id: 'thin', name: 'Thin Crust', priceMinor: '0', isDefault: true, available: false }),
+        modifier({
+          id: 'thin',
+          name: 'Thin Crust',
+          priceMinor: '0',
+          isDefault: true,
+          available: false,
+        }),
         modifier({ id: 'thick', name: 'Thick Crust', priceMinor: '50' }),
       ],
     });

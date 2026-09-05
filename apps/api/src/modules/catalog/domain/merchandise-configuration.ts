@@ -390,7 +390,9 @@ function indexSubmittedGroups(
   return map;
 }
 
-function defaultSelections(group: CatalogModifierGroup): Array<{ modifierId: string; quantity: number }> {
+function defaultSelections(
+  group: CatalogModifierGroup,
+): Array<{ modifierId: string; quantity: number }> {
   return group.modifiers
     .filter((m) => m.isDefault && m.available)
     .map((m) => ({ modifierId: m.id, quantity: 1 }));

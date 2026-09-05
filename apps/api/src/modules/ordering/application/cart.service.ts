@@ -39,7 +39,10 @@ export interface AddCartItemInput {
   restaurantId?: string;
   type?: OrderTypeName;
   customization?: Record<string, unknown> | null;
-  modifierGroups?: Array<{ groupId: string; selections: Array<{ modifierId: string; quantity?: number }> }>;
+  modifierGroups?: Array<{
+    groupId: string;
+    selections: Array<{ modifierId: string; quantity?: number }>;
+  }>;
   addOns?: unknown;
 }
 

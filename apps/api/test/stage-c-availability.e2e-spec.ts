@@ -212,8 +212,11 @@ describe('Stage C availability foundation', () => {
       false,
     );
     expect(
-      (await http().post('/api/v1/discover/quote').send({ variantId: seeded.small.id, quantity: 1 }))
-        .status,
+      (
+        await http()
+          .post('/api/v1/discover/quote')
+          .send({ variantId: seeded.small.id, quantity: 1 })
+      ).status,
     ).toBe(400);
   });
 
@@ -225,8 +228,11 @@ describe('Stage C availability foundation', () => {
     });
     expect((await http().get(`/api/v1/discover/items/${seeded.item.id}`)).status).toBe(404);
     expect(
-      (await http().post('/api/v1/discover/quote').send({ variantId: seeded.small.id, quantity: 1 }))
-        .status,
+      (
+        await http()
+          .post('/api/v1/discover/quote')
+          .send({ variantId: seeded.small.id, quantity: 1 })
+      ).status,
     ).toBe(400);
   });
 
@@ -241,8 +247,11 @@ describe('Stage C availability foundation', () => {
     expect(small.available).toBe(true);
 
     expect(
-      (await http().post('/api/v1/discover/quote').send({ variantId: seeded.small.id, quantity: 1 }))
-        .status,
+      (
+        await http()
+          .post('/api/v1/discover/quote')
+          .send({ variantId: seeded.small.id, quantity: 1 })
+      ).status,
     ).toBe(201);
     const rejected = await http()
       .post('/api/v1/discover/quote')
@@ -255,15 +264,20 @@ describe('Stage C availability foundation', () => {
     expect(none.body.orderable).toBe(false);
     expect(none.body.visible).toBe(true);
     expect(
-      (await http().post('/api/v1/discover/quote').send({ variantId: seeded.small.id, quantity: 1 }))
-        .status,
+      (
+        await http()
+          .post('/api/v1/discover/quote')
+          .send({ variantId: seeded.small.id, quantity: 1 })
+      ).status,
     ).toBe(400);
   });
 
   it('9-14. modifier availability, required groups, optional omit, and min/max stay enforced', async () => {
     const seeded = await seedPizza({ mushroomsAvailable: false });
     const detail = await http().get(`/api/v1/discover/items/${seeded.item.id}`);
-    const toppings = detail.body.modifierGroups.find((g: { name: string }) => g.name === 'Toppings');
+    const toppings = detail.body.modifierGroups.find(
+      (g: { name: string }) => g.name === 'Toppings',
+    );
     expect(toppings.modifiers.find((m: { name: string }) => m.name === 'Mushrooms').available).toBe(
       false,
     );
@@ -397,9 +411,7 @@ describe('Stage C availability foundation', () => {
     ).not.toContain(seeded.item.id);
     expect(
       (
-        await http()
-          .get(`/api/v1/discover/menus/${custom.id}`)
-          .query({ type: 'HOME_DELIVERY' })
+        await http().get(`/api/v1/discover/menus/${custom.id}`).query({ type: 'HOME_DELIVERY' })
       ).body.items.map((row: { id: string }) => row.id),
     ).not.toContain(seeded.item.id);
     expect(
@@ -520,9 +532,10 @@ describe('Stage C availability foundation', () => {
       catalog.updateAddOn(staffOf(b.merchantId), a.pepperoni.id, { available: false }),
     ).rejects.toThrow(/Cross-merchant|Forbidden|denied|not found/i);
 
-    expect((await http().patch(`/api/v1/catalog/items/${a.item.id}`).send({ availability: 'SOLDOUT' })).status).toBe(
-      401,
-    );
+    expect(
+      (await http().patch(`/api/v1/catalog/items/${a.item.id}`).send({ availability: 'SOLDOUT' }))
+        .status,
+    ).toBe(401);
     expect(
       (
         await http()

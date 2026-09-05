@@ -1,15 +1,16 @@
 # 116 — Dining / Reservations Runtime Slice 1 (implementation)
 
-**Status:** IMPLEMENTED (Slice 1 only). Forensic contract unchanged.  
+**Status:** IMPLEMENTED + HARDENED (Slice 1 only). Forensic contract unchanged.  
 **Date:** 2026-09-05  
 **Starting HEAD:** `1d969d89e195a2a421a8161ebc3d510e61eda59c`  
-**Final HEAD:** `916be13bf3394a8036fe9d2597560221540f8229`  
-**Implementation commits:** `2a7b1ea` (API/UI), `fa08766` (e2e), `916be13` (merchant active lane + this record).  
+**Final HEAD:** `fbca3a8c90b1aa9e165b0ad6b2e4683c784a5373`  
+**Implementation commits:** `2a7b1ea` (API/UI), `fa08766` (e2e), `916be13` (merchant active lane), `d260804` (slice-1 stamp), `105f0f0` (atomic same-day create + e2e), `fbca3a8` (advisory-lock deserialize).  
 **Governing contract:** [116-DINING-RESERVATIONS-RECONCILIATION.md](./116-DINING-RESERVATIONS-RECONCILIATION.md)  
 **Gap matrix:** [116-DINING-RESERVATIONS-GAP-MATRIX.json](./116-DINING-RESERVATIONS-GAP-MATRIX.json)  
-**Foundation:** [45-SEATING-CONFIGURATION-REQUEST-FOUNDATION.md](./45-SEATING-CONFIGURATION-REQUEST-FOUNDATION.md)
+**Foundation:** [45-SEATING-CONFIGURATION-REQUEST-FOUNDATION.md](./45-SEATING-CONFIGURATION-REQUEST-FOUNDATION.md)  
+**Post-implementation audit:** [116-DINING-RESERVATIONS-POST-IMPLEMENTATION-AUDIT.md](./116-DINING-RESERVATIONS-POST-IMPLEMENTATION-AUDIT.md) (pre-hardening record; left unchanged)
 
-This document records what Slice 1 shipped. It does **not** rewrite the Stage 116 forensic. Owner decisions OD-SEAT-1 through OD-SEAT-12 remain unresolved.
+This document records what Slice 1 shipped and the later hardening pass that closed the two audit gaps. It does **not** rewrite the Stage 116 forensic. Owner decisions OD-SEAT-1 through OD-SEAT-12 remain unresolved.
 
 ---
 
@@ -120,6 +121,8 @@ Consumer cancel of a bound `NOT_SEATED` request releases `ON_HOLD` / `OCCUPIED` 
 
 Out-of-restaurant tables: 400. Occupied / inactive tables: 409. Concurrent double-seat: one 200, one 409 (covered by e2e).
 
+Same-day active `WALK_IN`/`WAITLIST` create (hardening): `createWalkInOrWaitlistIfNoActiveSameDay` takes `pg_advisory_xact_lock(hashtext(userId+restaurantId+localDate))` inside a Prisma transaction, then re-reads active same-local-day rows and inserts only if none exist. Competing create is HTTP 409. `RESERVATION` still uses `createRequest` and is not subject to this uniqueness rule. No migration.
+
 ## 7. UI flows
 
 **Consumer `apps/web`**
@@ -148,6 +151,12 @@ Existing design-system tokens and layout only.
 - Merchant isolation and 401
 - Out-of-scope table 400; unavailable table 409; sequential double-seat 409
 - Concurrent double-seat: exactly one occupant
+- `RESERVATION` requires `reservationAt`; persisted type is `RESERVATION` (not walk-in/waitlist)
+- `SEATING` + `walkin_waitlist.value !== true` → persisted `WALK_IN` (client cannot force type)
+- `SEATING` + `walkin_waitlist.value === true` → persisted `WAITLIST` (server-derived; OD-SEAT-10 still unresolved)
+- Seating gate disabled → HTTP 403 and no `SeatingRequest` row
+- Sequential same-day `WALK_IN`/`WAITLIST` duplicate → HTTP 409; one active row
+- Concurrent same-day creates → `{201, 409}` and exactly one active row
 
 Regressions run green: seating-foundation, staff-authorization, consumer-auth, Stage 115, Stages A–G, I, J, merchant-order-management.
 
@@ -210,3 +219,21 @@ None that stopped Slice 1. Noted only:
 - Restaurant has no `seatingWaitingTime` column; OD-SEAT-10 cannot read a restaurant wait-time field without a migration (not applied).
 - Staff foundation `updateSeatingRequest` still skips the Slice 1 state machine (intentional; keeps doc 45 tests).
 - `StaffAuthorizationGuard` SUPER_ADMIN role bypass is unchanged (known 115 limitation).
+
+---
+
+## 14. Hardening pass (audit gaps only)
+
+Closes the two findings in the post-implementation audit. Not Slice 2.
+
+| Gap | Correction | Migration |
+|---|---|---|
+| Same-day `WALK_IN`/`WAITLIST` check-then-write race | Transaction + `pg_advisory_xact_lock` keyed by user, restaurant, and restaurant-local date, then check + insert | **NO** |
+| Missing e2e proof | Six focused cases added to `stage-116-dining-reservations-runtime.e2e-spec.ts` | **NO** |
+
+**Test results (hardening):**
+
+- Stage 116 dining/reservations e2e: **13 passed / 13**
+- seating-foundation, consumer-auth, staff-authorization, Stage 115, Stages A–G, I, J, merchant-order-management: **14 suites, 104 passed / 104**
+
+Existing Slice 1 machine, cancellation, table lock, consumer ownership, merchant isolation, reservation semantics, and OD-SEAT-1..12 unresolved status are unchanged. Server-derived `WAITLIST`/`WALK_IN` still follows the Slice 1 default and does **not** resolve OD-SEAT-10.

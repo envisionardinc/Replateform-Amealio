@@ -33,8 +33,9 @@ Verified consumer surfaces (manifest, V2 tokens, profile, brand SVGs) converge o
 
 ### 1.2 Typography
 
-- **Mulish** is the global consumer family (`fonts.scss` `$fontFamily: Mulish`; `fontFaces.css`).
-- Inter (400–500) and Poppins (400–600) exist as secondary faces.
+- **LEGACY REALITY — Mulish.** The shipped consumer family is Mulish (`fonts.scss` `$fontFamily: Mulish`; `fontFaces.css`). That is forensic fact, not the target.
+- Inter (400–500) and Poppins (400–600) already exist as secondary faces in legacy `fontFaces.css`.
+- **TARGET — Inter.** The amealio product/design-system family is Inter. Mulish is not a target token and is not an active `apps/web` dependency.
 - Type scale is an explosion of utility classes (`f8`…`f36` × 400/500/600/700/800) with a 768px shrink. That is **not** a hierarchy.
 
 ### 1.3 Components (verified)
@@ -83,7 +84,7 @@ Do not copy competitor orange/red brand systems.
 | Scaffold green   | invented in first slice     | —                               | not amealio                       | Remove                                      | **CORRECT**                                              |
 | Merchant purple  | `#40299B`                   | —                               | different product                 | Merchant later; not consumer                | **FUTURE**                                               |
 | Coral `#fc5a47`  | old food CSS                | food apps often use warm accent | conflicts with V2                 | Do not use as primary                       | **CORRECT**                                              |
-| Font             | Mulish (+ Inter/Poppins)    | one family                      | 80+ size utilities                | Mulish; 5-step scale                        | **IMPROVE**                                              |
+| Font             | Mulish (+ Inter/Poppins)    | one family                      | legacy Mulish ≠ target Inter      | **Inter**; 5-step scale                     | **CORRECT / IMPROVE**                                    |
 | Buttons          | gradient 56px / mixed       | 44px min, one CTA language      | inconsistent                      | Gradient primary, outline secondary         | **IMPROVE**                                              |
 | Cards            | 12px + light shadow         | image + meta                    | no image API                      | 12px card + letter placeholder              | **IMPROVE**                                              |
 | Nav              | header + 5-tab bar          | 3–5 tabs                        | Experience/Bytes have no Nest API | Top wordmark + 3-tab bar (Home/Cart/Orders) | **IMPROVE**                                              |
@@ -106,7 +107,7 @@ Do not copy competitor orange/red brand systems.
 | ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
 | Consumer identity       | Navy + blue, not coral, purple, or scaffold green | V2 tokens + PWA + profile                                          |
 | Styling approach        | CSS variables in `apps/web`                       | No `packages/ui`; do not introduce Next/Tailwind just for this     |
-| Type                    | Mulish + compact scale                            | Verified family; utilities were unusable                           |
+| Type                    | Inter + compact scale                             | Established target family; Mulish is legacy-only                   |
 | CTA                     | Blue→navy horizontal gradient                     | `AmealioColors.gradients.brandHorizontal` + `V2ButtonColors.solid` |
 | Bottom nav destinations | Home, Cart, Orders                                | Only routes this slice owns                                        |
 
@@ -145,7 +146,9 @@ Implemented as `--ame-*` CSS variables. Screens must not invent hex values.
 
 ### 5.2 Typography
 
-Family: **Mulish**, fallback `ui-sans-serif, system-ui, sans-serif`.
+Family: **Inter**, fallback `ui-sans-serif, system-ui, sans-serif`.
+
+`--ame-font` is the only family token. Body, headings, buttons, fields, cards, navigation, and status UI consume it. Mulish is not a target token.
 
 | Token         | Size / weight |
 | ------------- | ------------- |
@@ -193,6 +196,16 @@ Family: **Mulish**, fallback `ui-sans-serif, system-ui, sans-serif`.
 `apps/web/src/design-system/` + `apps/web/src/styles.css`.
 
 `packages/ui` / Next.js remains **FUTURE**. Do not duplicate tokens in screens.
+
+Mulish remaining in this repo after the Inter correction:
+
+| Reference | Classification | Why it stays |
+| --------- | -------------- | ------------ |
+| This document §1.2, L3 legacy column, §4, §6 | 2. legacy forensic documentation | Records shipped consumer reality and the correction |
+| `apps/web/src/design-system/tokens.test.ts` negative `Mulish` assertions | 2. forensic / validation | Proves the runtime stylesheet does not load Mulish |
+| `apps/web` runtime CSS, tokens, HTML, package.json | 1. target runtime dependency | **Removed** — none remain |
+
+No `apps/web` runtime file may import, token, or load Mulish.
 
 ---
 

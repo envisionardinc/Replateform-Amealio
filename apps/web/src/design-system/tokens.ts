@@ -23,7 +23,7 @@ export const AMEALIO_TOKENS = {
     infoBg: '#D9ECFF',
   },
   font: {
-    family: 'Mulish',
+    family: 'Inter',
   },
   radius: {
     sm: '8px',

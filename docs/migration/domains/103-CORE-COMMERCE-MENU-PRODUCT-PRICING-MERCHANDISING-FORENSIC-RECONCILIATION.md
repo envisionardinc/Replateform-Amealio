@@ -602,7 +602,7 @@ Canonical Stage G contract and implementation: [110](./110-STAGE-G-UPSELL-CROSSS
 
 - **Upsell** = merchant-defined upgrade from variant A → higher-value variant/item B (or premium modifier). Legacy: absent. **Not implemented** — variants / modifiers / combos already cover upgrade UX (`OD-UPSELL` FUTURE).
 - **Cross-sell** = merchant-defined complementary **item**. Legacy: category list (POS). Target implemented: `MerchandisingRelation{type:CROSS_SELL}` item→item, deterministic, not ML. Category complementary is a follow-up.
-- **Personalization foundation** = prefs, favorites, dietary filters, explicit merchant tags. Intelligence remains Stage H. **Do not start H without GO.**
+- **Personalization foundation** = prefs, favorites, dietary filters, explicit merchant tags. Intelligence remains Stage H. Canonical L1–L4 contract: [111](./111-STAGE-H-PERSONALIZATION.md). **DEFER implementation. Do not start H code without GO.**
 
 ---
 

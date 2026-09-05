@@ -708,7 +708,7 @@ Adjusted from the suggested A–J only where forensic dependencies require it. *
 | **D** | Pricing / Tax / Fees / Surcharges | Server quote; unmix tax vs fee; stop caller-supplied tax/fee; snapshot. **This is the Phase 2 gate.** |
 | **F** | Combo / Bundle | After A (needs item refs); include combo lines in the quote **before** E if combos are sellable. Placed before E when combos are in the first consumer cut. |
 | **E** | Promotion evaluation integration (Phase 2) | Wire `evaluate()` + existing `couponCode` only after D (and F if combos sell) |
-| **G** | Upsell / Cross-sell | Preserve category cross-sell; add item-level CROSS_SELL; UPSELL only if OD-UPSELL says yes |
+| **G** | Upsell / Cross-sell | **Implemented in [110](./110-STAGE-G-UPSELL-CROSSSELL.md):** item-level CROSS_SELL + item-detail placement. Category complementary is a follow-up. UPSELL relations remain FUTURE (`OD-UPSELL`). |
 | **H** | Personalization foundation | Prefs / favorites / dietary already exist; do not add AI |
 | **I** | Merchant + Super Admin Global Catalog UX | Complete materialization (temp-local, field copy, chain) per 82; no live sync |
 | **J** | Consumer UX | Menu switcher, customization, combo, honest tax/fee, coupon — last, against the stable contract |

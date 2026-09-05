@@ -89,4 +89,18 @@ export class UserProfileRepository {
     });
     return toRecord(row);
   }
+
+  /** Write the full preferences object after an allowlisted merge/clear. */
+  async savePreferences(
+    userId: string,
+    preferences: ProfilePreferences,
+  ): Promise<UserProfileRecord> {
+    const row = await this.prisma.userProfile.upsert({
+      where: { userId },
+      create: { userId, preferences: preferences as Prisma.InputJsonValue },
+      update: { preferences: preferences as Prisma.InputJsonValue },
+      select: PROFILE_SELECT,
+    });
+    return toRecord(row);
+  }
 }

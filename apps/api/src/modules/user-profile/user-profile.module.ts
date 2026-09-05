@@ -3,10 +3,9 @@ import { UserProfileRepository } from './infrastructure/user-profile.repository'
 import { UserProfileService } from './application/user-profile.service';
 
 /**
- * User profile / onboarding-state foundation module (P1.7.8). Read/write access
- * to the per-user `UserProfile` state (detailsSubmitted / completionPercentage /
- * preferences Json), user-owned. No new entity, no controllers, no discovery/
- * taxonomy normalization, no geography/media.
+ * User profile / onboarding-state foundation (P1.7.8). Additive state over the
+ * existing `UserProfile` (no new entity). Consumer HTTP lives in
+ * ConsumerProfileModule so foundation tests do not boot auth routes.
  */
 @Module({
   providers: [UserProfileRepository, UserProfileService],

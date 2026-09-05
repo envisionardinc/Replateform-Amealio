@@ -15,6 +15,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { PlatformCatalogModule } from './modules/platform-catalog/platform-catalog.module';
 import { PlatformExperienceCatalogueModule } from './modules/platform-experience-catalogue/platform-experience-catalogue.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { ConsumerProfileModule } from './modules/user-profile/consumer-profile.module';
 import { UserProfileModule } from './modules/user-profile/user-profile.module';
 import { OrderingModule } from './modules/ordering/ordering.module';
 import { OrderVerticalModule } from './modules/ordering/order-vertical.module';
@@ -62,6 +63,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     PlatformExperienceCatalogueModule,
     OnboardingModule,
     UserProfileModule,
+    ConsumerProfileModule,
     OrderingModule,
     OrderVerticalModule,
     SeatingModule,

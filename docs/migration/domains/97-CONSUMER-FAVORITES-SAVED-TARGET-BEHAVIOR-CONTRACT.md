@@ -1,6 +1,6 @@
 # 97 — Consumer Favorites / Saved Target Behavior Contract
 
-**Status:** CONTRACT only — not implemented  
+**Status:** CONTRACT + implementation  
 **Date:** 2026-09-05  
 **Brand:** amealio  
 **Rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  

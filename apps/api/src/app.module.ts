@@ -26,6 +26,7 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { TipModule } from './modules/tip/tip.module';
 import { SettlementModule } from './modules/settlement/settlement.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
+import { FavoritesModule } from './modules/favorites/favorites.module';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { LoggingInterceptor } from './common/logging/logging.interceptor';
 import { RequestIdMiddleware } from './common/request-context/request-id.middleware';
@@ -64,6 +65,7 @@ import { RequestIdMiddleware } from './common/request-context/request-id.middlew
     OnboardingModule,
     UserProfileModule,
     ConsumerProfileModule,
+    FavoritesModule,
     OrderingModule,
     OrderVerticalModule,
     SeatingModule,

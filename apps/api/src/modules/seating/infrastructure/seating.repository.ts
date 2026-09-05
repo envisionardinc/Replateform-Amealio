@@ -264,7 +264,9 @@ export class SeatingRepository {
     return this.prisma.$transaction(async (tx) => {
       const today = localDateKey(new Date(), data.timeZone);
       const lockKey = `seating-same-day:${data.userId}:${data.restaurantId}:${today}`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      await tx.$queryRaw<{ locked: string }[]>`
+        SELECT pg_advisory_xact_lock(hashtext(${lockKey}))::text AS locked
+      `;
 
       const existing = await this.findActiveSeatingSameLocalDayOn(tx, {
         userId: data.userId,

@@ -10,14 +10,20 @@ export function getRefreshToken(): string | null {
   return sessionStorage.getItem(REFRESH_KEY);
 }
 
+function notifySession() {
+  window.dispatchEvent(new Event('amealio-session'));
+}
+
 export function setSession(accessToken: string, refreshToken: string): void {
   sessionStorage.setItem(ACCESS_KEY, accessToken);
   sessionStorage.setItem(REFRESH_KEY, refreshToken);
+  notifySession();
 }
 
 export function clearSession(): void {
   sessionStorage.removeItem(ACCESS_KEY);
   sessionStorage.removeItem(REFRESH_KEY);
+  notifySession();
 }
 
 export function isAuthenticated(): boolean {

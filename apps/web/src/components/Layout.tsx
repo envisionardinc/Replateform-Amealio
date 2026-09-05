@@ -1,9 +1,15 @@
+import { useEffect, useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { clearSession, getRefreshToken, isAuthenticated } from '../lib/session';
 import { authApi } from '../lib/api';
 
 export function Layout() {
-  const signedIn = isAuthenticated();
+  const [signedIn, setSignedIn] = useState(isAuthenticated);
+  useEffect(() => {
+    const sync = () => setSignedIn(isAuthenticated());
+    window.addEventListener('amealio-session', sync);
+    return () => window.removeEventListener('amealio-session', sync);
+  }, []);
 
   async function logout() {
     const refresh = getRefreshToken();

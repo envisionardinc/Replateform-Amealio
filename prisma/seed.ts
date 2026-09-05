@@ -138,16 +138,17 @@ async function main() {
       isPublished: true,
     },
   });
-  await prisma.itemVariant.upsert({
-    where: { id: await stableId('variant-regular', item.id) },
-    update: {},
-    create: {
-      id: await stableId('variant-regular', item.id),
+  // Cart/checkout DTOs require RFC UUID variant ids. The old sha1-as-UUID
+  // helper produced invalid variant nibbles that @IsUUID() rejects.
+  await prisma.itemVariant.deleteMany({ where: { menuItemId: item.id } });
+  await prisma.itemVariant.create({
+    data: {
       menuItemId: item.id,
       size: 'Regular',
       uomId: uom.id,
       priceMinor: 24900n, // ₹249.00 in paise
       currencyCode: 'INR',
+      available: true,
     },
   });
 
@@ -175,6 +176,50 @@ async function main() {
     where: { key: 'ORDER_CONFIRMED' },
     update: {},
     create: { key: 'ORDER_CONFIRMED', channel: 'PUSH', body: 'Your order is confirmed.' },
+  });
+
+  await prisma.menuItem.upsert({
+    where: { legacyId: 'seed-item-soldout' },
+    update: { isPublished: true, availability: 'SOLDOUT' },
+    create: {
+      legacyId: 'seed-item-soldout',
+      merchantId: merchant.id,
+      restaurantId: restaurant.id,
+      name: 'DEV Sold-Out Biryani',
+      description: 'Published but unavailable',
+      availability: 'SOLDOUT',
+      isPublished: true,
+    },
+  });
+  const sold = await prisma.menuItem.findUniqueOrThrow({
+    where: { legacyId: 'seed-item-soldout' },
+  });
+  await prisma.itemVariant.deleteMany({ where: { menuItemId: sold.id } });
+  await prisma.itemVariant.create({
+    data: {
+      menuItemId: sold.id,
+      size: 'Regular',
+      priceMinor: 19900n,
+      currencyCode: 'INR',
+      available: false,
+    },
+  });
+
+  const closedMerchant = await prisma.merchant.upsert({
+    where: { legacyId: 'seed-merchant-closed' },
+    update: {},
+    create: { legacyId: 'seed-merchant-closed', legalName: 'DEV Closed Foods' },
+  });
+  await prisma.restaurant.upsert({
+    where: { legacyId: 'seed-restaurant-closed' },
+    update: { status: 'CLOSED' },
+    create: {
+      legacyId: 'seed-restaurant-closed',
+      merchantId: closedMerchant.id,
+      name: 'DEV Closed Kitchen',
+      city: 'Pune',
+      status: 'CLOSED',
+    },
   });
 
   console.log('Seed complete (synthetic dev data):', {

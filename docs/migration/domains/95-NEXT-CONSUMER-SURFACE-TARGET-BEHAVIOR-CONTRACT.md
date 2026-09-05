@@ -22,21 +22,21 @@ Home 1, restaurant/menu/item, cart, checkout, confirmation, and order **list** a
 
 ## 1. Candidates investigated
 
-| Surface | Legacy | Target | Class | Why not now |
-| ------- | ------ | ------ | ----- | ----------- |
-| Order tracking / detail | Track hub + per-order track; `GET user-ordering/:id`; socket `order_trigger` | `GET /api/v1/me/orders/:id` already returns `status`, `statusEvents`, `deliveryPerson`, `paymentIntents`; `PATCH …/cancel`; list `?lane=` | **🟢** | **Selected** |
-| Order history | ONGOING / HISTORY tabs | List exists; UI was flat | 🟢 polish | Covered as lane filter on the same surface |
-| Profile | `/profile/new` | `UserProfile` service, **no HTTP** | 🟡 | Does not unblock post-purchase journey |
-| Dietary prefs | Health flow → `user-service` | `UserProfile.preferences` Json, no HTTP | 🟡 | Discovery does not consume prefs |
-| Addresses | `GET/POST/PATCH/DELETE /address` | Prisma `Address`; **no consumer HTTP**; checkout has no `deliveryAddressId` | 🟡 | Wiring checkout would change ordering; map/geo is STOP |
-| Favorites | `GET/POST /favourites` + lat/long | Prisma `Favourite`; no API | 🟡 | New CRUD + legacy geo |
-| Reservations | `POST /diner` | Staff seating only | 🔴 | Major booking stack |
-| Experiences / celebrations | Book/pay/track loop | Staff config only | 🔴 / ⚪ | Booking deferred; OD-1 |
-| Notifications | Drawer inbox | Models unused | 🔴 | No inbox HTTP |
-| Support / help | `/raiseTicket` | No schema | 🔴 | Greenfield |
-| Wallet | Checkout instrument; `/wallet` 404 | Refund rail only; **OD-6** | 🟡 / ⚪ | Owner decision |
-| Offers / coupons page | Drawer 404; apply at cart | Checkout `couponCode` unused in web | 🟡 | Not a standalone journey step |
-| Referrals / loyalty / settings | Dead or absent | Missing / OD-5 | ⚪ | Owner / future |
+| Surface                        | Legacy                                                                       | Target                                                                                                                                    | Class     | Why not now                                            |
+| ------------------------------ | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------ |
+| Order tracking / detail        | Track hub + per-order track; `GET user-ordering/:id`; socket `order_trigger` | `GET /api/v1/me/orders/:id` already returns `status`, `statusEvents`, `deliveryPerson`, `paymentIntents`; `PATCH …/cancel`; list `?lane=` | **🟢**    | **Selected**                                           |
+| Order history                  | ONGOING / HISTORY tabs                                                       | List exists; UI was flat                                                                                                                  | 🟢 polish | Covered as lane filter on the same surface             |
+| Profile                        | `/profile/new`                                                               | `UserProfile` service, **no HTTP**                                                                                                        | 🟡        | Does not unblock post-purchase journey                 |
+| Dietary prefs                  | Health flow → `user-service`                                                 | `UserProfile.preferences` Json, no HTTP                                                                                                   | 🟡        | Discovery does not consume prefs                       |
+| Addresses                      | `GET/POST/PATCH/DELETE /address`                                             | Prisma `Address`; **no consumer HTTP**; checkout has no `deliveryAddressId`                                                               | 🟡        | Wiring checkout would change ordering; map/geo is STOP |
+| Favorites                      | `GET/POST /favourites` + lat/long                                            | Prisma `Favourite`; no API                                                                                                                | 🟡        | New CRUD + legacy geo                                  |
+| Reservations                   | `POST /diner`                                                                | Staff seating only                                                                                                                        | 🔴        | Major booking stack                                    |
+| Experiences / celebrations     | Book/pay/track loop                                                          | Staff config only                                                                                                                         | 🔴 / ⚪   | Booking deferred; OD-1                                 |
+| Notifications                  | Drawer inbox                                                                 | Models unused                                                                                                                             | 🔴        | No inbox HTTP                                          |
+| Support / help                 | `/raiseTicket`                                                               | No schema                                                                                                                                 | 🔴        | Greenfield                                             |
+| Wallet                         | Checkout instrument; `/wallet` 404                                           | Refund rail only; **OD-6**                                                                                                                | 🟡 / ⚪   | Owner decision                                         |
+| Offers / coupons page          | Drawer 404; apply at cart                                                    | Checkout `couponCode` unused in web                                                                                                       | 🟡        | Not a standalone journey step                          |
+| Referrals / loyalty / settings | Dead or absent                                                               | Missing / OD-5                                                                                                                            | ⚪        | Owner / future                                         |
 
 ---
 
@@ -66,18 +66,18 @@ Named status timeline from server events (not a client-predicted machine). Rider
 
 ## 5. L3 — GAP
 
-| Behavior | LEGACY | INDUSTRY | TARGET | CLASS |
-| -------- | ------ | -------- | ------ | ----- |
-| Track after checkout | Dedicated track route | Timeline + refresh | `/orders/:id` renders events + current status | **IMPROVE** |
-| Status source | Numeric + socket | Server events | `statusEvents[]` only | **PRESERVE** / **CORRECT** (no client machine) |
-| Live map / GPS | Porter/Dunzo URL | Common | **FUTURE** (no consumer geo API) | **FUTURE** |
-| Sockets | `order_trigger` | Push or poll | GET + manual refresh + light poll on active | **IMPROVE** |
-| Cancel | Status 0 only | Before accept | `INITIAL`/`PENDING` → `PATCH /me/orders/:id/cancel` + `expectedStatus` | **PRESERVE** (doc 90) |
-| Paid cancel | Wallet if `settleAmount` | Explicit refund | Existing `RefundService`; UI shows `paymentIntents` | **PRESERVE** |
-| Rider | Delivery track URL | Identity after assign | `deliveryPerson` from GET | **PRESERVE** |
-| History vs active | Separate tabs | Same | `GET /me/orders?lane=active\|history` | **PRESERVE** |
-| Auth / privacy | JWT | Own orders only | 401 unauthenticated; 404 foreign | **PRESERVE** |
-| Font | Mulish | One family | Inter | **CORRECT** |
+| Behavior             | LEGACY                   | INDUSTRY              | TARGET                                                                 | CLASS                                          |
+| -------------------- | ------------------------ | --------------------- | ---------------------------------------------------------------------- | ---------------------------------------------- |
+| Track after checkout | Dedicated track route    | Timeline + refresh    | `/orders/:id` renders events + current status                          | **IMPROVE**                                    |
+| Status source        | Numeric + socket         | Server events         | `statusEvents[]` only                                                  | **PRESERVE** / **CORRECT** (no client machine) |
+| Live map / GPS       | Porter/Dunzo URL         | Common                | **FUTURE** (no consumer geo API)                                       | **FUTURE**                                     |
+| Sockets              | `order_trigger`          | Push or poll          | GET + manual refresh + light poll on active                            | **IMPROVE**                                    |
+| Cancel               | Status 0 only            | Before accept         | `INITIAL`/`PENDING` → `PATCH /me/orders/:id/cancel` + `expectedStatus` | **PRESERVE** (doc 90)                          |
+| Paid cancel          | Wallet if `settleAmount` | Explicit refund       | Existing `RefundService`; UI shows `paymentIntents`                    | **PRESERVE**                                   |
+| Rider                | Delivery track URL       | Identity after assign | `deliveryPerson` from GET                                              | **PRESERVE**                                   |
+| History vs active    | Separate tabs            | Same                  | `GET /me/orders?lane=active\|history`                                  | **PRESERVE**                                   |
+| Auth / privacy       | JWT                      | Own orders only       | 401 unauthenticated; 404 foreign                                       | **PRESERVE**                                   |
+| Font                 | Mulish                   | One family            | Inter                                                                  | **CORRECT**                                    |
 
 ---
 
@@ -85,12 +85,12 @@ Named status timeline from server events (not a client-predicted machine). Rider
 
 ### 6.1 APIs (existing — do not duplicate)
 
-| Method | Path | Use |
-| ------ | ---- | --- |
-| GET | `/api/v1/me/orders` | `lane=active\|history` |
-| GET | `/api/v1/me/orders/:id` | Status, events, items, payments, rider |
-| PATCH | `/api/v1/me/orders/:id/cancel` | `{ expectedStatus, reason? }` |
-| GET | `/api/v1/discover/restaurants/:id` | Optional restaurant name (public) |
+| Method | Path                               | Use                                    |
+| ------ | ---------------------------------- | -------------------------------------- |
+| GET    | `/api/v1/me/orders`                | `lane=active\|history`                 |
+| GET    | `/api/v1/me/orders/:id`            | Status, events, items, payments, rider |
+| PATCH  | `/api/v1/me/orders/:id/cancel`     | `{ expectedStatus, reason? }`          |
+| GET    | `/api/v1/discover/restaurants/:id` | Optional restaurant name (public)      |
 
 No new Prisma models. No new order state machine.
 

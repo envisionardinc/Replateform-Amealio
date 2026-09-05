@@ -137,6 +137,13 @@ describe('Consumer discovery (doc 92 public HTTP e2e)', () => {
     const empty = await prisma.category.create({
       data: { name: uniq('Desserts'), type: 'FOOD', code: uniq('EMPTY').slice(0, 24) },
     });
+    const seating = await prisma.category.create({
+      data: {
+        name: uniq('SeatingArea'),
+        type: 'SEATING_AREA',
+        code: uniq('SEAT').slice(0, 24),
+      },
+    });
     const menu = await prisma.menu.create({
       data: {
         merchantId: live.merchant.id,
@@ -165,6 +172,7 @@ describe('Consumer discovery (doc 92 public HTTP e2e)', () => {
     expect(chips.find((c) => c.id === empty.id)).toEqual(
       expect.objectContaining({ available: false, restaurantCount: 0 }),
     );
+    expect(chips.find((c) => c.id === seating.id)).toBeUndefined();
 
     const filtered = await http().get('/api/v1/discover/home').query({ categoryId: mains.id });
     expect(filtered.status).toBe(200);

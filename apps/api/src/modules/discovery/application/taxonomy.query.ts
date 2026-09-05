@@ -42,6 +42,7 @@ export class TaxonomyQuery {
       where: {
         deletedAt: null,
         code: { not: null },
+        type: 'FOOD',
       },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, type: true, status: true },

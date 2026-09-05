@@ -131,6 +131,7 @@ export type MenuItem = {
   channelEnabled?: boolean | null;
   variants: ItemVariant[];
   modifierGroups?: CatalogModifierGroup[];
+  soldOut?: boolean;
 };
 
 export type ConsumerMenu = {

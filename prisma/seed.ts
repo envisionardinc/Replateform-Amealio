@@ -404,6 +404,121 @@ async function main() {
     },
   });
 
+  const pizza = await prisma.menuItem.upsert({
+    where: { legacyId: 'seed-item-pizza-avail' },
+    update: {
+      isPublished: true,
+      availability: 'AVAILABLE',
+      menuSectionId: customSection.id,
+      name: 'DEV Availability Pizza',
+      description: 'Small available, Large unavailable; Mushrooms unavailable',
+    },
+    create: {
+      legacyId: 'seed-item-pizza-avail',
+      merchantId: merchant.id,
+      restaurantId: restaurant.id,
+      menuSectionId: customSection.id,
+      name: 'DEV Availability Pizza',
+      description: 'Small available, Large unavailable; Mushrooms unavailable',
+      availability: 'AVAILABLE',
+      isPublished: true,
+    },
+  });
+  await prisma.itemVariant.deleteMany({ where: { menuItemId: pizza.id } });
+  await prisma.itemVariant.createMany({
+    data: [
+      {
+        menuItemId: pizza.id,
+        size: 'Small',
+        sku: 'DEV-PIZ-S',
+        priceMinor: 19900n,
+        currencyCode: 'INR',
+        isDefault: true,
+        available: true,
+      },
+      {
+        menuItemId: pizza.id,
+        size: 'Large',
+        sku: 'DEV-PIZ-L',
+        priceMinor: 29900n,
+        currencyCode: 'INR',
+        available: false,
+      },
+    ],
+  });
+  await prisma.addOnGroup.deleteMany({ where: { menuItemId: pizza.id } });
+  await prisma.addOnGroup.create({
+    data: {
+      menuItemId: pizza.id,
+      name: 'Crust',
+      minSelect: 1,
+      maxSelect: 1,
+      available: true,
+      addOns: {
+        create: [{ name: 'Thin Crust', priceMinor: 0n, isDefault: true, sortOrder: 1 }],
+      },
+    },
+  });
+  await prisma.addOnGroup.create({
+    data: {
+      menuItemId: pizza.id,
+      name: 'Toppings',
+      minSelect: 0,
+      maxSelect: 2,
+      available: true,
+      addOns: {
+        create: [
+          { name: 'Pepperoni', priceMinor: 2000n, sortOrder: 1 },
+          { name: 'Mushrooms', priceMinor: 1500n, available: false, sortOrder: 2 },
+          { name: 'Olives', priceMinor: 1000n, sortOrder: 3 },
+        ],
+      },
+    },
+  });
+
+  const blockedRequired = await prisma.menuItem.upsert({
+    where: { legacyId: 'seed-item-required-empty' },
+    update: {
+      isPublished: true,
+      availability: 'AVAILABLE',
+      name: 'DEV Required Empty Toppings',
+      description: 'Required group with no valid available selection',
+    },
+    create: {
+      legacyId: 'seed-item-required-empty',
+      merchantId: merchant.id,
+      restaurantId: restaurant.id,
+      name: 'DEV Required Empty Toppings',
+      description: 'Required group with no valid available selection',
+      availability: 'AVAILABLE',
+      isPublished: true,
+    },
+  });
+  await prisma.itemVariant.deleteMany({ where: { menuItemId: blockedRequired.id } });
+  await prisma.itemVariant.create({
+    data: {
+      menuItemId: blockedRequired.id,
+      size: 'Regular',
+      sku: 'DEV-REQ-EMPTY',
+      priceMinor: 14900n,
+      currencyCode: 'INR',
+      available: true,
+    },
+  });
+  await prisma.addOnGroup.deleteMany({ where: { menuItemId: blockedRequired.id } });
+  await prisma.addOnGroup.create({
+    data: {
+      menuItemId: blockedRequired.id,
+      name: 'Must pick',
+      minSelect: 1,
+      maxSelect: 1,
+      available: true,
+      addOns: {
+        create: [{ name: 'None left', priceMinor: 0n, available: false, isDefault: true }],
+      },
+    },
+  });
+
   const closedMerchant = await prisma.merchant.upsert({
     where: { legacyId: 'seed-merchant-closed' },
     update: {},

@@ -40,7 +40,10 @@ export function ItemScreen() {
   const [quoting, setQuoting] = useState(false);
 
   const groups = useMemo(
-    () => (item?.modifierGroups ?? []).filter((group) => group.available).sort(bySort),
+    () =>
+      (item?.modifierGroups ?? [])
+        .filter((group) => group.available || group.required || group.minSelect >= 1)
+        .sort(bySort),
     [item],
   );
 
@@ -49,7 +52,7 @@ export function ItemScreen() {
     setError(null);
     try {
       const data = await discoverApi.item(id, 'HOME_DELIVERY');
-      const firstAvailable = data.variants.find((row) => row.available) ?? data.variants[0];
+      const firstAvailable = data.variants.find((row) => row.available);
       setItem(data);
       setVariantId(firstAvailable?.id ?? '');
       setSelections(initialSelections(data.modifierGroups ?? []));
@@ -201,7 +204,9 @@ export function ItemScreen() {
 
             {!sellable ? (
               <Banner tone="warning">
-                This item is not available. The server will reject add-to-cart.
+                {item.soldOut || item.availability === 'SOLDOUT'
+                  ? 'Sold out. This item stays visible but cannot be ordered.'
+                  : 'This item is not available. The server will reject add-to-cart.'}
               </Banner>
             ) : null}
             {quoteError ? <Banner tone="error">{quoteError}</Banner> : null}

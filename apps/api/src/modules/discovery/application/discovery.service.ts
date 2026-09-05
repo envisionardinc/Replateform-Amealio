@@ -195,8 +195,9 @@ function serializeConsumerItem(item: ConsumerCatalogItem) {
       currencyCode: v.currencyCode,
       available: v.available,
     })),
+    soldOut: item.availability === 'SOLDOUT',
     modifierGroups: item.groups
-      .filter((g) => g.available)
+      .filter((g) => g.available || g.minSelect >= 1)
       .map((g) => ({
         id: g.id,
         name: g.name,
@@ -207,21 +208,19 @@ function serializeConsumerItem(item: ConsumerCatalogItem) {
         sortOrder: g.sortOrder,
         required: g.minSelect >= 1,
         singleSelect: g.maxSelect === 1,
-        modifiers: g.modifiers
-          .filter((m) => m.available)
-          .map((m) => ({
-            id: m.id,
-            name: m.name,
-            priceMinor: m.priceMinor.toString(),
-            currencyCode: m.currencyCode,
-            available: m.available,
-            isDefault: m.isDefault,
-            sortOrder: m.sortOrder,
-            variantPrices: m.variantPrices.map((p) => ({
-              variantId: p.variantId,
-              priceMinor: p.priceMinor.toString(),
-            })),
+        modifiers: g.modifiers.map((m) => ({
+          id: m.id,
+          name: m.name,
+          priceMinor: m.priceMinor.toString(),
+          currencyCode: m.currencyCode,
+          available: m.available,
+          isDefault: m.isDefault,
+          sortOrder: m.sortOrder,
+          variantPrices: m.variantPrices.map((p) => ({
+            variantId: p.variantId,
+            priceMinor: p.priceMinor.toString(),
           })),
+        })),
       })),
   };
 }

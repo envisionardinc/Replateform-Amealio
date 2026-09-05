@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.repository';
 import type { OrderChannel } from '../domain/catalog.types';
 import {
   MerchandiseConfigurationError,
@@ -19,7 +20,10 @@ import { MenuItemRepository } from '../infrastructure/menu-item.repository';
  */
 @Injectable()
 export class MerchandiseQuoteService {
-  constructor(private readonly items: MenuItemRepository) {}
+  constructor(
+    private readonly items: MenuItemRepository,
+    private readonly restaurants: RestaurantRepository,
+  ) {}
 
   async quote(input: {
     variantId: string;
@@ -31,6 +35,10 @@ export class MerchandiseQuoteService {
     const loaded = await this.items.findMerchandiseCatalog(input.variantId, input.channel);
     if (!loaded) {
       throw new BadRequestException('Unknown menu variant');
+    }
+    const restaurant = await this.restaurants.findById(loaded.catalog.restaurantId);
+    if (!restaurant || restaurant.deletedAt !== null || restaurant.status !== 'ACTIVE') {
+      throw new BadRequestException('Restaurant is not accepting orders');
     }
     try {
       const modifierGroups =

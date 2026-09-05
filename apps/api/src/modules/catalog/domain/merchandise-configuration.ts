@@ -235,6 +235,7 @@ export function quoteMerchandise(
   itemName: string,
 ): MerchandiseQuote {
   assertOrderable(catalog, input.variantId);
+  assertRequiredGroupsSelectable(catalog);
   if (!Number.isInteger(input.quantity) || input.quantity <= 0) {
     throw new MerchandiseConfigurationError(
       'INVALID_MODIFIER_QUANTITY',
@@ -340,6 +341,19 @@ export function snapshotMerchandise(quote: MerchandiseQuote): MerchandiseSnapsho
     variantId: quote.variantId,
     modifierGroups: [...byGroup.values()],
   };
+}
+
+function assertRequiredGroupsSelectable(catalog: CatalogMerchandiseItem): void {
+  for (const group of catalog.groups) {
+    if (!isRequiredGroup(group)) continue;
+    const availableCount = group.modifiers.filter((modifier) => modifier.available).length;
+    if (!group.available || availableCount < group.minSelect) {
+      throw new MerchandiseConfigurationError(
+        'ITEM_NOT_ORDERABLE',
+        `required modifier group ${group.id} has no valid available selection`,
+      );
+    }
+  }
 }
 
 function assertOrderable(catalog: CatalogMerchandiseItem, variantId: string): void {

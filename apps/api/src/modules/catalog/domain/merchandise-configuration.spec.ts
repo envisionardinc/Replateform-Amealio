@@ -444,4 +444,101 @@ describe('merchandise configuration (Stage A)', () => {
       quoteMerchandise(item(), { variantId: MEDIUM, quantity: 1 }, 'Pizza'),
     ).toThrow(/does not match/);
   });
+
+  it('rejects a required group with no valid available selection', () => {
+    const catalog = item({
+      groups: item().groups.map((g) =>
+        g.id === CRUST
+          ? {
+              ...g,
+              modifiers: g.modifiers.map((m) => ({ ...m, available: false })),
+            }
+          : g,
+      ),
+    });
+    expect(() =>
+      quoteMerchandise(catalog, { variantId: SMALL, quantity: 1, modifierGroups: [] }, 'Pizza'),
+    ).toThrow(MerchandiseConfigurationError);
+    try {
+      quoteMerchandise(catalog, { variantId: SMALL, quantity: 1, modifierGroups: [] }, 'Pizza');
+    } catch (err) {
+      expect((err as MerchandiseConfigurationError).code).toBe('ITEM_NOT_ORDERABLE');
+      expect((err as MerchandiseConfigurationError).message).toMatch(
+        /no valid available selection/,
+      );
+    }
+  });
+
+  it('does not auto-apply an unavailable default or substitute another modifier', () => {
+    const catalog = item({
+      groups: item().groups.map((g) =>
+        g.id === CRUST
+          ? {
+              ...g,
+              modifiers: [
+                { ...g.modifiers[0], available: false, isDefault: true },
+                {
+                  id: 'mod-thick',
+                  groupId: CRUST,
+                  name: 'Thick Crust',
+                  defaultPriceMinor: 50n,
+                  available: true,
+                  isDefault: false,
+                  variantPriceMinor: null,
+                },
+              ],
+            }
+          : g,
+      ),
+    });
+    try {
+      quoteMerchandise(catalog, { variantId: SMALL, quantity: 1, modifierGroups: [] }, 'Pizza');
+      throw new Error('expected quote to fail');
+    } catch (err) {
+      expect(err).toBeInstanceOf(MerchandiseConfigurationError);
+      expect((err as MerchandiseConfigurationError).code).toBe('MIN_SELECTIONS');
+    }
+    try {
+      quoteMerchandise(
+        catalog,
+        {
+          variantId: SMALL,
+          quantity: 1,
+          modifierGroups: [{ groupId: CRUST, selections: [{ modifierId: THIN }] }],
+        },
+        'Pizza',
+      );
+    } catch (err) {
+      expect((err as MerchandiseConfigurationError).code).toBe('MODIFIER_UNAVAILABLE');
+    }
+    const explicit = quoteMerchandise(
+      catalog,
+      {
+        variantId: SMALL,
+        quantity: 1,
+        modifierGroups: [{ groupId: CRUST, selections: [{ modifierId: 'mod-thick' }] }],
+      },
+      'Pizza',
+    );
+    expect(explicit.selections.map((s) => s.modifierId)).toEqual(['mod-thick']);
+  });
+
+  it('allows omitting an optional group whose modifiers are all unavailable', () => {
+    const catalog = item({
+      groups: item().groups.map((g) =>
+        g.id === TOPPINGS
+          ? {
+              ...g,
+              modifiers: g.modifiers.map((m) => ({ ...m, available: false })),
+            }
+          : g,
+      ),
+    });
+    const quote = quoteMerchandise(
+      catalog,
+      { variantId: SMALL, quantity: 1, modifierGroups: [] },
+      'Pizza',
+    );
+    expect(quote.selections.map((s) => s.modifierId)).toEqual([THIN]);
+  });
 });

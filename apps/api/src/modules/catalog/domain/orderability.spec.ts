@@ -14,7 +14,7 @@ const base = {
   groups: [{ available: true, minSelect: 1 }],
 };
 
-describe('consumer orderability (Stage B)', () => {
+describe('consumer orderability (Stage B/C)', () => {
   it('treats unpublished and deleted items as invisible', () => {
     expect(isConsumerVisible({ ...base, isPublished: false })).toBe(false);
     expect(isConsumerVisible({ ...base, deletedAt: new Date() })).toBe(false);
@@ -44,5 +44,56 @@ describe('consumer orderability (Stage B)', () => {
     expect(isConsumerOrderable({ ...base, groups: [{ available: false, minSelect: 0 }] })).toBe(
       true,
     );
+  });
+
+  it('keeps an item orderable when one variant is unavailable and another is sellable', () => {
+    expect(
+      isConsumerOrderable({
+        ...base,
+        variants: [{ available: false }, { available: true }],
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects a required group that has no valid available modifiers', () => {
+    expect(
+      isConsumerOrderable({
+        ...base,
+        groups: [
+          {
+            available: true,
+            minSelect: 1,
+            modifiers: [{ available: false }, { available: false }],
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps an optional group from blocking orderability when all modifiers are unavailable', () => {
+    expect(
+      isConsumerOrderable({
+        ...base,
+        groups: [
+          { available: true, minSelect: 1, modifiers: [{ available: true }] },
+          { available: true, minSelect: 0, modifiers: [{ available: false }] },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it('treats a required group as selectable when enough modifiers remain available', () => {
+    expect(
+      isConsumerOrderable({
+        ...base,
+        groups: [
+          {
+            available: true,
+            minSelect: 1,
+            modifiers: [{ available: false }, { available: true }],
+          },
+        ],
+      }),
+    ).toBe(true);
   });
 });

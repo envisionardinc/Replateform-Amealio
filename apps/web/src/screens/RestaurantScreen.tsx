@@ -113,7 +113,11 @@ export function MenuItemCard({ item }: { item: MenuItem }) {
               {variant.size ? ` · ${variant.size}` : ''}
             </p>
           ) : null}
-          {!sellable ? <Badge tone="warning">Not orderable</Badge> : null}
+          {!sellable ? (
+            <Badge tone="warning">
+              {item.soldOut || item.availability === 'SOLDOUT' ? 'Sold out' : 'Not orderable'}
+            </Badge>
+          ) : null}
         </div>
         <Link to={`/items/${item.id}`}>{configurable ? 'Customize' : 'Details'}</Link>
       </div>

@@ -1,9 +1,9 @@
 /**
- * Stage B shared consumer orderability (doc 103 / 105).
+ * Stage B/C shared consumer visibility + orderability (docs 103 / 105 / 106).
  *
- * Published ≠ visible-on-channel ≠ orderable ≠ in stock.
+ * Published ≠ visible-on-channel ≠ available ≠ orderable ≠ in stock.
  * The same gates apply to Standard (virtual) and Custom menus.
- * This is not an availability engine (Stage C) and not a pricing engine.
+ * This is not a scheduling engine and not a pricing engine.
  */
 
 export type OrderabilityAvailability = 'AVAILABLE' | 'SOLDOUT' | 'NOTAVAILABLE';
@@ -15,12 +15,14 @@ export interface OrderabilityInput {
   /** false = ItemChannelConfig.enabled is false for the requested channel. */
   channelEnabled: boolean | null;
   variants: ReadonlyArray<{ available: boolean }>;
-  groups: ReadonlyArray<{ available: boolean; minSelect: number }>;
+  groups: ReadonlyArray<{
+    available: boolean;
+    minSelect: number;
+    modifiers?: ReadonlyArray<{ available: boolean }>;
+  }>;
 }
 
-export function isPublishedVisible(
-  input: Pick<OrderabilityInput, 'deletedAt' | 'isPublished'>,
-): boolean {
+export function isPublishedVisible(input: Pick<OrderabilityInput, 'deletedAt' | 'isPublished'>): boolean {
   return input.deletedAt === null && input.isPublished;
 }
 
@@ -32,10 +34,41 @@ export function hasSellableVariant(variants: ReadonlyArray<{ available: boolean 
   return variants.some((variant) => variant.available);
 }
 
-export function requiredGroupsAvailable(
-  groups: ReadonlyArray<{ available: boolean; minSelect: number }>,
+export function availableModifierCount(
+  group: Readonly<{ modifiers?: ReadonlyArray<{ available: boolean }> }>,
+): number {
+  return (group.modifiers ?? []).filter((modifier) => modifier.available).length;
+}
+
+/**
+ * Required groups must be offered and have enough currently available modifiers.
+ * Optional groups never block orderability.
+ * When modifiers are omitted (older callers), group.available is the only gate.
+ */
+export function requiredGroupsSelectable(
+  groups: ReadonlyArray<{
+    available: boolean;
+    minSelect: number;
+    modifiers?: ReadonlyArray<{ available: boolean }>;
+  }>,
 ): boolean {
-  return groups.every((group) => group.available || group.minSelect < 1);
+  return groups.every((group) => {
+    if (group.minSelect < 1) return true;
+    if (!group.available) return false;
+    if (!group.modifiers) return true;
+    return availableModifierCount(group) >= group.minSelect;
+  });
+}
+
+/** @deprecated Stage B name; use requiredGroupsSelectable. */
+export function requiredGroupsAvailable(
+  groups: ReadonlyArray<{
+    available: boolean;
+    minSelect: number;
+    modifiers?: ReadonlyArray<{ available: boolean }>;
+  }>,
+): boolean {
+  return requiredGroupsSelectable(groups);
 }
 
 /** Consumer may see the item on a menu (publication only). */
@@ -53,7 +86,7 @@ export function isConsumerOrderable(input: OrderabilityInput): boolean {
     input.availability === 'AVAILABLE' &&
     isChannelAllowed(input.channelEnabled) &&
     hasSellableVariant(input.variants) &&
-    requiredGroupsAvailable(input.groups)
+    requiredGroupsSelectable(input.groups)
   );
 }
 

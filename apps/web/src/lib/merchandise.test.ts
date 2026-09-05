@@ -115,6 +115,25 @@ describe('merchandise selection (consumer Stage A)', () => {
     expect(three.error).toMatch(/at most 2/);
   });
 
+  it('does not preselect an unavailable default modifier', () => {
+    const crustUnavailableDefault = group({
+      id: 'grp-crust',
+      name: 'Crust',
+      minSelect: 1,
+      maxSelect: 1,
+      required: true,
+      singleSelect: true,
+      modifiers: [
+        modifier({ id: 'thin', name: 'Thin Crust', priceMinor: '0', isDefault: true, available: false }),
+        modifier({ id: 'thick', name: 'Thick Crust', priceMinor: '50' }),
+      ],
+    });
+    expect(initialSelections([crustUnavailableDefault])['grp-crust']).toEqual({});
+    const blocked = toggleModifier(crustUnavailableDefault, {}, 'thin');
+    expect(blocked.error).toMatch(/not available/);
+    expect(blocked.selected).toEqual({});
+  });
+
   it('reads variant-specific catalog adjustments for display only', () => {
     const pep = toppings.modifiers[0];
     expect(catalogAdjustmentMinor(pep, 'small')).toBe('200');

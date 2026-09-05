@@ -105,6 +105,17 @@ export class CartService {
       throw new BadRequestException('quantity must be a positive integer');
     }
     const cart = await this.carts.getOrCreate(userId);
+    const existing = cart.items.find((item) => item.id === itemId);
+    if (!existing) throw new NotFoundException('Cart item not found');
+    if (!existing.variantId) {
+      throw new BadRequestException('Cart item is missing a catalog variant');
+    }
+    await this.quotes.quote({
+      variantId: existing.variantId,
+      quantity,
+      channel: cart.type ?? undefined,
+      addOns: existing.addOns,
+    });
     const updated = await this.carts.updateItem(cart.id, itemId, quantity);
     if (!updated) throw new NotFoundException('Cart item not found');
     return this.price(cart.id);

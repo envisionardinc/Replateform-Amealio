@@ -3,7 +3,7 @@
 **Status:** FORENSIC ONLY. No production behavior changed.  
 **Date:** 2026-09-05  
 **Starting HEAD:** `cf9746109cfdf9e485854faaa6eb2f46f6c68e36`  
-**Final HEAD:** this documentation commit on `replatform/backend-consolidation` (reported after commit)  
+**Final HEAD:** `552a836daccf91e643ccddb5e3d19a1a3b544c48` (documentation-only; no production files)  
 **Governing rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  
 **Machine-readable matrix:** [115-MERCHANT-CATALOG-AUTHORING-OPERATIONS-GAP-MATRIX.json](./115-MERCHANT-CATALOG-AUTHORING-OPERATIONS-GAP-MATRIX.json)
 
@@ -44,7 +44,7 @@ Accepted prior slices at that HEAD: Stages A–G implemented; Stage I Global →
 
 ## 2. Final HEAD
 
-Documentation-only commit on the same branch. No Prisma, API, React, seed, CSS, or contract change. Exact SHA is recorded after commit and in the gap-matrix JSON.
+`552a836daccf91e643ccddb5e3d19a1a3b544c48` — documentation-only commit on the same branch. No Prisma, API, React, seed, CSS, or contract change. A follow-up stamp on this file does not change production behavior.
 
 ## 3. Repositories inspected
 

@@ -4,7 +4,7 @@
   "stage": "MERCHANT_CATALOG_AUTHORING",
   "status": "forensic_only",
   "acceptedHead": "cf9746109cfdf9e485854faaa6eb2f46f6c68e36",
-  "finalHead": "PENDING_DOC_COMMIT",
+  "finalHead": "552a836daccf91e643ccddb5e3d19a1a3b544c48",
   "implementation": "DEFER_UNTIL_GO",
   "productionBehaviorChanged": false,
   "schemaChanged": false,

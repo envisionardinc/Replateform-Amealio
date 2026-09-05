@@ -36,6 +36,7 @@ export class CheckoutController {
       tipMinor: body.tipMinor !== undefined ? BigInt(body.tipMinor) : undefined,
       donationMinor: body.donationMinor !== undefined ? BigInt(body.donationMinor) : undefined,
       items: body.items,
+      addressId: body.addressId,
       idempotencyKey: idempotencyKey ?? null,
     });
     return {

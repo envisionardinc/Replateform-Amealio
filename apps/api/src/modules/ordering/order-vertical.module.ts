@@ -6,6 +6,7 @@ import { StaffAuthModule } from '../identity/staff-authentication/staff-auth.mod
 import { MerchantModule } from '../merchant/merchant.module';
 import { PaymentModule } from '../payment/payment.module';
 import { OfferModule } from '../offer/offer.module';
+import { AddressesModule } from '../addresses/addresses.module';
 import { OrderingModule } from './ordering.module';
 import { CartRepository } from './infrastructure/cart.repository';
 import { CartService } from './application/cart.service';
@@ -34,6 +35,7 @@ import { OrdersController } from './api/orders.controller';
     MerchantModule,
     StaffAuthModule,
     ConsumerAuthModule,
+    AddressesModule,
     JwtModule.register({}),
   ],
   controllers: [

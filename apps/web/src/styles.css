@@ -307,7 +307,7 @@ p {
 
 .field input,
 .field select,
-input,
+input:not([type='radio']):not([type='checkbox']),
 select {
   display: block;
   width: 100%;
@@ -319,6 +319,16 @@ select {
   background: var(--ame-card);
   color: var(--ame-text);
   font: 400 var(--ame-fs-md) / var(--ame-lh) var(--ame-font);
+}
+
+input[type='radio'],
+input[type='checkbox'] {
+  width: 1.15rem;
+  height: 1.15rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
 }
 
 .field input:focus,

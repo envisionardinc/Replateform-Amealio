@@ -379,6 +379,20 @@ export type OrderDeliveryPerson = {
   isOnline: boolean;
 };
 
+export type DeliveryAddressSnapshot = {
+  schema?: string;
+  sourceAddressId?: string;
+  snapshottedAt?: string;
+  label?: string | null;
+  line1: string;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pinCode?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+};
+
 export type Order = {
   id: string;
   orderNumber: string | null;
@@ -411,6 +425,8 @@ export type Order = {
   tipMinor: string;
   deliveryPersonId: string | null;
   deliveryPerson: OrderDeliveryPerson | null;
+  deliveryAddressId?: string | null;
+  deliveryAddressSnapshot?: DeliveryAddressSnapshot | null;
   items: Array<{
     id: string;
     nameSnapshot: string | null;
@@ -543,6 +559,7 @@ export const checkoutApi = {
       settlement: 'COD' | 'PREPAID' | 'PAY_LATER';
       tipMinor?: number;
       couponCode?: string;
+      addressId?: string;
     },
     idempotencyKey: string,
   ) =>

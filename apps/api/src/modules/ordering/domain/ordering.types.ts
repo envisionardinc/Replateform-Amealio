@@ -58,6 +58,8 @@ export interface CreateOrderInput {
   checkoutIdempotencyKey?: string | null;
   deferRedemption?: boolean;
   status?: OrderStatusName;
+  deliveryAddressId?: string | null;
+  deliveryAddressSnapshot?: unknown | null;
 }
 
 export type RedemptionStatusName = 'ACTIVE' | 'REVERSED';
@@ -179,6 +181,8 @@ export interface OrderRecord {
   checkoutIdempotencyKey: string | null;
   deliveryPersonId: string | null;
   deliveryPerson?: OrderDeliveryPersonSummary | null;
+  deliveryAddressId?: string | null;
+  deliveryAddressSnapshot?: unknown | null;
   commercialSnapshot?: unknown | null;
   items: OrderItemRecord[];
   statusEvents: OrderStatusEventRecord[];

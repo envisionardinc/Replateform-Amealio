@@ -1,9 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConsumerAddressesService } from '../../addresses/application/consumer-addresses.service';
 import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.repository';
 import { PaymentService } from '../../payment/application/payment.service';
 import type { PaymentIntentRecord } from '../../payment/domain/payment.types';
 import { CartRepository } from '../infrastructure/cart.repository';
 import { OrderRepository } from '../infrastructure/order.repository';
+import {
+  requiresCheckoutAddress,
+  snapshotDeliveryAddress,
+} from '../domain/delivery-address-snapshot';
 import type { CreateOrderItemInput, OrderRecord, OrderTypeName } from '../domain/ordering.types';
 import { ComboService } from '../../catalog/application/combo.service';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
@@ -28,6 +33,7 @@ export interface CheckoutInput {
     }>;
     addOns?: unknown;
   }>;
+  addressId?: string | null;
   idempotencyKey?: string | null;
 }
 
@@ -56,6 +62,7 @@ export class CheckoutService {
     private readonly orders: OrderService,
     private readonly orderRepo: OrderRepository,
     private readonly payments: PaymentService,
+    private readonly addresses: ConsumerAddressesService,
   ) {}
 
   async checkout(userId: string, input: CheckoutInput): Promise<CheckoutResult> {
@@ -160,6 +167,18 @@ export class CheckoutService {
       throw new BadRequestException('Restaurant is not accepting orders');
     }
 
+    const addressId = input.addressId?.trim() || null;
+    let deliveryAddressId: string | null = null;
+    let deliveryAddressSnapshot = null;
+    if (requiresCheckoutAddress(type)) {
+      if (!addressId) {
+        throw new BadRequestException('addressId is required for HOME_DELIVERY and CATERING');
+      }
+      const owned = await this.addresses.loadOwnedForCheckout(userId, addressId);
+      deliveryAddressId = owned.id;
+      deliveryAddressSnapshot = snapshotDeliveryAddress(owned);
+    }
+
     const prepaid = input.settlement === 'PREPAID';
     const created = await this.orders.createOrder(
       { actorType: 'CUSTOMER', userId },
@@ -175,6 +194,8 @@ export class CheckoutService {
         checkoutIdempotencyKey: key,
         deferRedemption: prepaid && !!input.couponCode,
         status: prepaid ? 'INITIAL' : 'PENDING',
+        deliveryAddressId,
+        deliveryAddressSnapshot,
       },
     );
 

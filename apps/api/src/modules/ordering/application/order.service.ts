@@ -259,6 +259,9 @@ export class OrderService {
       redemption,
       checkoutIdempotencyKey: input.checkoutIdempotencyKey ?? null,
       deferRedemption: input.deferRedemption === true,
+      deliveryAddressId: input.deliveryAddressId ?? null,
+      deliveryAddressSnapshot:
+        (input.deliveryAddressSnapshot as Prisma.InputJsonValue | null) ?? null,
     });
   }
 

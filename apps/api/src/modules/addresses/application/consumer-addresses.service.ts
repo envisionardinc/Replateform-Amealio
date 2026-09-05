@@ -82,6 +82,23 @@ export class ConsumerAddressesService {
     return { id };
   }
 
+  async loadOwnedForCheckout(userId: string, addressId: string): Promise<AddressCheckoutSource> {
+    this.requireUserId(userId);
+    const row = await this.repo.findActiveMine(this.prisma, userId, addressId);
+    if (!row) throw new NotFoundException('Address not found');
+    return {
+      id: row.id,
+      label: row.label,
+      line1: row.line1,
+      line2: row.line2,
+      city: row.city,
+      state: row.state,
+      pinCode: row.pinCode,
+      lat: row.lat,
+      lon: row.lon,
+    };
+  }
+
   private requireUserId(userId: string): void {
     if (!userId) throw new UnauthorizedException('Consumer authentication required');
   }
@@ -101,3 +118,16 @@ function toView(row: AddressRow): AddressView {
     updatedAt: row.updatedAt.toISOString(),
   };
 }
+
+/** Checkout identity lookup. Book HTTP still omits lat/lon. */
+export type AddressCheckoutSource = {
+  id: string;
+  label: string | null;
+  line1: string;
+  line2: string | null;
+  city: string | null;
+  state: string | null;
+  pinCode: string | null;
+  lat: number | null;
+  lon: number | null;
+};

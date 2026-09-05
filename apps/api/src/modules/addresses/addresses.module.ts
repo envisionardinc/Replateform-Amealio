@@ -5,8 +5,8 @@ import { ConsumerAddressesService } from './application/consumer-addresses.servi
 import { AddressRepository } from './infrastructure/address.repository';
 
 /**
- * Consumer saved-address HTTP (doc 98). JWT subject owns GET/POST/PATCH/DELETE
- * /me/addresses over the existing Address table. No geo. No checkout.
+ * Consumer saved-address HTTP (doc 98) plus checkout ownership lookup (doc 114).
+ * JWT subject owns GET/POST/PATCH/DELETE /me/addresses. Book HTTP still omits geo.
  */
 @Module({
   imports: [ConsumerAuthModule],

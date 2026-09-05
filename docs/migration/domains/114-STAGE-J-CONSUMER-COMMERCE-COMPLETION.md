@@ -1,6 +1,6 @@
 # 114 — Stage J: Consumer Commerce Completion
 
-**Status:** FORENSIC ONLY — L1–L4 contract. **No implementation.**  
+**Status:** FORENSIC CONTRACT + first slice implemented (checkout address snapshot).  
 **Date:** 2026-09-05  
 **Accepted HEAD at start:** `9d7d8d7b1c89ec23638f92927ddbdd05160fa88f`  
 **Governing rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  
@@ -8,7 +8,9 @@
 
 This document recovers the canonical amealio **consumer / user-app commerce experience** from HOME through TRACKING, plus PROFILE / FAVORITES / SAVED ADDRESSES / DIETARY PREFERENCES. It compares that evidence to the current TurboRepo, industry practice, and the already-shipped A–G / Payment / Refund / OrderStatus authorities.
 
-**Hard stop:** no schema, migrations, APIs, UI, seeds, or A–I production changes in this task. Do not implement Stage J. Do not start Stage H personalization. Do not start Stage K event/celebration commerce. Do not modify Stage I.
+**First slice (accepted and implemented):** HOME_DELIVERY / CATERING require `addressId` → server ownership check → immutable `deliveryAddressSnapshot` on Order → confirmation/tracking. DINE_IN / TAKE_AWAY (and other non-delivery types) do not require an address.
+
+Do not start Stage H personalization. Do not start Stage K event/celebration commerce. Do not modify Stage I. Do not implement guest cart, maps, prepaid verify UI, or tip UI in this slice.
 
 ---
 
@@ -691,8 +693,8 @@ Only unresolved product choices. Examples from the brief that are **already reso
 | J-CART-3 | Persistence | Guest local; auth server | Server only (`sessionStorage` for coupon/key) | Matches no-guest | PRESERVE | Do not invent local cart |
 | J-PROMO-1 | Apply code | Legacy path only | Cart + checkout E | V1 had none | PRESERVE | Do not reopen 99 |
 | J-ADDR-1 | Address book | `/address` | `/addresses` + `/me/addresses` | Done | PRESERVE | Lane A closed |
-| J-ADDR-2 | Checkout selection | Cart `address_id` | **Missing** | Delivery has no destination | IMPROVE | First slice |
-| J-ADDR-3 | Order destination | Live ObjectId + lat/lng | Unused FK | Historical integrity | CORRECT | Snapshot |
+| J-ADDR-2 | Checkout selection | Cart `address_id` | `addressId` at checkout | Implemented | IMPROVE | Shipped |
+| J-ADDR-3 | Order destination | Live ObjectId + lat/lng | `deliveryAddressSnapshot` | Implemented | CORRECT | Shipped |
 | J-ADDR-4 | Recipient / phone / notes | Partial / dropped | No columns | Product | OWNER DECISION | OD-J-4 |
 | J-PAY-1 | COD | Unwired on v1 | COD first-class | Target ahead | PRESERVE | |
 | J-PAY-2 | Prepaid verify | Fetch/capture, no HMAC | Kernel exists; web unwired | Consumer completion | IMPROVE | After address slice |
@@ -744,7 +746,7 @@ First slice: **coordinates not required.** Lane C / rider dropoff geo stays FUTU
 
 ## 28–29. Smallest justified Stage J implementation slice
 
-**Decision: IMPLEMENT NOW** (when an explicit GO is given). **Do not implement in this forensic task.**
+**Decision: IMPLEMENT NOW** — first slice shipped after the checkout-address flow was accepted.
 
 The consumer A–G path already places COD orders and tracks them. The one hole that makes **HOME_DELIVERY commercially incomplete** is the missing destination.
 
@@ -784,10 +786,10 @@ Tip, prepaid verify, and PAY_LATER are real IMPROVEs, but COD + server totals al
 
 ---
 
-## Explicit non-implementation confirmation
+## Slice implementation confirmation
 
-- **No production code changed** in this task (Prisma, migrations, controllers, services, React, routes, seeds, CSS, APIs).
+- First slice **is implemented**: checkout `addressId`, ownership check, `deliveryAddressSnapshot`, confirmation/tracking display.
 - **Stage H was not implemented.**
 - **Stage K was not implemented.**
 - **Stage I was not modified.**
-- Defects that would need code (unused `deliveryAddressId`, omitted tip, unwired verify, silent restaurant replace) are **documented only**.
+- Out-of-slice gaps (guest cart, maps, prepaid verify UI, tip UI) remain documented only.

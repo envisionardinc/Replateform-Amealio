@@ -6,6 +6,7 @@ import { Banner } from '../design-system/Banner';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
 import { ApiError, discoverApi, ordersApi, type CheckoutResult, type Order } from '../lib/api';
+import { formatAddressLines } from '../lib/addresses';
 import { formatMinor } from '../lib/money';
 import { isAuthenticated } from '../lib/session';
 import { canCancel, isTerminalStatus, orderStatusTone } from '../lib/tracking';
@@ -113,6 +114,15 @@ export function OrderScreen() {
             {restaurantName ? (
               <p>
                 <Link to={`/restaurants/${order.restaurantId}`}>{restaurantName}</Link>
+              </p>
+            ) : null}
+            {order.deliveryAddressSnapshot?.line1 ? (
+              <p className="lede">
+                Deliver to
+                {order.deliveryAddressSnapshot.label
+                  ? ` ${order.deliveryAddressSnapshot.label} · `
+                  : ' '}
+                {formatAddressLines(order.deliveryAddressSnapshot)}
               </p>
             ) : null}
             {events.length > 0 ? (

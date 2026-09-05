@@ -174,11 +174,18 @@ describe('Consumer experience slice (doc 92 HTTP e2e)', () => {
       type: 'HOME_DELIVERY',
     });
 
+    const address = await http()
+      .post('/api/v1/me/addresses')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({ label: 'Home', line1: '12 Test Street', city: 'Pune' });
+    expect(address.status).toBe(201);
+
     const key = `web-slice-${Date.now()}`;
     const body = {
       restaurantId: live.restaurant.id,
       type: 'HOME_DELIVERY',
       settlement: 'COD',
+      addressId: address.body.id,
     };
     const first = await http()
       .post('/api/v1/checkout')

@@ -163,6 +163,10 @@ export class CheckoutDto {
   @ValidateNested({ each: true })
   @Type(() => CheckoutItemDto)
   items?: CheckoutItemDto[];
+
+  @IsOptional()
+  @IsUUID()
+  addressId?: string;
 }
 
 export class CancelConsumerOrderDto {

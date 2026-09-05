@@ -1,13 +1,22 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { StatusPanel } from '../components/StatusPanel';
+import { Badge } from '../design-system/Badge';
 import { Banner } from '../design-system/Banner';
 import { Button } from '../design-system/Button';
 import { Card } from '../design-system/Card';
 import { Field } from '../design-system/Field';
 import { CouponField } from '../components/CouponField';
 import { QuoteTotals } from '../components/QuoteTotals';
-import { cartApi, checkoutApi, promoCodeFromError, type PricedCart } from '../lib/api';
+import {
+  addressesApi,
+  cartApi,
+  checkoutApi,
+  promoCodeFromError,
+  type PricedCart,
+  type SavedAddress,
+} from '../lib/api';
+import { formatAddressLines } from '../lib/addresses';
 import {
   clearCheckoutKey,
   clearCouponCode,
@@ -17,9 +26,15 @@ import {
   setCouponCode,
 } from '../lib/session';
 
+function requiresCheckoutAddress(type: string | null | undefined): boolean {
+  return type === 'HOME_DELIVERY' || type === 'CATERING';
+}
+
 export function CheckoutScreen() {
   const navigate = useNavigate();
   const [cart, setCart] = useState<PricedCart | null>(null);
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [addressId, setAddressId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [settlement, setSettlement] = useState<'COD' | 'PREPAID'>('COD');
@@ -35,8 +50,20 @@ export function CheckoutScreen() {
     setLoading(true);
     setError(null);
     try {
-      setCart(await cartApi.get(getCouponCode() || undefined));
+      const nextCart = await cartApi.get(getCouponCode() || undefined);
+      setCart(nextCart);
       setPromoError(null);
+      if (requiresCheckoutAddress(nextCart.type ?? 'HOME_DELIVERY')) {
+        const book = await addressesApi.list();
+        setAddresses(book.data);
+        setAddressId((current) => {
+          if (current && book.data.some((row) => row.id === current)) return current;
+          return book.data.find((row) => row.isDefault)?.id ?? book.data[0]?.id ?? '';
+        });
+      } else {
+        setAddresses([]);
+        setAddressId('');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load cart');
     } finally {
@@ -48,9 +75,16 @@ export function CheckoutScreen() {
     void load();
   }, [load]);
 
+  const type = cart?.type ?? 'HOME_DELIVERY';
+  const needsAddress = requiresCheckoutAddress(type);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!cart) return;
+    if (needsAddress && !addressId) {
+      setError('Select a delivery address to place this order.');
+      return;
+    }
     setBusy(true);
     setError(null);
     const key = getOrCreateCheckoutKey();
@@ -58,9 +92,10 @@ export function CheckoutScreen() {
       const result = await checkoutApi.place(
         {
           restaurantId: cart.restaurantId ?? undefined,
-          type: cart.type ?? 'HOME_DELIVERY',
+          type,
           settlement,
           couponCode: getCouponCode() || undefined,
+          addressId: needsAddress ? addressId : undefined,
         },
         key,
       );
@@ -132,6 +167,50 @@ export function CheckoutScreen() {
             <p className="lede">
               Totals come from the server quote. This page never sends a price, tax, or fee.
             </p>
+            {needsAddress ? (
+              <fieldset>
+                <legend>Delivery address</legend>
+                <p className="lede">
+                  The server copies this address onto the order. Later book edits do not change a
+                  placed order.
+                </p>
+                {addresses.length === 0 ? (
+                  <Banner tone="empty">
+                    Add a saved address before placing a delivery order.{' '}
+                    <Link to="/addresses">Open address book</Link>
+                  </Banner>
+                ) : (
+                  addresses.map((row) => (
+                    <label key={row.id} className="row">
+                      <input
+                        type="radio"
+                        name="addressId"
+                        value={row.id}
+                        checked={addressId === row.id}
+                        onChange={() => setAddressId(row.id)}
+                      />
+                      <span>
+                        {row.label ? <strong>{row.label} · </strong> : null}
+                        {formatAddressLines(row)}
+                        {row.isDefault ? (
+                          <>
+                            {' '}
+                            <Badge>Default</Badge>
+                          </>
+                        ) : null}
+                      </span>
+                    </label>
+                  ))
+                )}
+                <p>
+                  <Link to="/addresses">Manage saved addresses</Link>
+                </p>
+              </fieldset>
+            ) : (
+              <Banner tone="empty">
+                {type.replaceAll('_', ' ')} does not require a delivery address.
+              </Banner>
+            )}
             <Field label="Settlement">
               <select
                 value={settlement}
@@ -151,7 +230,7 @@ export function CheckoutScreen() {
               </Banner>
             ) : null}
             <div className="sticky-cta">
-              <Button type="submit" disabled={busy}>
+              <Button type="submit" disabled={busy || (needsAddress && !addressId)}>
                 {busy ? 'Placing order…' : 'Place order'}
               </Button>
             </div>

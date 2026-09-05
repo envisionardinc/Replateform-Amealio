@@ -4,7 +4,7 @@
   "stage": "J",
   "status": "forensic_only",
   "acceptedHead": "9d7d8d7b1c89ec23638f92927ddbdd05160fa88f",
-  "implementation": "IMPLEMENT_NOW_AFTER_GO",
+  "implementation": "FIRST_SLICE_IMPLEMENTED",
   "productionBehaviorChanged": false,
   "stageHImplemented": false,
   "stageIModified": false,

@@ -5,7 +5,7 @@ export type AddressLabelChip = (typeof ADDRESS_LABEL_CHIPS)[number];
 
 export const ADDRESS_COPY = {
   title: 'Saved addresses',
-  lede: 'Your address book. These do not change checkout, delivery, or map location.',
+  lede: 'Your address book. Checkout copies a selected address onto the order; later edits do not change placed orders.',
   signIn: 'Sign in to view and edit saved addresses.',
   empty: 'No saved addresses yet.',
   saved: 'Address saved.',

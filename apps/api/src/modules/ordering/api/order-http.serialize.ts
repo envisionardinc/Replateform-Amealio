@@ -12,6 +12,8 @@ export function serializeOrder(order: OrderRecord) {
     cancelReason: order.cancelReason,
     deliveryPersonId: order.deliveryPersonId,
     deliveryPerson: order.deliveryPerson ?? null,
+    deliveryAddressId: order.deliveryAddressId ?? null,
+    deliveryAddressSnapshot: order.deliveryAddressSnapshot ?? null,
     currencyCode: order.currencyCode,
     subtotalMinor: order.subtotalMinor.toString(),
     taxTotalMinor: order.taxTotalMinor.toString(),

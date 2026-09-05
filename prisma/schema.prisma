@@ -1151,6 +1151,10 @@ model Order {
   deliveryMethod      DeliveryMethod?
   deliveryAddressId   String?           @db.Uuid
   deliveryAddress     Address?          @relation(fields: [deliveryAddressId], references: [id])
+  // Historical destination copied at consumer checkout (doc 114). Display and
+  // fulfillment read this snapshot. deliveryAddressId is lineage only — later
+  // book edits/deletes must not change a placed order.
+  deliveryAddressSnapshot Json?
   // money in integer minor units
   subtotalMinor       BigInt            @default(0)
   taxTotalMinor       BigInt            @default(0)

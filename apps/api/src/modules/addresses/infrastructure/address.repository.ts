@@ -10,6 +10,8 @@ export type AddressRow = {
   city: string | null;
   state: string | null;
   pinCode: string | null;
+  lat: number | null;
+  lon: number | null;
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +35,8 @@ export const ADDRESS_SELECT = {
   city: true,
   state: true,
   pinCode: true,
+  lat: true,
+  lon: true,
   isDefault: true,
   createdAt: true,
   updatedAt: true,

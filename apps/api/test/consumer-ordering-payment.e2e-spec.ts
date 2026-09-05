@@ -103,9 +103,22 @@ describe('Consumer ordering + payment (doc 90 HTTP e2e)', () => {
   }
 
   async function checkout(token: string, body: Record<string, unknown>, idempotencyKey?: string) {
+    const payload = { ...body };
+    const type = typeof payload.type === 'string' ? payload.type : 'HOME_DELIVERY';
+    if (
+      (type === 'HOME_DELIVERY' || type === 'CATERING') &&
+      typeof payload.addressId !== 'string'
+    ) {
+      const created = await http()
+        .post('/api/v1/me/addresses')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ label: 'Home', line1: '12 Test Street', city: 'Pune' });
+      expect(created.status).toBe(201);
+      payload.addressId = created.body.id;
+    }
     const req = http().post('/api/v1/checkout').set('Authorization', `Bearer ${token}`);
     if (idempotencyKey) req.set('Idempotency-Key', idempotencyKey);
-    return req.send(body);
+    return req.send(payload);
   }
 
   function sign(razorpayOrderId: string, razorpayPaymentId: string) {

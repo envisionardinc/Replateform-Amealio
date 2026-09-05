@@ -79,6 +79,8 @@ interface CreateArgs {
   donationMinor: bigint;
   currencyCode: string;
   checkoutIdempotencyKey?: string | null;
+  deliveryAddressId?: string | null;
+  deliveryAddressSnapshot?: Prisma.InputJsonValue | null;
   items: Array<{
     menuItemId: string | null;
     nameSnapshot: string;
@@ -193,6 +195,8 @@ export class OrderRepository {
             offerId: r?.offerId ?? args.offerId ?? null,
             couponId: r?.couponId ?? null,
             checkoutIdempotencyKey: args.checkoutIdempotencyKey ?? null,
+            deliveryAddressId: args.deliveryAddressId ?? null,
+            deliveryAddressSnapshot: args.deliveryAddressSnapshot ?? undefined,
             placedAt: new Date(),
             items: {
               create: args.items.map((i) => ({
@@ -530,6 +534,8 @@ export class OrderRepository {
     checkoutIdempotencyKey: string | null;
     deliveryPersonId: string | null;
     deliveryPerson?: OrderDeliveryPersonSummary | null;
+    deliveryAddressId?: string | null;
+    deliveryAddressSnapshot?: unknown | null;
     commercialSnapshot?: unknown | null;
     items: Array<Omit<OrderItemRecord, 'quantity'> & { quantity: number }>;
     statusEvents: Array<{
@@ -567,6 +573,8 @@ export class OrderRepository {
       checkoutIdempotencyKey: row.checkoutIdempotencyKey ?? null,
       deliveryPersonId: row.deliveryPersonId ?? null,
       deliveryPerson: row.deliveryPerson ?? null,
+      deliveryAddressId: row.deliveryAddressId ?? null,
+      deliveryAddressSnapshot: row.deliveryAddressSnapshot ?? null,
       items: row.items as OrderItemRecord[],
       statusEvents: row.statusEvents.map((e): OrderStatusEventRecord => ({
         id: e.id,

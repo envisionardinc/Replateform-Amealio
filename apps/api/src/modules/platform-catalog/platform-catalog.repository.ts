@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import type { MaterializationProduct } from '../catalog/domain/materialization-product';
 
 export interface PlatformCatalogRecord {
   id: string;
@@ -245,6 +247,7 @@ export class PlatformCatalogRepository {
     menuSectionId?: string | null;
     name: string;
     description?: string | null;
+    product?: MaterializationProduct | null;
   }): Promise<{ menuItemId: string; materializationId: string }> {
     return this.prisma.$transaction(async (tx) => {
       const menuItemRows = await tx.$queryRaw<Array<{ id: string }>>`
@@ -270,7 +273,84 @@ export class PlatformCatalogRepository {
       if (!materializationId)
         throw new Error('Catalogue materialization link did not return an id');
 
+      if (input.product) {
+        await copyMaterializedProduct(tx, menuItemId, input.product);
+      }
+
       return { menuItemId, materializationId };
+    });
+  }
+}
+
+async function copyMaterializedProduct(
+  tx: Prisma.TransactionClient,
+  menuItemId: string,
+  product: MaterializationProduct,
+): Promise<void> {
+  const variants: Array<{ id: string; size: string | null; sku: string | null }> = [];
+  for (const variant of product.variants ?? []) {
+    const created = await tx.itemVariant.create({
+      data: {
+        menuItemId,
+        size: variant.size ?? null,
+        sku: variant.sku ?? null,
+        priceMinor: variant.priceMinor,
+        currencyCode: variant.currencyCode ?? 'INR',
+        isDefault: variant.isDefault ?? false,
+        available: variant.available ?? true,
+      },
+      select: { id: true, size: true, sku: true },
+    });
+    variants.push(created);
+  }
+
+  for (const group of product.addOnGroups ?? []) {
+    const createdGroup = await tx.addOnGroup.create({
+      data: {
+        menuItemId,
+        name: group.name,
+        minSelect: group.minSelect ?? 0,
+        maxSelect: group.maxSelect ?? null,
+        allowQuantity: group.allowQuantity ?? false,
+        available: group.available ?? true,
+        sortOrder: group.sortOrder ?? 0,
+      },
+      select: { id: true },
+    });
+    for (const addon of group.addOns ?? []) {
+      const createdAddon = await tx.addOn.create({
+        data: {
+          addOnGroupId: createdGroup.id,
+          name: addon.name,
+          priceMinor: addon.priceMinor ?? 0n,
+          available: addon.available ?? true,
+          isDefault: addon.isDefault ?? false,
+          sortOrder: addon.sortOrder ?? 0,
+        },
+        select: { id: true },
+      });
+      for (const override of addon.variantPrices ?? []) {
+        const target = variants.find(
+          (row) =>
+            (override.sku && row.sku === override.sku) ||
+            (override.size && row.size === override.size),
+        );
+        if (!target) continue;
+        await tx.addOnVariantPrice.create({
+          data: { addOnId: createdAddon.id, variantId: target.id, priceMinor: override.priceMinor },
+        });
+      }
+    }
+  }
+
+  for (const channel of product.channelConfigs ?? []) {
+    await tx.itemChannelConfig.create({
+      data: {
+        menuItemId,
+        channel: channel.channel,
+        enabled: channel.enabled ?? true,
+        priceOverrideMinor: channel.priceOverrideMinor ?? null,
+      },
     });
   }
 }

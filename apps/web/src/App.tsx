@@ -10,6 +10,7 @@ import { OrdersScreen } from './screens/OrdersScreen';
 import { AddressesScreen } from './screens/AddressesScreen';
 import { FavoritesScreen } from './screens/FavoritesScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { CustomMenuScreen } from './screens/CustomMenuScreen';
 import { RestaurantScreen } from './screens/RestaurantScreen';
 
 export function App() {
@@ -19,6 +20,7 @@ export function App() {
         <Route path="/" element={<HomeScreen />} />
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/restaurants/:id" element={<RestaurantScreen />} />
+        <Route path="/restaurants/:restaurantId/menus/:menuId" element={<CustomMenuScreen />} />
         <Route path="/items/:id" element={<ItemScreen />} />
         <Route path="/cart" element={<CartScreen />} />
         <Route path="/checkout" element={<CheckoutScreen />} />

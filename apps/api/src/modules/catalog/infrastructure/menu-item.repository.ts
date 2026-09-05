@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import type {
   CheckoutCatalogLine,
+  ConsumerCatalogItem,
   ItemAvailabilityName,
   ItemChannelConfigRecord,
   ItemVariantRecord,
@@ -20,6 +21,7 @@ const ITEM_SELECT = {
   name: true,
   description: true,
   availability: true,
+  isPublished: true,
   posItemId: true,
   deletedAt: true,
 } as const;
@@ -116,6 +118,108 @@ export class MenuItemRepository {
       },
     });
     return rows.map((r) => ({ ...r, channel: r.channel as OrderChannel }));
+  }
+
+  /**
+   * Consumer catalog rows for Standard (virtual) or Custom (section-scoped) menus.
+   * Publication is applied here. Channel/orderability are evaluated by the caller
+   * using the shared Stage B rule.
+   */
+  async listConsumerItems(input: {
+    restaurantId: string;
+    channel?: OrderChannel;
+    menuSectionIds?: string[];
+    itemId?: string;
+  }): Promise<ConsumerCatalogItem[]> {
+    try {
+      const rows = await this.prisma.menuItem.findMany({
+        where: {
+          restaurantId: input.restaurantId,
+          deletedAt: null,
+          isPublished: true,
+          ...(input.itemId ? { id: input.itemId } : {}),
+          ...(input.menuSectionIds ? { menuSectionId: { in: input.menuSectionIds } } : {}),
+        },
+        select: {
+          id: true,
+          restaurantId: true,
+          menuSectionId: true,
+          name: true,
+          description: true,
+          availability: true,
+          isPublished: true,
+          deletedAt: true,
+          variants: {
+            select: {
+              id: true,
+              size: true,
+              sku: true,
+              priceMinor: true,
+              currencyCode: true,
+              available: true,
+            },
+            orderBy: { priceMinor: 'asc' },
+          },
+          channelConfigs: {
+            where: input.channel ? { channel: input.channel } : undefined,
+            select: { enabled: true },
+          },
+          addOnGroups: {
+            select: {
+              id: true,
+              name: true,
+              minSelect: true,
+              maxSelect: true,
+              allowQuantity: true,
+              available: true,
+              sortOrder: true,
+              addOns: {
+                select: {
+                  id: true,
+                  name: true,
+                  priceMinor: true,
+                  currencyCode: true,
+                  available: true,
+                  isDefault: true,
+                  sortOrder: true,
+                  variantPrices: { select: { variantId: true, priceMinor: true } },
+                },
+                orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+              },
+            },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+      return rows.map((row) => {
+        const cfg = input.channel ? (row.channelConfigs[0] ?? null) : null;
+        return {
+          id: row.id,
+          restaurantId: row.restaurantId,
+          menuSectionId: row.menuSectionId,
+          name: row.name,
+          description: row.description,
+          availability: row.availability as ItemAvailabilityName,
+          isPublished: row.isPublished,
+          deletedAt: row.deletedAt,
+          channelEnabled: cfg ? cfg.enabled : null,
+          variants: row.variants,
+          groups: row.addOnGroups.map((group) => ({
+            id: group.id,
+            name: group.name,
+            minSelect: group.minSelect,
+            maxSelect: group.maxSelect,
+            allowQuantity: group.allowQuantity,
+            available: group.available,
+            sortOrder: group.sortOrder,
+            modifiers: group.addOns,
+          })),
+        };
+      });
+    } catch {
+      return [];
+    }
   }
 
   /**

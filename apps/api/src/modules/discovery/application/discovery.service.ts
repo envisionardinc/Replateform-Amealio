@@ -1,19 +1,30 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { RestaurantRepository } from '../../merchant/infrastructure/restaurant.repository';
 import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repository';
+import { MenuRepository } from '../../catalog/infrastructure/menu.repository';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
-import type { OrderChannel } from '../../catalog/domain/catalog.types';
+import type { ConsumerCatalogItem, OrderChannel } from '../../catalog/domain/catalog.types';
 import type { ModifierGroupSelectionInput } from '../../catalog/domain/merchandise-configuration';
+import {
+  appearsOnConsumerMenu,
+  isConsumerOrderable,
+} from '../../catalog/domain/orderability';
 import type { RestaurantRecord } from '../../merchant/domain/merchant.types';
 import { DISCOVERY_FEED, type DiscoveryFeedProvider } from '../domain/discovery-feed';
 import { TaxonomyQuery } from './taxonomy.query';
 
+/**
+ * Public consumer discovery. Standard menu is a virtual assembly of published
+ * merchant catalog items. Custom Menu is a real Menu(type=CUSTOM) that references
+ * those same items. Both use the Stage B orderability rule.
+ */
 @Injectable()
 export class DiscoveryService {
   constructor(
     @Inject(DISCOVERY_FEED) private readonly feed: DiscoveryFeedProvider,
     private readonly restaurants: RestaurantRepository,
     private readonly items: MenuItemRepository,
+    private readonly menus: MenuRepository,
     private readonly taxonomy: TaxonomyQuery,
     private readonly quotes: MerchandiseQuoteService,
   ) {}
@@ -38,17 +49,73 @@ export class DiscoveryService {
     return row;
   }
 
-  async getMenu(restaurantId: string) {
+  async getMenu(restaurantId: string, channel?: OrderChannel) {
     await this.requireDiscoverable(restaurantId);
-    const items = await this.items.listPublishedByRestaurant(restaurantId);
-    return { restaurantId, items: items.map(serializePublishedItem) };
+    const items = await this.items.listConsumerItems({ restaurantId, channel });
+    return {
+      kind: 'STANDARD' as const,
+      restaurantId,
+      channel: channel ?? null,
+      items: items.filter((item) => appearsOnConsumerMenu(item, channel)).map(serializeConsumerItem),
+    };
   }
 
-  async getItem(id: string) {
-    const item = await this.items.findPublishedDetailById(id);
-    if (!item) throw new NotFoundException('Item not found');
+  async listCustomMenus(restaurantId: string) {
+    await this.requireDiscoverable(restaurantId);
+    const menus = await this.menus.listVisibleCustomMenus(restaurantId);
+    return {
+      restaurantId,
+      menus: menus.map((menu) => ({
+        id: menu.id,
+        name: menu.name,
+        type: 'CUSTOM' as const,
+        visibility: menu.visibility,
+      })),
+    };
+  }
+
+  async getCustomMenu(menuId: string, channel?: OrderChannel) {
+    const menu = await this.menus.findVisibleCustomMenu(menuId);
+    if (!menu) throw new NotFoundException('Menu not found');
+    await this.requireDiscoverable(menu.restaurantId);
+    const sectionIds = menu.sections.map((section) => section.id);
+    const items = sectionIds.length
+      ? await this.items.listConsumerItems({
+          restaurantId: menu.restaurantId,
+          channel,
+          menuSectionIds: sectionIds,
+        })
+      : [];
+    const visible = items.filter((item) => appearsOnConsumerMenu(item, channel));
+    const bySection = new Map(visible.map((item) => [item.menuSectionId, [] as typeof visible]));
+    for (const item of visible) {
+      const list = bySection.get(item.menuSectionId) ?? [];
+      list.push(item);
+      bySection.set(item.menuSectionId, list);
+    }
+    return {
+      kind: 'CUSTOM' as const,
+      restaurantId: menu.restaurantId,
+      channel: channel ?? null,
+      menu: { id: menu.id, name: menu.name, type: 'CUSTOM' as const, visibility: menu.visibility },
+      sections: menu.sections.map((section) => ({
+        id: section.id,
+        name: section.name,
+        sortOrder: section.sortOrder,
+        categoryId: section.categoryId,
+        items: (bySection.get(section.id) ?? []).map(serializeConsumerItem),
+      })),
+      items: visible.map(serializeConsumerItem),
+    };
+  }
+
+  async getItem(id: string, channel?: OrderChannel) {
+    const item = await this.findPublishedConsumerItem(id, channel);
+    if (!item || !appearsOnConsumerMenu(item, channel)) {
+      throw new NotFoundException('Item not found');
+    }
     await this.requireDiscoverable(item.restaurantId);
-    return serializePublishedItem(item);
+    return serializeConsumerItem(item);
   }
 
   async quoteItem(input: {
@@ -79,6 +146,20 @@ export class DiscoveryService {
     };
   }
 
+  private async findPublishedConsumerItem(
+    id: string,
+    channel?: OrderChannel,
+  ): Promise<ConsumerCatalogItem | null> {
+    const stub = await this.items.findById(id);
+    if (!stub) return null;
+    const rows = await this.items.listConsumerItems({
+      restaurantId: stub.restaurantId,
+      itemId: id,
+      channel,
+    });
+    return rows[0] ?? null;
+  }
+
   private async categoryIdsForFilter(categoryId: string): Promise<string[]> {
     if (!this.taxonomy.isCategoryId(categoryId)) {
       return ['00000000-0000-4000-8000-000000000000'];
@@ -95,43 +176,8 @@ export class DiscoveryService {
   }
 }
 
-function serializePublishedItem(item: {
-  id: string;
-  restaurantId: string;
-  name: string;
-  description: string | null;
-  availability: string;
-  isPublished: boolean;
-  variants: Array<{
-    id: string;
-    size: string | null;
-    sku?: string | null;
-    priceMinor: bigint;
-    currencyCode: string;
-    available: boolean;
-  }>;
-  modifierGroups?: Array<{
-    id: string;
-    name: string;
-    minSelect: number;
-    maxSelect: number | null;
-    allowQuantity: boolean;
-    available: boolean;
-    sortOrder: number;
-    required: boolean;
-    singleSelect: boolean;
-    modifiers: Array<{
-      id: string;
-      name: string;
-      priceMinor: bigint;
-      currencyCode: string;
-      available: boolean;
-      isDefault: boolean;
-      sortOrder: number;
-      variantPrices: Array<{ variantId: string; priceMinor: bigint }>;
-    }>;
-  }>;
-}) {
+function serializeConsumerItem(item: ConsumerCatalogItem) {
+  const orderable = isConsumerOrderable(item);
   return {
     id: item.id,
     restaurantId: item.restaurantId,
@@ -139,6 +185,9 @@ function serializePublishedItem(item: {
     description: item.description,
     availability: item.availability,
     isPublished: item.isPublished,
+    visible: true,
+    orderable,
+    channelEnabled: item.channelEnabled,
     variants: item.variants.map((v) => ({
       id: v.id,
       size: v.size,
@@ -147,33 +196,33 @@ function serializePublishedItem(item: {
       currencyCode: v.currencyCode,
       available: v.available,
     })),
-    ...(item.modifierGroups
-      ? {
-          modifierGroups: item.modifierGroups.map((g) => ({
-            id: g.id,
-            name: g.name,
-            minSelect: g.minSelect,
-            maxSelect: g.maxSelect,
-            allowQuantity: g.allowQuantity,
-            available: g.available,
-            sortOrder: g.sortOrder,
-            required: g.required,
-            singleSelect: g.singleSelect,
-            modifiers: g.modifiers.map((m) => ({
-              id: m.id,
-              name: m.name,
-              priceMinor: m.priceMinor.toString(),
-              currencyCode: m.currencyCode,
-              available: m.available,
-              isDefault: m.isDefault,
-              sortOrder: m.sortOrder,
-              variantPrices: m.variantPrices.map((p) => ({
-                variantId: p.variantId,
-                priceMinor: p.priceMinor.toString(),
-              })),
+    modifierGroups: item.groups
+      .filter((g) => g.available)
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        minSelect: g.minSelect,
+        maxSelect: g.maxSelect,
+        allowQuantity: g.allowQuantity,
+        available: g.available,
+        sortOrder: g.sortOrder,
+        required: g.minSelect >= 1,
+        singleSelect: g.maxSelect === 1,
+        modifiers: g.modifiers
+          .filter((m) => m.available)
+          .map((m) => ({
+            id: m.id,
+            name: m.name,
+            priceMinor: m.priceMinor.toString(),
+            currencyCode: m.currencyCode,
+            available: m.available,
+            isDefault: m.isDefault,
+            sortOrder: m.sortOrder,
+            variantPrices: m.variantPrices.map((p) => ({
+              variantId: p.variantId,
+              priceMinor: p.priceMinor.toString(),
             })),
           })),
-        }
-      : {}),
+      })),
   };
 }

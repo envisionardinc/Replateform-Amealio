@@ -13,6 +13,7 @@ import {
   PlatformCatalogCategoryRecord,
   PlatformCatalogItemRecord,
 } from './platform-catalog.repository';
+import { parseMaterializationProduct } from '../catalog/domain/materialization-product';
 
 /**
  * Global Catalogue source + merchant materialization foundation.
@@ -278,6 +279,7 @@ export class PlatformCatalogService {
       menuSectionId: input.menuSectionId ?? null,
       name: name.trim(),
       description: input.descriptionOverride ?? source.description,
+      product: parseMaterializationProduct(source.sourcePayload),
     });
   }
 

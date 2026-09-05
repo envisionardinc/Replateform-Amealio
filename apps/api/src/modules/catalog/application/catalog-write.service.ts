@@ -59,6 +59,9 @@ export class CatalogWriteService {
     if (input.type !== undefined && !MENU_TYPES.has(input.type)) {
       throw new BadRequestException('invalid menu type');
     }
+    if (input.legacyId === '123456') {
+      throw new BadRequestException('legacy placeholder menu ids are not allowed');
+    }
     const merchantId = await this.assertRestaurant(principal, input.restaurantId);
     return this.repo.createMenu(merchantId, input);
   }

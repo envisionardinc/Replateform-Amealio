@@ -215,6 +215,7 @@ describe('PlatformCatalogService', () => {
           merchantId: 'm1',
           restaurantId: UUID.restaurant,
           name: 'Paneer',
+          product: null,
         }),
       );
     });

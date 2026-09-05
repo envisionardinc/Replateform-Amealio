@@ -75,17 +75,50 @@ export class DiscoveryController {
   }
 
   @Get('restaurants/:id/menu')
-  menu(@Param('id', ParseUUIDPipe) id: string) {
-    return this.discovery.getMenu(id);
+  menu(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('type') type?: OrderChannel,
+  ) {
+    return this.discovery.getMenu(id, parseChannel(type));
+  }
+
+  @Get('restaurants/:id/menus')
+  customMenus(@Param('id', ParseUUIDPipe) id: string) {
+    return this.discovery.listCustomMenus(id);
+  }
+
+  @Get('menus/:menuId')
+  customMenu(
+    @Param('menuId', ParseUUIDPipe) menuId: string,
+    @Query('type') type?: OrderChannel,
+  ) {
+    return this.discovery.getCustomMenu(menuId, parseChannel(type));
   }
 
   @Get('items/:id')
-  item(@Param('id', ParseUUIDPipe) id: string) {
-    return this.discovery.getItem(id);
+  item(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('type') type?: OrderChannel,
+  ) {
+    return this.discovery.getItem(id, parseChannel(type));
   }
 
   @Post('quote')
   quote(@Body() body: MerchandiseQuoteDto) {
     return this.discovery.quoteItem(body);
   }
+}
+
+const CHANNELS: OrderChannel[] = [
+  'DINE_IN',
+  'TAKE_AWAY',
+  'CURB_SIDE',
+  'SKIP_LINE',
+  'HOME_DELIVERY',
+  'CATERING',
+];
+
+function parseChannel(type?: string): OrderChannel | undefined {
+  if (!type) return undefined;
+  return CHANNELS.includes(type as OrderChannel) ? (type as OrderChannel) : undefined;
 }

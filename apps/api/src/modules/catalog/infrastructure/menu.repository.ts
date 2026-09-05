@@ -78,4 +78,36 @@ export class MenuRepository {
       orderBy: { sortOrder: 'asc' },
     });
   }
+
+  /** Consumer Custom Menus only. Persisted STANDARD rows are never the à-la-carte projection. */
+  async listVisibleCustomMenus(restaurantId: string): Promise<MenuRecord[]> {
+    const rows = await this.prisma.menu.findMany({
+      where: {
+        restaurantId,
+        deletedAt: null,
+        visibility: true,
+        type: 'CUSTOM',
+      },
+      select: MENU_SELECT,
+      orderBy: { name: 'asc' },
+    });
+    return rows.map(toMenu);
+  }
+
+  async findVisibleCustomMenu(
+    menuId: string,
+  ): Promise<(MenuRecord & { sections: MenuSectionRecord[] }) | null> {
+    try {
+      const row = await this.prisma.menu.findFirst({
+        where: { id: menuId, deletedAt: null, visibility: true, type: 'CUSTOM' },
+        select: {
+          ...MENU_SELECT,
+          sections: { select: SECTION_SELECT, orderBy: { sortOrder: 'asc' } },
+        },
+      });
+      return row ? { ...toMenu(row), sections: row.sections } : null;
+    } catch {
+      return null;
+    }
+  }
 }

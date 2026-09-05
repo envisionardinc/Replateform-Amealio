@@ -48,7 +48,7 @@ export function ItemScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await discoverApi.item(id);
+      const data = await discoverApi.item(id, 'HOME_DELIVERY');
       const firstAvailable = data.variants.find((row) => row.available) ?? data.variants[0];
       setItem(data);
       setVariantId(firstAvailable?.id ?? '');
@@ -66,7 +66,8 @@ export function ItemScreen() {
   }, [load]);
 
   const variant = item?.variants.find((row) => row.id === variantId) ?? item?.variants[0];
-  const sellable = item?.availability === 'AVAILABLE' && variant?.available === true;
+  const sellable =
+    item?.orderable !== false && item?.availability === 'AVAILABLE' && variant?.available === true;
   const payload = useMemo(() => toModifierGroupPayload(groups, selections), [groups, selections]);
 
   useEffect(() => {

@@ -97,6 +97,7 @@ export interface MenuItemRecord {
   name: string;
   description: string | null;
   availability: ItemAvailabilityName;
+  isPublished: boolean;
   posItemId: string | null;
   deletedAt: Date | null;
 }
@@ -106,6 +107,46 @@ export interface MenuItemDetail extends MenuItemRecord {
   variants: ItemVariantRecord[];
   channelConfigs: ItemChannelConfigRecord[];
   addOnGroups: AddOnGroupRecord[];
+}
+
+/** Consumer-visible catalog projection (Stage B). Same shape for Standard and Custom. */
+export interface ConsumerCatalogItem {
+  id: string;
+  restaurantId: string;
+  menuSectionId: string | null;
+  name: string;
+  description: string | null;
+  availability: ItemAvailabilityName;
+  isPublished: boolean;
+  deletedAt: Date | null;
+  channelEnabled: boolean | null;
+  variants: Array<{
+    id: string;
+    size: string | null;
+    sku: string | null;
+    priceMinor: bigint;
+    currencyCode: string;
+    available: boolean;
+  }>;
+  groups: Array<{
+    id: string;
+    name: string;
+    minSelect: number;
+    maxSelect: number | null;
+    allowQuantity: boolean;
+    available: boolean;
+    sortOrder: number;
+    modifiers: Array<{
+      id: string;
+      name: string;
+      priceMinor: bigint;
+      currencyCode: string;
+      available: boolean;
+      isDefault: boolean;
+      sortOrder: number;
+      variantPrices: Array<{ variantId: string; priceMinor: bigint }>;
+    }>;
+  }>;
 }
 
 /** Catalog line used to reprice cart/checkout (doc 90). Never trust client totals. */

@@ -126,8 +126,33 @@ export type MenuItem = {
   description: string | null;
   availability: string;
   isPublished: boolean;
+  visible?: boolean;
+  orderable?: boolean;
+  channelEnabled?: boolean | null;
   variants: ItemVariant[];
   modifierGroups?: CatalogModifierGroup[];
+};
+
+export type ConsumerMenu = {
+  kind: 'STANDARD' | 'CUSTOM';
+  restaurantId: string;
+  channel?: string | null;
+  items: MenuItem[];
+  menu?: { id: string; name: string; type: 'CUSTOM'; visibility: boolean };
+  sections?: Array<{
+    id: string;
+    name: string;
+    sortOrder: number;
+    categoryId: string | null;
+    items: MenuItem[];
+  }>;
+};
+
+export type CustomMenuSummary = {
+  id: string;
+  name: string;
+  type: 'CUSTOM';
+  visibility: boolean;
 };
 
 export type ModifierGroupPayload = {
@@ -292,9 +317,16 @@ export const discoverApi = {
     return api<HomeFeed>(`/api/v1/discover/home${qs ? `?${qs}` : ''}`);
   },
   restaurant: (id: string) => api<Restaurant>(`/api/v1/discover/restaurants/${id}`),
-  menu: (id: string) =>
-    api<{ restaurantId: string; items: MenuItem[] }>(`/api/v1/discover/restaurants/${id}/menu`),
-  item: (id: string) => api<MenuItem>(`/api/v1/discover/items/${id}`),
+  menu: (id: string, type = 'HOME_DELIVERY') =>
+    api<ConsumerMenu>(`/api/v1/discover/restaurants/${id}/menu?type=${type}`),
+  customMenus: (id: string) =>
+    api<{ restaurantId: string; menus: CustomMenuSummary[] }>(
+      `/api/v1/discover/restaurants/${id}/menus`,
+    ),
+  customMenu: (menuId: string, type = 'HOME_DELIVERY') =>
+    api<ConsumerMenu>(`/api/v1/discover/menus/${menuId}?type=${type}`),
+  item: (id: string, type = 'HOME_DELIVERY') =>
+    api<MenuItem>(`/api/v1/discover/items/${id}?type=${type}`),
   quote: (body: {
     variantId: string;
     quantity: number;

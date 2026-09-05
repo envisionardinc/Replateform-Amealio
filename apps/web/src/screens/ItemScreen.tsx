@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { FavoriteButton } from '../components/FavoriteButton';
 import { StatusPanel } from '../components/StatusPanel';
 import { Banner } from '../design-system/Banner';
 import { Button } from '../design-system/Button';
@@ -76,7 +77,14 @@ export function ItemScreen() {
       <StatusPanel loading={loading} error={error} onRetry={() => void load()}>
         {item ? (
           <Card>
-            <h1>{item.name}</h1>
+            <div className="row">
+              <h1>{item.name}</h1>
+              <FavoriteButton
+                targetType="MENU_ITEM"
+                targetId={item.id}
+                next={`/items/${item.id}`}
+              />
+            </div>
             <p className="lede">{item.description || 'No description'}</p>
             <Field label="Size">
               <select value={variantId} onChange={(e) => setVariantId(e.target.value)}>

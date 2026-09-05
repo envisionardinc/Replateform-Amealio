@@ -310,6 +310,40 @@ export type ConsumerProfilePatch = {
   };
 };
 
+export type FavoriteTargetType = 'RESTAURANT' | 'MENU_ITEM';
+
+export type Favorite = {
+  id: string;
+  targetType: FavoriteTargetType;
+  targetId: string;
+  createdAt: string;
+  restaurant: { id: string; name: string; city: string | null; status: string } | null;
+  item: {
+    id: string;
+    name: string;
+    restaurantId: string;
+    availability: string;
+    isPublished: boolean;
+  } | null;
+};
+
+export const favoritesApi = {
+  list: (targetType?: FavoriteTargetType) => {
+    const qs = targetType ? `?targetType=${targetType}` : '';
+    return api<{ data: Favorite[] }>(`/api/v1/me/favorites${qs}`);
+  },
+  put: (body: { targetType: FavoriteTargetType; targetId: string }) =>
+    api<Favorite>('/api/v1/me/favorites', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  remove: (targetType: FavoriteTargetType, targetId: string) =>
+    api<{ targetType: FavoriteTargetType; targetId: string }>(
+      `/api/v1/me/favorites/${targetType}/${targetId}`,
+      { method: 'DELETE' },
+    ),
+};
+
 export const profileApi = {
   get: () => api<ConsumerProfile>('/api/v1/me/profile'),
   patch: (body: ConsumerProfilePatch) =>

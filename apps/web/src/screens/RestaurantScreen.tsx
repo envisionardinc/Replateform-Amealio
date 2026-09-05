@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { FavoriteButton } from '../components/FavoriteButton';
 import { StatusPanel } from '../components/StatusPanel';
 import { Badge } from '../design-system/Badge';
+import { Banner } from '../design-system/Banner';
 import { Card } from '../design-system/Card';
 import { discoverApi, type MenuItem, type Restaurant } from '../lib/api';
 import { formatMinor } from '../lib/money';
@@ -38,21 +40,24 @@ export function RestaurantScreen() {
       <p>
         <Link to="/">← Home</Link>
       </p>
-      <StatusPanel
-        loading={loading}
-        error={error}
-        empty={
-          !loading && !error && items.length === 0
-            ? 'This restaurant has no published items.'
-            : null
-        }
-        onRetry={() => void load()}
-      >
-        <h1>{restaurant?.name}</h1>
+      <StatusPanel loading={loading} error={error} onRetry={() => void load()}>
+        <div className="row">
+          <h1>{restaurant?.name}</h1>
+          {restaurant ? (
+            <FavoriteButton
+              targetType="RESTAURANT"
+              targetId={restaurant.id}
+              next={`/restaurants/${restaurant.id}`}
+            />
+          ) : null}
+        </div>
         <p className="lede">
           {restaurant?.city ?? ''} · only published items are listed. Unpublished catalog rows stay
           staff-only.
         </p>
+        {items.length === 0 ? (
+          <Banner tone="empty">This restaurant has no published items.</Banner>
+        ) : null}
         {items.map((item) => {
           const variant = item.variants[0];
           const sellable = item.availability === 'AVAILABLE' && variant?.available;

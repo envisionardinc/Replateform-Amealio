@@ -96,6 +96,11 @@ export function ProfileScreen() {
     <section>
       <h1>{PROFILE_COPY.title}</h1>
       <p className="lede">{PROFILE_COPY.lede}</p>
+      {isAuthenticated() ? (
+        <p>
+          <Link to="/favorites">Favorites</Link>
+        </p>
+      ) : null}
       {view.kind === 'unauthenticated' ? (
         <Banner tone="error">
           <p>{view.message}</p>

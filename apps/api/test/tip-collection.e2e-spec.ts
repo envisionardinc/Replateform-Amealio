@@ -132,7 +132,7 @@ describe('Tip collection/capture foundation (P1.7.38)', () => {
         orderNumber: uniq('ORD'),
         restaurantId,
         userId,
-        type: 'HOME_DELIVERY',
+        type: 'TAKE_AWAY',
         items: [
           { nameSnapshot: 'Item', unitPriceMinor: over.unitPriceMinor ?? 10000n, quantity: 1 },
         ],

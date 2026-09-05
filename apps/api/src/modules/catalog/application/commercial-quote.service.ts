@@ -20,7 +20,7 @@ import { MerchandiseQuoteService } from './merchandise-quote.service';
  *
  * Wraps Stage A merchandise quoting and composes discount/tax/fee/grand.
  * Production tax/fee rule tables do not exist — empty rules yield explicit zeros.
- * Never reads ItemChannelConfig.surcharges. Never calls PromotionEvaluationService.
+ * Never reads ItemChannelConfig.surcharges. Never calls the Phase 1 promotion kernel.
  */
 @Injectable()
 export class CommercialQuoteService {

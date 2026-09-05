@@ -78,7 +78,7 @@ describe('Config-driven tip beneficiary routing (P1.7.39)', () => {
       orderNumber: uniq('ORD'),
       restaurantId,
       userId: user.id,
-      type: 'HOME_DELIVERY',
+      type: 'TAKE_AWAY',
       items: [{ nameSnapshot: 'Item', unitPriceMinor, quantity: 1 }],
     });
   };

@@ -88,7 +88,7 @@ describe('Order tip & donation model (P1.7.36)', () => {
   ) => ({
     orderNumber: uniq('ORD'),
     restaurantId,
-    type: 'HOME_DELIVERY' as const,
+    type: 'TAKE_AWAY' as const,
     items: [{ nameSnapshot: 'Item', unitPriceMinor: 10000n, quantity: 1 }],
     ...over,
   });

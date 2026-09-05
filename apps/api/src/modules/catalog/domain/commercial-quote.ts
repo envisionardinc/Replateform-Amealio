@@ -190,10 +190,7 @@ export function composeCommercialQuote(input: {
   );
   const discountMinor = input.discountMinor ?? 0n;
   if (discountMinor < 0n) {
-    throw new CommercialQuoteError(
-      'CLIENT_MONEY_NOT_AUTHORITATIVE',
-      'discountMinor must be >= 0',
-    );
+    throw new CommercialQuoteError('CLIENT_MONEY_NOT_AUTHORITATIVE', 'discountMinor must be >= 0');
   }
   if (discountMinor > merchandiseSubtotalMinor) {
     throw new CommercialQuoteError(
@@ -407,7 +404,10 @@ function applyFeeRules(
 ): CommercialFeeLine[] {
   return rules.map((rule) => {
     if (!FEE_TYPE_SET.has(rule.type)) {
-      throw new CommercialQuoteError('UNSUPPORTED_FEE_TYPE', `unsupported fee type ${String(rule.type)}`);
+      throw new CommercialQuoteError(
+        'UNSUPPORTED_FEE_TYPE',
+        `unsupported fee type ${String(rule.type)}`,
+      );
     }
     if (rule.taxTreatment !== 'NONE') {
       throw new CommercialQuoteError(

@@ -162,7 +162,7 @@ describe('Settlement window & commission (P1.7.32)', () => {
       const order = await orders.createOrder(staffOf(merchantId), {
         orderNumber: uniq('ORD'),
         restaurantId,
-        type: 'HOME_DELIVERY',
+        type: 'TAKE_AWAY',
         userId: opts.userId ?? null,
         items: [
           { nameSnapshot: 'Item', unitPriceMinor: opts.unitPriceMinor ?? 10000n, quantity: 1 },
@@ -364,7 +364,7 @@ describe('Settlement window & commission (P1.7.32)', () => {
           orderNumber: uniq('ORD'),
           merchantId,
           restaurantId,
-          type: 'HOME_DELIVERY',
+          type: 'TAKE_AWAY',
           status: 'INITIAL',
           subtotalMinor: 10000n,
           taxTotalMinor: 2000n,

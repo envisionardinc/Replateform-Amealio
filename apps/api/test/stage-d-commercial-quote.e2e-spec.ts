@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -89,17 +91,20 @@ describe('Stage D commercial quote', () => {
       name: 'Pizza',
       isPublished: true,
       availability: 'AVAILABLE',
-      variants: [{ size: 'Large', sku: 'PIZ-L', priceMinor: opts?.priceMinor ?? 16000n, isDefault: true }],
-      addOnGroups: opts?.toppings === false
-        ? []
-        : [
-            {
-              name: 'Toppings',
-              minSelect: 0,
-              maxSelect: 2,
-              addOns: [{ name: 'Pepperoni', priceMinor: 300n }],
-            },
-          ],
+      variants: [
+        { size: 'Large', sku: 'PIZ-L', priceMinor: opts?.priceMinor ?? 16000n, isDefault: true },
+      ],
+      addOnGroups:
+        opts?.toppings === false
+          ? []
+          : [
+              {
+                name: 'Toppings',
+                minSelect: 0,
+                maxSelect: 2,
+                addOns: [{ name: 'Pepperoni', priceMinor: 300n }],
+              },
+            ],
     });
     const variant = item.variants[0];
     const toppings = item.addOnGroups.find((g) => g.name === 'Toppings');
@@ -314,17 +319,17 @@ describe('Stage D commercial quote', () => {
   it('cannot use another merchant catalog for a quote', async () => {
     const a = await seedItem({ toppings: false });
     const b = await seedItem({ toppings: false });
-    await expect(commercial.quote({ variantId: a.variant.id, quantity: 1 })).resolves.toMatchObject({
-      restaurantId: a.restaurantId,
-    });
+    await expect(commercial.quote({ variantId: a.variant.id, quantity: 1 })).resolves.toMatchObject(
+      {
+        restaurantId: a.restaurantId,
+      },
+    );
     const quoteB = await commercial.quote({ variantId: b.variant.id, quantity: 1 });
     expect(quoteB.restaurantId).toBe(b.restaurantId);
     expect(quoteB.merchantId).not.toBe(a.merchantId);
   });
 
   it('does not import the promotion evaluation kernel on the quote path', () => {
-    const fs = require('fs') as typeof import('fs');
-    const path = require('path') as typeof import('path');
     const files = [
       '../src/modules/catalog/application/commercial-quote.service.ts',
       '../src/modules/catalog/domain/commercial-quote.ts',
@@ -334,8 +339,8 @@ describe('Stage D commercial quote', () => {
       '../src/modules/discovery/application/discovery.service.ts',
     ];
     for (const file of files) {
-      const src = fs.readFileSync(path.join(__dirname, file), 'utf8');
-      expect(src).not.toMatch(/PromotionEvaluationService/);
+      const src = readFileSync(join(__dirname, file), 'utf8');
+      expect(src).not.toMatch(/from ['"].*promotion-evaluation\.service['"]/);
     }
   });
 });

@@ -13,6 +13,8 @@ This document answers whether **consumer offer / coupon browsing** can exist as 
 
 Do **not** implement `GET /api/v1/me/offers`, `GET /api/v1/discover/offers`, or a consumer Offers UI this slice.
 
+Modern target architecture (do not implement the browse-only slice): [101-AMEALIO-PROMOTIONS-TARGET-BEHAVIOR-CONTRACT.md](./101-AMEALIO-PROMOTIONS-TARGET-BEHAVIOR-CONTRACT.md). This document remains forensic evidence.
+
 ---
 
 ## 0. Method

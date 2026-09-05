@@ -21,12 +21,19 @@ describe('Consumer discovery (doc 92 public HTTP e2e)', () => {
     await app.close();
   });
 
-  async function seedRestaurant(over: { status?: string; city?: string; deleted?: boolean } = {}) {
+  async function seedRestaurant(
+    over: {
+      status?: string;
+      city?: string;
+      deleted?: boolean;
+      name?: string;
+    } = {},
+  ) {
     const merchant = await prisma.merchant.create({ data: { legalName: uniq('Biz') } });
     const restaurant = await prisma.restaurant.create({
       data: {
         merchantId: merchant.id,
-        name: uniq('Cafe'),
+        name: over.name ?? uniq('Cafe'),
         city: over.city ?? 'Pune',
         status: over.status ?? 'ACTIVE',
         deletedAt: over.deleted ? new Date() : null,
@@ -73,7 +80,9 @@ describe('Consumer discovery (doc 92 public HTTP e2e)', () => {
   }
 
   it('lists ACTIVE restaurants on canonical home and hides inactive/deleted', async () => {
-    const live = await seedRestaurant({ city: 'Pune' });
+    // Shared test DBs accumulate restaurants; home is name-asc + take 100.
+    // A leading '!' keeps this row on the first page without changing feed rules.
+    const live = await seedRestaurant({ city: 'Pune', name: uniq('!Live') });
     const closed = await seedRestaurant({ status: 'INACTIVE' });
     const gone = await seedRestaurant({ deleted: true });
 

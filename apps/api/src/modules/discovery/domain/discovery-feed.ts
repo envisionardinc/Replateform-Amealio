@@ -7,8 +7,24 @@ import type { RestaurantRecord } from '../../merchant/domain/merchant.types';
  */
 export type DiscoveryFeedSource = 'CANONICAL' | 'RECOMMENDATION';
 
+export type DiscoveryQuery = { city?: string; q?: string; categoryId?: string };
+
+export type DiscoveryTaxonomyChip = {
+  id: string;
+  label: string;
+  type: string | null;
+  available: boolean;
+  restaurantCount: number;
+};
+
+export type DiscoveryTaxonomy = {
+  kind: 'CATEGORY';
+  chips: DiscoveryTaxonomyChip[];
+};
+
 export interface DiscoveryHomeFeed {
   source: DiscoveryFeedSource;
+  taxonomy: DiscoveryTaxonomy;
   sections: Array<{
     id: string;
     title: string;
@@ -17,7 +33,7 @@ export interface DiscoveryHomeFeed {
 }
 
 export interface DiscoveryFeedProvider {
-  getHomeFeed(query: { city?: string; q?: string }): Promise<DiscoveryHomeFeed>;
+  getHomeFeed(query: DiscoveryQuery): Promise<DiscoveryHomeFeed>;
 }
 
 export const DISCOVERY_FEED = 'DISCOVERY_FEED';

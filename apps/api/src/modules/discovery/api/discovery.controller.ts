@@ -10,13 +10,21 @@ export class DiscoveryController {
   constructor(private readonly discovery: DiscoveryService) {}
 
   @Get('home')
-  home(@Query('city') city?: string, @Query('q') q?: string) {
-    return this.discovery.getHome({ city, q });
+  home(
+    @Query('city') city?: string,
+    @Query('q') q?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    return this.discovery.getHome({ city, q, categoryId });
   }
 
   @Get('restaurants')
-  list(@Query('city') city?: string, @Query('q') q?: string) {
-    return this.discovery.listRestaurants({ city, q }).then((data) => ({ data }));
+  list(
+    @Query('city') city?: string,
+    @Query('q') q?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    return this.discovery.listRestaurants({ city, q, categoryId }).then((data) => ({ data }));
   }
 
   @Get('restaurants/:id')

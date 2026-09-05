@@ -90,6 +90,20 @@ async function main() {
     update: {},
     create: { name: 'Mains', code: 'MAINS', type: 'FOOD' },
   });
+  await prisma.category.upsert({
+    where: { code: 'DESSERTS' },
+    update: {},
+    create: { name: 'Desserts', code: 'DESSERTS', type: 'FOOD' },
+  });
+  const breads = await prisma.category.upsert({
+    where: { code: 'BREADS' },
+    update: {},
+    create: {
+      name: 'Breads with a deliberately long label for chip overflow',
+      code: 'BREADS',
+      type: 'FOOD',
+    },
+  });
   await prisma.cuisine.upsert({
     where: { name: 'North Indian' },
     update: {},
@@ -202,6 +216,70 @@ async function main() {
       priceMinor: 19900n,
       currencyCode: 'INR',
       available: false,
+    },
+  });
+
+  const breadMerchant = await prisma.merchant.upsert({
+    where: { legacyId: 'seed-merchant-bread' },
+    update: {},
+    create: { legacyId: 'seed-merchant-bread', legalName: 'DEV Bread Foods' },
+  });
+  const breadRestaurant = await prisma.restaurant.upsert({
+    where: { legacyId: 'seed-restaurant-bread' },
+    update: { status: 'ACTIVE' },
+    create: {
+      legacyId: 'seed-restaurant-bread',
+      merchantId: breadMerchant.id,
+      name: 'DEV Bread Kitchen',
+      city: 'Bengaluru',
+      status: 'ACTIVE',
+    },
+  });
+  const breadMenu = await prisma.menu.upsert({
+    where: { legacyId: 'seed-menu-bread' },
+    update: {},
+    create: {
+      legacyId: 'seed-menu-bread',
+      merchantId: breadMerchant.id,
+      restaurantId: breadRestaurant.id,
+      name: 'DEV Bread Menu',
+      type: 'STANDARD',
+    },
+  });
+  const breadSection = await prisma.menuSection.upsert({
+    where: { id: await stableId('section-breads', breadMenu.id) },
+    update: { categoryId: breads.id },
+    create: {
+      id: await stableId('section-breads', breadMenu.id),
+      menuId: breadMenu.id,
+      categoryId: breads.id,
+      name: 'Breads',
+      sortOrder: 1,
+    },
+  });
+  const breadItem = await prisma.menuItem.upsert({
+    where: { legacyId: 'seed-item-bread' },
+    update: { isPublished: true, availability: 'AVAILABLE', menuSectionId: breadSection.id },
+    create: {
+      legacyId: 'seed-item-bread',
+      merchantId: breadMerchant.id,
+      restaurantId: breadRestaurant.id,
+      menuSectionId: breadSection.id,
+      name: 'DEV Butter Naan',
+      description: 'Synthetic bread item',
+      availability: 'AVAILABLE',
+      isPublished: true,
+    },
+  });
+  await prisma.itemVariant.deleteMany({ where: { menuItemId: breadItem.id } });
+  await prisma.itemVariant.create({
+    data: {
+      menuItemId: breadItem.id,
+      size: 'Regular',
+      uomId: uom.id,
+      priceMinor: 4900n,
+      currencyCode: 'INR',
+      available: true,
     },
   });
 

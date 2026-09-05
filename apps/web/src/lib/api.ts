@@ -104,8 +104,17 @@ export type MenuItem = {
   variants: ItemVariant[];
 };
 
+export type TaxonomyChip = {
+  id: string;
+  label: string;
+  type: string | null;
+  available: boolean;
+  restaurantCount: number;
+};
+
 export type HomeFeed = {
   source: 'CANONICAL' | 'RECOMMENDATION';
+  taxonomy: { kind: 'CATEGORY'; chips: TaxonomyChip[] };
   sections: Array<{ id: string; title: string; restaurants: Restaurant[] }>;
 };
 
@@ -193,10 +202,11 @@ export type CheckoutResult = {
 };
 
 export const discoverApi = {
-  home: (q?: { city?: string; q?: string }) => {
+  home: (q?: { city?: string; q?: string; categoryId?: string }) => {
     const params = new URLSearchParams();
     if (q?.city) params.set('city', q.city);
     if (q?.q) params.set('q', q.q);
+    if (q?.categoryId) params.set('categoryId', q.categoryId);
     const qs = params.toString();
     return api<HomeFeed>(`/api/v1/discover/home${qs ? `?${qs}` : ''}`);
   },

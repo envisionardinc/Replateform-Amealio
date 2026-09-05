@@ -460,6 +460,76 @@ select:focus {
   }
 }
 
+.taxonomy-rail {
+  margin: 0 0 var(--ame-space-4);
+}
+
+.taxonomy-heading {
+  font-family: var(--ame-font);
+  font-size: var(--ame-fs-md);
+  font-weight: 700;
+}
+
+.chip-rail {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--ame-space-2);
+  overflow-x: auto;
+  padding-bottom: var(--ame-space-2);
+  -webkit-overflow-scrolling: touch;
+}
+
+.chip {
+  flex: 0 0 auto;
+  max-width: 14rem;
+  min-height: var(--ame-touch);
+  padding: 0 var(--ame-space-3);
+  border: 1px solid var(--ame-border-strong);
+  border-radius: var(--ame-radius-pill);
+  background: var(--ame-card);
+  color: var(--ame-text);
+  font: 600 var(--ame-fs-sm) / 1.2 var(--ame-font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--ame-blue);
+  outline-offset: 2px;
+}
+
+.chip-selected {
+  background: var(--ame-info-bg);
+  border-color: var(--ame-blue);
+  color: var(--ame-navy);
+}
+
+.chip-unavailable {
+  background: var(--ame-page);
+  color: var(--ame-muted);
+  border-color: var(--ame-border);
+  cursor: not-allowed;
+}
+
+.chip-skeleton {
+  display: inline-block;
+  min-width: 5.5rem;
+  min-height: var(--ame-touch);
+  border-radius: var(--ame-radius-pill);
+  background: linear-gradient(90deg, #eef2f7 0%, #f7f9fc 50%, #eef2f7 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+@media (min-width: 768px) {
+  .chip-rail {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+}
+
 @media (min-width: 768px) {
   .app-header-nav {
     display: flex;

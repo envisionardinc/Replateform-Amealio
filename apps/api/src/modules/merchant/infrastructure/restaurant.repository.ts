@@ -49,7 +49,9 @@ export class RestaurantRepository {
    * Consumer discovery: ACTIVE + not deleted. Optional city / name filter.
    * No geo ranking (FUTURE).
    */
-  listDiscoverable(query: { city?: string; q?: string } = {}): Promise<RestaurantRecord[]> {
+  listDiscoverable(
+    query: { city?: string; q?: string; categoryIds?: string[] } = {},
+  ): Promise<RestaurantRecord[]> {
     const where: Prisma.RestaurantWhereInput = {
       deletedAt: null,
       status: 'ACTIVE',
@@ -59,6 +61,19 @@ export class RestaurantRepository {
     }
     if (query.q?.trim()) {
       where.name = { contains: query.q.trim(), mode: 'insensitive' };
+    }
+    if (query.categoryIds?.length) {
+      where.menus = {
+        some: {
+          deletedAt: null,
+          sections: {
+            some: {
+              categoryId: { in: query.categoryIds },
+              items: { some: { isPublished: true, deletedAt: null } },
+            },
+          },
+        },
+      };
     }
     return this.prisma.restaurant.findMany({
       where,

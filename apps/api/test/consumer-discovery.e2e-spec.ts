@@ -80,6 +80,9 @@ describe('Consumer discovery (doc 92 public HTTP e2e)', () => {
     const home = await http().get('/api/v1/discover/home');
     expect(home.status).toBe(200);
     expect(home.body.source).toBe('CANONICAL');
+    expect(home.body.taxonomy).toEqual(
+      expect.objectContaining({ kind: 'CATEGORY', chips: expect.any(Array) }),
+    );
     const ids = home.body.sections[0].restaurants.map((r: { id: string }) => r.id);
     expect(ids).toContain(live.restaurant.id);
     expect(ids).not.toContain(closed.restaurant.id);
@@ -123,6 +126,55 @@ describe('Consumer discovery (doc 92 public HTTP e2e)', () => {
     expect(
       (await http().get(`/api/v1/discover/restaurants/${closed.restaurant.id}/menu`)).status,
     ).toBe(404);
+  });
+
+  it('filters restaurants by existing Category via MenuSection and marks empty chips unavailable', async () => {
+    const live = await seedRestaurant({ city: 'Pune' });
+    const other = await seedRestaurant({ city: 'Pune' });
+    const mains = await prisma.category.create({
+      data: { name: uniq('Mains'), type: 'FOOD' },
+    });
+    const empty = await prisma.category.create({
+      data: { name: uniq('Desserts'), type: 'FOOD' },
+    });
+    const menu = await prisma.menu.create({
+      data: {
+        merchantId: live.merchant.id,
+        restaurantId: live.restaurant.id,
+        name: 'Card',
+      },
+    });
+    const section = await prisma.menuSection.create({
+      data: { menuId: menu.id, categoryId: mains.id, name: 'Mains' },
+    });
+    await prisma.menuItem.update({
+      where: { id: live.published.id },
+      data: { menuSectionId: section.id },
+    });
+
+    const home = await http().get('/api/v1/discover/home');
+    expect(home.status).toBe(200);
+    const chips = home.body.taxonomy.chips as Array<{
+      id: string;
+      available: boolean;
+      restaurantCount: number;
+    }>;
+    expect(chips.find((c) => c.id === mains.id)).toEqual(
+      expect.objectContaining({ available: true, restaurantCount: 1 }),
+    );
+    expect(chips.find((c) => c.id === empty.id)).toEqual(
+      expect.objectContaining({ available: false, restaurantCount: 0 }),
+    );
+
+    const filtered = await http().get('/api/v1/discover/home').query({ categoryId: mains.id });
+    expect(filtered.status).toBe(200);
+    const filteredIds = filtered.body.sections[0].restaurants.map((r: { id: string }) => r.id);
+    expect(filteredIds).toContain(live.restaurant.id);
+    expect(filteredIds).not.toContain(other.restaurant.id);
+
+    const list = await http().get('/api/v1/discover/restaurants').query({ categoryId: empty.id });
+    expect(list.status).toBe(200);
+    expect(list.body.data).toEqual([]);
   });
 
   it('does not require authentication and does not use staff catalog routes', async () => {

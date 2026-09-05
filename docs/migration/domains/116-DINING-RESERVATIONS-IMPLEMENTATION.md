@@ -3,7 +3,7 @@
 **Status:** IMPLEMENTED + HARDENED (Slice 1 only). Forensic contract unchanged.  
 **Date:** 2026-09-05  
 **Starting HEAD:** `1d969d89e195a2a421a8161ebc3d510e61eda59c`  
-**Final HEAD:** `fbca3a8c90b1aa9e165b0ad6b2e4683c784a5373`  
+**Final HEAD:** `e919e1f0a18f95afbfeb204517db0f71004df515`  
 **Implementation commits:** `2a7b1ea` (API/UI), `fa08766` (e2e), `916be13` (merchant active lane), `d260804` (slice-1 stamp), `105f0f0` (atomic same-day create + e2e), `fbca3a8` (advisory-lock deserialize).  
 **Governing contract:** [116-DINING-RESERVATIONS-RECONCILIATION.md](./116-DINING-RESERVATIONS-RECONCILIATION.md)  
 **Gap matrix:** [116-DINING-RESERVATIONS-GAP-MATRIX.json](./116-DINING-RESERVATIONS-GAP-MATRIX.json)  

@@ -1,6 +1,6 @@
 # 98 — Consumer Saved Addresses Target Behavior Contract
 
-**Status:** CONTRACT ONLY — not implemented  
+**Status:** CONTRACT + implementation  
 **Date:** 2026-09-05  
 **Brand:** amealio  
 **Rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  

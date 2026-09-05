@@ -123,7 +123,8 @@ describe('consumer saved addresses (doc 98)', () => {
     expect(selectedLabelChip('Parents')).toBe('Other');
     expect(selectedLabelChip('')).toBeNull();
     expect(applyLabelChip(emptyAddressDraft(), 'Home').label).toBe('Home');
-    expect(applyLabelChip({ ...emptyAddressDraft(), label: 'Home' }, 'Other').label).toBe('');
+    expect(applyLabelChip(emptyAddressDraft(), 'Other').label).toBe('Other');
+    expect(applyLabelChip({ ...emptyAddressDraft(), label: 'Home' }, 'Other').label).toBe('Other');
     expect(applyLabelChip({ ...emptyAddressDraft(), label: 'Parents' }, 'Other').label).toBe(
       'Parents',
     );

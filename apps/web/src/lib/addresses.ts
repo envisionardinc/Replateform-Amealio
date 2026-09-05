@@ -76,7 +76,7 @@ export function selectedLabelChip(label: string): AddressLabelChip | null {
 export function applyLabelChip(draft: AddressDraft, chip: AddressLabelChip): AddressDraft {
   if (chip === 'Other') {
     const current = selectedLabelChip(draft.label);
-    return { ...draft, label: current === 'Other' ? draft.label : '' };
+    return { ...draft, label: current === 'Other' ? draft.label : 'Other' };
   }
   return { ...draft, label: chip };
 }

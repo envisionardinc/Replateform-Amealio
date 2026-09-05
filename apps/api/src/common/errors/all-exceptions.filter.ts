@@ -13,6 +13,7 @@ export interface ApiErrorBody {
   statusCode: number;
   error: string;
   message: string | string[];
+  code?: string;
   requestId?: string;
   path: string;
   timestamp: string;
@@ -30,6 +31,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal server error';
     let error = 'InternalServerError';
+    let code: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -40,6 +42,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const r = response as Record<string, unknown>;
         message = (r.message as string | string[]) ?? exception.message;
         error = (r.error as string) ?? exception.name;
+        if (typeof r.code === 'string' && r.code.trim()) code = r.code;
       }
       if (error === 'InternalServerError') error = exception.name;
     }
@@ -58,6 +61,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       error,
       message,
+      ...(code ? { code } : {}),
       requestId: req.requestId,
       path: req.originalUrl,
       timestamp: new Date().toISOString(),

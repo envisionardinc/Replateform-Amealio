@@ -133,11 +133,11 @@ describe('Stage C availability foundation', () => {
   function errorCode(body: unknown): string | undefined {
     if (!body || typeof body !== 'object') return undefined;
     const rec = body as Record<string, unknown>;
+    if (typeof rec.code === 'string') return rec.code;
     if (rec.message && typeof rec.message === 'object') {
       const inner = rec.message as Record<string, unknown>;
       if (typeof inner.code === 'string') return inner.code;
     }
-    if (typeof rec.code === 'string') return rec.code;
     return undefined;
   }
 

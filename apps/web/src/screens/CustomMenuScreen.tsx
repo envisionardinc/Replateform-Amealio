@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { StatusPanel } from '../components/StatusPanel';
 import { Banner } from '../design-system/Banner';
 import { discoverApi, type ConsumerMenu } from '../lib/api';
-import { MenuItemCard } from './RestaurantScreen';
+import { ComboCard, MenuItemCard } from './RestaurantScreen';
 
 export function CustomMenuScreen() {
   const { restaurantId = '', menuId = '' } = useParams();
@@ -28,7 +28,11 @@ export function CustomMenuScreen() {
     void load();
   }, [load]);
 
-  const sections = menu?.sections?.filter((section) => section.items.length > 0) ?? [];
+  const sections =
+    menu?.sections?.filter(
+      (section) => section.items.length > 0 || (section.combos?.length ?? 0) > 0,
+    ) ?? [];
+  const hasCombos = (menu?.combos?.length ?? 0) > 0;
 
   return (
     <section>
@@ -41,13 +45,16 @@ export function CustomMenuScreen() {
           Custom Menu references merchant catalog items. Publication, channel, and modifier rules
           match the Standard menu.
         </p>
-        {menu && menu.items.length === 0 ? (
+        {menu && menu.items.length === 0 && !hasCombos ? (
           <Banner tone="empty">This custom menu has no published items for this channel.</Banner>
         ) : null}
         {sections.length > 0
           ? sections.map((section) => (
               <div key={section.id}>
                 <h2>{section.name}</h2>
+                {(section.combos ?? []).map((combo) => (
+                  <ComboCard key={combo.id} combo={combo} />
+                ))}
                 {section.items.map((item) => (
                   <MenuItemCard key={item.id} item={item} />
                 ))}

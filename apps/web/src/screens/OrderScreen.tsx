@@ -134,6 +134,9 @@ export function OrderScreen() {
                 <li key={line.id}>
                   {line.nameSnapshot} × {line.quantity} —{' '}
                   {formatMinor(line.lineTotalMinor, order.currencyCode)}
+                  {line.addOns?.schema === 'combo.v1' && line.addOns.components?.length
+                    ? ` · ${line.addOns.components.map((row) => row.menuItemName ?? row.menuItemId).join(' + ')}`
+                    : ''}
                 </li>
               ))}
             </ul>

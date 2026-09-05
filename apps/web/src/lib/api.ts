@@ -140,11 +140,55 @@ export type MenuItem = {
   soldOut?: boolean;
 };
 
+export type ComboSlotOption = {
+  id: string;
+  menuItemId: string;
+  isDefault: boolean;
+  sortOrder: number;
+};
+
+export type ComboSlot = {
+  id: string;
+  name: string | null;
+  sortOrder: number;
+  options: ComboSlotOption[];
+};
+
+export type ComboComponent = {
+  menuItemId: string;
+  name: string;
+  available?: boolean;
+};
+
+export type ConsumerCombo = {
+  id: string;
+  restaurantId: string;
+  merchantId: string;
+  name: string;
+  description: string | null;
+  isPublished: boolean;
+  availability: string;
+  substitutable: boolean;
+  comboPriceMinor: string;
+  currencyCode: string;
+  sortOrder: number;
+  sectionIds: string[];
+  orderable?: boolean;
+  slots: ComboSlot[];
+  components?: ComboComponent[];
+};
+
+export type ComboSelectionPayload = {
+  slotId: string;
+  menuItemId: string;
+};
+
 export type ConsumerMenu = {
   kind: 'STANDARD' | 'CUSTOM';
   restaurantId: string;
   channel?: string | null;
   items: MenuItem[];
+  combos?: ConsumerCombo[];
   menu?: { id: string; name: string; type: 'CUSTOM'; visibility: boolean };
   sections?: Array<{
     id: string;
@@ -152,6 +196,7 @@ export type ConsumerMenu = {
     sortOrder: number;
     categoryId: string | null;
     items: MenuItem[];
+    combos?: ConsumerCombo[];
   }>;
 };
 
@@ -190,9 +235,11 @@ export type AppliedPromotion = {
 };
 
 export type MerchandiseQuote = {
-  variantId: string;
-  menuItemId: string;
+  variantId?: string;
+  menuItemId?: string | null;
+  comboId?: string;
   restaurantId: string;
+  name?: string;
   quantity: number;
   currencyCode: string;
   variantPriceMinor: string;
@@ -209,19 +256,28 @@ export type MerchandiseQuote = {
   deliveryChargeMinor?: string;
   grandTotalMinor?: string;
   promotion?: AppliedPromotion | null;
-  selections: Array<{
+  selections?: Array<{
     groupId: string;
     modifierId: string;
     name: string;
     quantity: number;
     priceAdjustmentMinor: string;
   }>;
+  components?: Array<{
+    slotId: string;
+    slotName: string | null;
+    optionId: string;
+    menuItemId: string;
+    menuItemName: string;
+  }>;
 };
 
 export type MerchandiseSnapshot = {
   schema?: string;
   variantId?: string;
+  comboId?: string;
   modifierGroups?: ModifierGroupPayload[];
+  components?: Array<{ slotId: string; menuItemId: string; menuItemName?: string }>;
 };
 
 export type TaxonomyChip = {
@@ -258,6 +314,7 @@ export type PricedCartItem = {
   id: string;
   menuItemId: string | null;
   variantId: string | null;
+  comboId?: string | null;
   name: string | null;
   variantSnapshot: string | null;
   quantity: number;
@@ -330,6 +387,11 @@ export type Order = {
     grandTotalMinor?: string;
     taxes?: CommercialTaxLine[];
     fees?: CommercialFeeLine[];
+    lines?: Array<{
+      comboId?: string | null;
+      name?: string;
+      components?: Array<{ menuItemId: string; name: string }>;
+    }>;
   } | null;
   tipMinor: string;
   deliveryPersonId: string | null;
@@ -341,6 +403,7 @@ export type Order = {
     quantity: number;
     unitPriceMinor: string;
     lineTotalMinor: string;
+    addOns?: MerchandiseSnapshot | null;
   }>;
   statusEvents: OrderStatusEvent[];
   paymentIntents: Array<{
@@ -386,11 +449,15 @@ export const discoverApi = {
     api<ConsumerMenu>(`/api/v1/discover/menus/${menuId}?type=${type}`),
   item: (id: string, type = 'HOME_DELIVERY') =>
     api<MenuItem>(`/api/v1/discover/items/${id}?type=${type}`),
+  combo: (id: string, type = 'HOME_DELIVERY') =>
+    api<ConsumerCombo>(`/api/v1/discover/combos/${id}?type=${type}`),
   quote: (body: {
-    variantId: string;
+    variantId?: string;
+    comboId?: string;
     quantity: number;
     type?: string;
     modifierGroups?: ModifierGroupPayload[];
+    selections?: ComboSelectionPayload[];
     couponCode?: string;
   }) =>
     api<MerchandiseQuote>('/api/v1/discover/quote', {
@@ -430,11 +497,13 @@ export const cartApi = {
   get: (couponCode?: string) => api<PricedCart>(cartPath('/api/v1/cart', couponCode)),
   add: (
     body: {
-      variantId: string;
+      variantId?: string;
+      comboId?: string;
       quantity: number;
       restaurantId?: string;
       type?: string;
       modifierGroups?: ModifierGroupPayload[];
+      selections?: ComboSelectionPayload[];
     },
     couponCode?: string,
   ) =>

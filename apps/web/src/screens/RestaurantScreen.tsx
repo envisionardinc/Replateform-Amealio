@@ -5,13 +5,20 @@ import { StatusPanel } from '../components/StatusPanel';
 import { Badge } from '../design-system/Badge';
 import { Banner } from '../design-system/Banner';
 import { Card } from '../design-system/Card';
-import { discoverApi, type CustomMenuSummary, type MenuItem, type Restaurant } from '../lib/api';
+import {
+  discoverApi,
+  type ConsumerCombo,
+  type CustomMenuSummary,
+  type MenuItem,
+  type Restaurant,
+} from '../lib/api';
 import { formatMinor } from '../lib/money';
 
 export function RestaurantScreen() {
   const { id = '' } = useParams();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [combos, setCombos] = useState<ConsumerCombo[]>([]);
   const [customMenus, setCustomMenus] = useState<CustomMenuSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +34,12 @@ export function RestaurantScreen() {
       ]);
       setRestaurant(place);
       setItems(menu.items);
+      setCombos(menu.combos ?? []);
       setCustomMenus(customs.menus);
     } catch (err) {
       setRestaurant(null);
       setItems([]);
+      setCombos([]);
       setCustomMenus([]);
       setError(err instanceof Error ? err.message : 'Restaurant unavailable');
     } finally {
@@ -80,6 +89,14 @@ export function RestaurantScreen() {
             ))}
           </div>
         ) : null}
+        {combos.length > 0 ? (
+          <div>
+            <h2>Combos</h2>
+            {combos.map((combo) => (
+              <ComboCard key={combo.id} combo={combo} />
+            ))}
+          </div>
+        ) : null}
         <h2>À la carte</h2>
         {items.length === 0 ? (
           <Banner tone="empty">This restaurant has no published items.</Banner>
@@ -120,6 +137,25 @@ export function MenuItemCard({ item }: { item: MenuItem }) {
           ) : null}
         </div>
         <Link to={`/items/${item.id}`}>{configurable ? 'Customize' : 'Details'}</Link>
+      </div>
+    </Card>
+  );
+}
+
+export function ComboCard({ combo }: { combo: ConsumerCombo }) {
+  const sellable = combo.orderable !== false && combo.availability === 'AVAILABLE';
+  return (
+    <Card media={combo.name}>
+      <div className="row">
+        <div>
+          <h2>
+            <Link to={`/combos/${combo.id}`}>{combo.name}</Link>
+          </h2>
+          <p className="lede">{combo.description || 'Meal deal'}</p>
+          <p className="price">{formatMinor(combo.comboPriceMinor, combo.currencyCode)}</p>
+          {!sellable ? <Badge tone="warning">Not orderable</Badge> : null}
+        </div>
+        <Link to={`/combos/${combo.id}`}>{combo.substitutable ? 'Choose' : 'Details'}</Link>
       </div>
     </Card>
   );

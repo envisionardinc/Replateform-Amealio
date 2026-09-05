@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { StatusPanel } from '../components/StatusPanel';
+import { Banner } from '../design-system/Banner';
+import { Button } from '../design-system/Button';
+import { Card } from '../design-system/Card';
+import { Field } from '../design-system/Field';
 import { cartApi, discoverApi, type MenuItem } from '../lib/api';
 import { formatMinor } from '../lib/money';
 import { isAuthenticated } from '../lib/session';
-import { StatusPanel } from '../components/StatusPanel';
 
 export function ItemScreen() {
   const { id = '' } = useParams();
@@ -71,11 +75,10 @@ export function ItemScreen() {
       </p>
       <StatusPanel loading={loading} error={error} onRetry={() => void load()}>
         {item ? (
-          <article className="card">
+          <Card>
             <h1>{item.name}</h1>
-            <p className="muted">{item.description || 'No description'}</p>
-            <label>
-              Size
+            <p className="lede">{item.description || 'No description'}</p>
+            <Field label="Size">
               <select value={variantId} onChange={(e) => setVariantId(e.target.value)}>
                 {item.variants.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -84,20 +87,22 @@ export function ItemScreen() {
                   </option>
                 ))}
               </select>
-            </label>
+            </Field>
             {!sellable ? (
-              <p className="banner warn">
+              <Banner tone="warning">
                 This item is not available. The server will reject add-to-cart.
-              </p>
+              </Banner>
             ) : null}
             <StatusPanel error={actionError} />
-            <button type="button" disabled={!sellable || busy} onClick={() => void addToCart()}>
-              {busy ? 'Adding…' : 'Add to cart'}
-            </button>
-            <p className="muted">
+            <div className="sticky-cta">
+              <Button type="button" disabled={!sellable || busy} onClick={() => void addToCart()}>
+                {busy ? 'Adding…' : 'Add to cart'}
+              </Button>
+            </div>
+            <p className="lede">
               Price shown is the published catalog price. Cart totals are server-priced.
             </p>
-          </article>
+          </Card>
         ) : null}
       </StatusPanel>
     </section>

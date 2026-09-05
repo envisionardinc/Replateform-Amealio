@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { StatusPanel } from '../components/StatusPanel';
+import { Badge } from '../design-system/Badge';
+import { Banner } from '../design-system/Banner';
+import { Button } from '../design-system/Button';
+import { Card } from '../design-system/Card';
 import { cartApi, type PricedCart } from '../lib/api';
 import { formatMinor } from '../lib/money';
 import { isAuthenticated } from '../lib/session';
-import { StatusPanel } from '../components/StatusPanel';
 
 export function CartScreen() {
   const signedIn = isAuthenticated();
@@ -33,10 +37,10 @@ export function CartScreen() {
     return (
       <section>
         <h1>Cart</h1>
-        <p className="banner empty">
+        <Banner tone="empty">
           Guest cart is not on this Nest slice. <Link to="/login?next=/cart">Sign in</Link> to use
           the server cart.
-        </p>
+        </Banner>
       </section>
     );
   }
@@ -62,7 +66,7 @@ export function CartScreen() {
   return (
     <section>
       <h1>Cart</h1>
-      <p className="muted">
+      <p className="lede">
         Totals come from <code>GET /api/v1/cart</code>. Unavailable lines are excluded from the
         subtotal.
       </p>
@@ -73,47 +77,53 @@ export function CartScreen() {
         onRetry={() => void load()}
       >
         {cart?.items.map((line) => (
-          <article className="card" key={line.id}>
+          <Card key={line.id}>
             <div className="row">
               <div>
                 <strong>{line.name ?? 'Item'}</strong>
-                <p className="muted">
+                <p className="lede">
                   {line.variantSnapshot ?? ''} ·{' '}
                   {formatMinor(line.unitPriceMinor, line.currencyCode)} × {line.quantity}
                 </p>
                 {!line.available ? (
-                  <span className="badge">Unavailable — not in subtotal</span>
+                  <Badge tone="warning">Unavailable — not in subtotal</Badge>
                 ) : null}
               </div>
-              <div>
-                <button
-                  type="button"
-                  className="secondary"
+              <div className="row-actions">
+                <Button
+                  variant="secondary"
                   disabled={line.quantity <= 1}
                   onClick={() => void changeQty(line.id, line.quantity - 1)}
                 >
                   −
-                </button>{' '}
-                <button
-                  type="button"
-                  className="secondary"
+                </Button>
+                <Button
+                  variant="secondary"
                   onClick={() => void changeQty(line.id, line.quantity + 1)}
                 >
                   +
-                </button>{' '}
-                <button type="button" onClick={() => void remove(line.id)}>
+                </Button>
+                <Button variant="ghost" onClick={() => void remove(line.id)}>
                   Remove
-                </button>
+                </Button>
               </div>
             </div>
-          </article>
+          </Card>
         ))}
         {cart ? (
-          <p className="card">
-            Server subtotal: <strong>{formatMinor(cart.subtotalMinor, cart.currencyCode)}</strong>
-          </p>
+          <Card>
+            <p className="price">
+              Server subtotal: {formatMinor(cart.subtotalMinor, cart.currencyCode)}
+            </p>
+          </Card>
         ) : null}
-        {cart && cart.items.length > 0 ? <Link to="/checkout">Continue to checkout</Link> : null}
+        {cart && cart.items.length > 0 ? (
+          <div className="sticky-cta">
+            <Link className="btn btn-primary" to="/checkout">
+              Continue to checkout
+            </Link>
+          </div>
+        ) : null}
       </StatusPanel>
     </section>
   );

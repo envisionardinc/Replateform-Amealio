@@ -1,8 +1,11 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { StatusPanel } from '../components/StatusPanel';
+import { Button } from '../design-system/Button';
+import { Card } from '../design-system/Card';
+import { Field } from '../design-system/Field';
 import { authApi } from '../lib/api';
 import { setSession } from '../lib/session';
-import { StatusPanel } from '../components/StatusPanel';
 
 export function LoginScreen() {
   const navigate = useNavigate();
@@ -36,23 +39,21 @@ export function LoginScreen() {
   return (
     <section>
       <h1>{mode === 'login' ? 'Sign in' : 'Create account'}</h1>
-      <p className="muted">
+      <p className="lede">
         Target consumer auth (doc 25): phone + password, <code>Authorization: Bearer</code>. OTP and
         social login are not on this Nest slice.
       </p>
       <StatusPanel error={error} />
-      <form className="card" onSubmit={(e) => void onSubmit(e)}>
-        <label>
-          Country code
+      <Card as="form" onSubmit={(e) => void onSubmit(e)}>
+        <Field label="Country code">
           <input
             value={phoneCountryCode}
             onChange={(e) => setCc(e.target.value)}
             autoComplete="tel-country-code"
             required
           />
-        </label>
-        <label>
-          Phone
+        </Field>
+        <Field label="Phone">
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -60,9 +61,8 @@ export function LoginScreen() {
             autoComplete="tel-national"
             required
           />
-        </label>
-        <label>
-          Password
+        </Field>
+        <Field label="Password">
           <input
             type="password"
             value={password}
@@ -71,20 +71,20 @@ export function LoginScreen() {
             minLength={8}
             required
           />
-        </label>
-        <div className="actions">
-          <button type="submit" disabled={busy}>
+        </Field>
+        <div className="form-actions">
+          <Button type="submit" disabled={busy}>
             {busy ? 'Working…' : mode === 'login' ? 'Sign in' : 'Register and sign in'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="secondary"
+            variant="secondary"
             onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
           >
             {mode === 'login' ? 'Need an account?' : 'Have an account?'}
-          </button>
+          </Button>
         </div>
-      </form>
+      </Card>
     </section>
   );
 }

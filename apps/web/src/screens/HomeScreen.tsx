@@ -1,8 +1,12 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { StatusPanel } from '../components/StatusPanel';
+import { Badge } from '../design-system/Badge';
+import { Button } from '../design-system/Button';
+import { Card } from '../design-system/Card';
+import { Field } from '../design-system/Field';
 import { discoverApi, type HomeFeed } from '../lib/api';
 import { isAuthenticated } from '../lib/session';
-import { StatusPanel } from '../components/StatusPanel';
 
 export function HomeScreen() {
   const [city, setCity] = useState('');
@@ -43,28 +47,26 @@ export function HomeScreen() {
   return (
     <section>
       <h1>Restaurants</h1>
-      <p className="muted">
+      <p className="lede">
         Canonical Home Page 1 discovery (<code>{feed?.source ?? 'CANONICAL'}</code>
         ). Home Page V2 recommendations are not the default home and are not called from these
         cards.
         {isAuthenticated() ? ' You are signed in.' : ' Browse without signing in.'}
       </p>
-      <form className="card" onSubmit={onSearch}>
-        <label>
-          City (optional — location denial does not block this list)
+      <Card as="form" onSubmit={onSearch}>
+        <Field label="City (optional — location denial does not block this list)">
           <input
             value={city}
             onChange={(e) => setCity(e.target.value)}
             placeholder="Pune"
             name="city"
           />
-        </label>
-        <label>
-          Restaurant name
+        </Field>
+        <Field label="Restaurant name">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" name="q" />
-        </label>
-        <button type="submit">Search</button>
-      </form>
+        </Field>
+        <Button type="submit">Search</Button>
+      </Card>
       <StatusPanel
         loading={loading}
         error={error}
@@ -72,19 +74,19 @@ export function HomeScreen() {
         onRetry={() => void load()}
       >
         {restaurants.map((r) => (
-          <article className="card" key={r.id}>
+          <Card key={r.id} media={r.name}>
             <div className="row">
               <div>
                 <h2>
                   <Link to={`/restaurants/${r.id}`}>{r.name}</Link>
                 </h2>
-                <p className="muted">
-                  {r.city ?? 'City not set'} · {r.status}
+                <p className="lede">
+                  {r.city ?? 'City not set'} · <Badge tone="info">{r.status}</Badge>
                 </p>
               </div>
               <Link to={`/restaurants/${r.id}`}>Menu</Link>
             </div>
-          </article>
+          </Card>
         ))}
       </StatusPanel>
     </section>

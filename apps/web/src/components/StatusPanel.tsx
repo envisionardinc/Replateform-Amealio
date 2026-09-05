@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react';
+import { Banner } from '../design-system/Banner';
+import { Button } from '../design-system/Button';
+import { Skeleton } from '../design-system/Skeleton';
 
 type Props = {
   loading?: boolean;
@@ -11,29 +14,26 @@ type Props = {
 export function StatusPanel({ loading, error, empty, onRetry, children }: Props) {
   if (loading) {
     return (
-      <p className="banner empty" role="status">
-        Loading…
-      </p>
+      <div role="status">
+        <p className="lede">Loading…</p>
+        <Skeleton />
+      </div>
     );
   }
   if (error) {
     return (
-      <div className="banner error" role="alert">
+      <Banner tone="error">
         <p>{error}</p>
         {onRetry ? (
-          <button type="button" onClick={onRetry}>
+          <Button type="button" onClick={onRetry}>
             Retry
-          </button>
+          </Button>
         ) : null}
-      </div>
+      </Banner>
     );
   }
   if (empty) {
-    return (
-      <p className="banner empty" role="status">
-        {empty}
-      </p>
-    );
+    return <Banner tone="empty">{empty}</Banner>;
   }
   return <>{children}</>;
 }

@@ -1,9 +1,13 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { StatusPanel } from '../components/StatusPanel';
+import { Banner } from '../design-system/Banner';
+import { Button } from '../design-system/Button';
+import { Card } from '../design-system/Card';
+import { Field } from '../design-system/Field';
 import { cartApi, checkoutApi, type PricedCart } from '../lib/api';
 import { formatMinor } from '../lib/money';
 import { clearCheckoutKey, getOrCreateCheckoutKey, isAuthenticated } from '../lib/session';
-import { StatusPanel } from '../components/StatusPanel';
 
 export function CheckoutScreen() {
   const navigate = useNavigate();
@@ -74,13 +78,12 @@ export function CheckoutScreen() {
         onRetry={() => void load()}
       >
         {cart && cart.items.length > 0 ? (
-          <form className="card" onSubmit={(e) => void onSubmit(e)}>
-            <p>
+          <Card as="form" onSubmit={(e) => void onSubmit(e)}>
+            <p className="lede">
               Server subtotal {formatMinor(cart.subtotalMinor, cart.currencyCode)}. Taxes, delivery
               fee, and offers use the existing checkout engine — this UI does not invent rates.
             </p>
-            <label>
-              Settlement
+            <Field label="Settlement">
               <select
                 value={settlement}
                 onChange={(e) => setSettlement(e.target.value as 'COD' | 'PREPAID')}
@@ -90,18 +93,20 @@ export function CheckoutScreen() {
                   Prepaid (creates a Razorpay intent; verify is not in this UI)
                 </option>
               </select>
-            </label>
+            </Field>
             {settlement === 'PREPAID' ? (
-              <p className="banner warn">
+              <Banner tone="warning">
                 Prepaid checkout is a real API call. Completing payment needs Razorpay credentials
                 and <code>POST /api/v1/payments/verify</code> — not configured in this consumer
                 slice.
-              </p>
+              </Banner>
             ) : null}
-            <button type="submit" disabled={busy}>
-              {busy ? 'Placing order…' : 'Place order'}
-            </button>
-          </form>
+            <div className="sticky-cta">
+              <Button type="submit" disabled={busy}>
+                {busy ? 'Placing order…' : 'Place order'}
+              </Button>
+            </div>
+          </Card>
         ) : null}
       </StatusPanel>
     </section>

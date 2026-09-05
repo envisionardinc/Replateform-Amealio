@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { StatusPanel } from '../components/StatusPanel';
+import { Badge } from '../design-system/Badge';
+import { Card } from '../design-system/Card';
 import { ordersApi, type Order } from '../lib/api';
 import { formatMinor } from '../lib/money';
 import { isAuthenticated } from '../lib/session';
-import { StatusPanel } from '../components/StatusPanel';
 
 export function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -42,17 +44,17 @@ export function OrdersScreen() {
         onRetry={() => void load()}
       >
         {orders.map((order) => (
-          <article className="card" key={order.id}>
+          <Card key={order.id}>
             <div className="row">
               <div>
                 <Link to={`/orders/${order.id}`}>{order.orderNumber ?? order.id}</Link>
-                <p className="muted">
+                <p className="lede">
                   {order.status} · {formatMinor(order.grandTotalMinor, order.currencyCode)}
                 </p>
               </div>
-              <span className="badge">{order.status}</span>
+              <Badge tone="info">{order.status}</Badge>
             </div>
-          </article>
+          </Card>
         ))}
       </StatusPanel>
     </section>

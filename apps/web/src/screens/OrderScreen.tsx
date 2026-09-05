@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
+import { StatusPanel } from '../components/StatusPanel';
+import { Badge } from '../design-system/Badge';
+import { Banner } from '../design-system/Banner';
+import { Button } from '../design-system/Button';
+import { Card } from '../design-system/Card';
 import { ordersApi, type CheckoutResult, type Order } from '../lib/api';
 import { formatMinor } from '../lib/money';
 import { isAuthenticated } from '../lib/session';
-import { StatusPanel } from '../components/StatusPanel';
+
+function statusTone(status: string): 'info' | 'success' | 'warning' | 'danger' | 'neutral' {
+  if (status === 'CANCELLED' || status === 'RETURNED') return 'danger';
+  if (status === 'DELIVERED' || status === 'COMPLETED') return 'success';
+  if (status === 'PENDING' || status === 'CONFIRMED') return 'info';
+  return 'neutral';
+}
 
 export function OrderScreen() {
   const { id = '' } = useParams();
@@ -42,11 +53,11 @@ export function OrderScreen() {
       <h1>Order</h1>
       <StatusPanel loading={loading} error={error} onRetry={() => void load()}>
         {order ? (
-          <article className="card">
+          <Card>
             <p>
-              <span className="badge">{order.status}</span> · {order.type}
+              <Badge tone={statusTone(order.status)}>{order.status}</Badge> · {order.type}
             </p>
-            <p className="muted">#{order.orderNumber ?? order.id}</p>
+            <p className="lede">#{order.orderNumber ?? order.id}</p>
             <ul>
               {order.items.map((line) => (
                 <li key={line.id}>
@@ -55,24 +66,24 @@ export function OrderScreen() {
                 </li>
               ))}
             </ul>
-            <p>
-              Grand total <strong>{formatMinor(order.grandTotalMinor, order.currencyCode)}</strong>
+            <p className="price">
+              Grand total {formatMinor(order.grandTotalMinor, order.currencyCode)}
             </p>
             {order.paymentIntents.map((p) => (
-              <p className="muted" key={p.id}>
+              <p className="lede" key={p.id}>
                 Payment {p.method} · {p.status} · {formatMinor(p.amountMinor, order.currencyCode)}
                 {p.razorpayOrderId ? ` · ${p.razorpayOrderId}` : ''}
               </p>
             ))}
             {checkout?.settlement === 'PREPAID' && checkout.payment?.status === 'CREATED' ? (
-              <p className="banner warn">
+              <Banner tone="warning">
                 Payment intent created. Capture/verify is the existing payment API, not this page.
-              </p>
+              </Banner>
             ) : null}
-            <button type="button" className="secondary" onClick={() => void load()}>
+            <Button variant="secondary" onClick={() => void load()}>
               Refresh status
-            </button>
-          </article>
+            </Button>
+          </Card>
         ) : null}
       </StatusPanel>
     </section>

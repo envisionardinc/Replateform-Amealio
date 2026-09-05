@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { StatusPanel } from '../components/StatusPanel';
+import { Badge } from '../design-system/Badge';
+import { Card } from '../design-system/Card';
 import { discoverApi, type MenuItem, type Restaurant } from '../lib/api';
 import { formatMinor } from '../lib/money';
-import { StatusPanel } from '../components/StatusPanel';
 
 export function RestaurantScreen() {
   const { id = '' } = useParams();
@@ -47,7 +49,7 @@ export function RestaurantScreen() {
         onRetry={() => void load()}
       >
         <h1>{restaurant?.name}</h1>
-        <p className="muted">
+        <p className="lede">
           {restaurant?.city ?? ''} · only published items are listed. Unpublished catalog rows stay
           staff-only.
         </p>
@@ -55,24 +57,24 @@ export function RestaurantScreen() {
           const variant = item.variants[0];
           const sellable = item.availability === 'AVAILABLE' && variant?.available;
           return (
-            <article className="card" key={item.id}>
+            <Card key={item.id} media={item.name}>
               <div className="row">
                 <div>
                   <h2>
                     <Link to={`/items/${item.id}`}>{item.name}</Link>
                   </h2>
-                  <p className="muted">{item.description || item.availability}</p>
+                  <p className="lede">{item.description || item.availability}</p>
                   {variant ? (
-                    <p>
+                    <p className="price">
                       {formatMinor(variant.priceMinor, variant.currencyCode)}
                       {variant.size ? ` · ${variant.size}` : ''}
                     </p>
                   ) : null}
-                  {!sellable ? <span className="badge">Unavailable</span> : null}
+                  {!sellable ? <Badge tone="warning">Unavailable</Badge> : null}
                 </div>
                 <Link to={`/items/${item.id}`}>Details</Link>
               </div>
-            </article>
+            </Card>
           );
         })}
       </StatusPanel>

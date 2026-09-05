@@ -27,7 +27,7 @@ function tone(status: string): 'info' | 'success' | 'warning' | 'danger' | 'neut
 export function DinerQueueScreen() {
   const [restaurants, setRestaurants] = useState<MerchantRestaurant[]>([]);
   const [restaurantId, setRestaurantId] = useState('');
-  const [status, setStatus] = useState('PENDING');
+  const [lane, setLane] = useState<'active' | 'history'>('active');
   const [rows, setRows] = useState<MerchantDiner[]>([]);
   const [tables, setTables] = useState<MerchantTable[]>([]);
   const [seatFor, setSeatFor] = useState<string | null>(null);
@@ -58,10 +58,15 @@ export function DinerQueueScreen() {
     setError(null);
     try {
       const [diners, floor] = await Promise.all([
-        merchantDinerApi.list({ restaurantId, status: status || undefined }),
+        merchantDinerApi.list({ restaurantId }),
         merchantDinerApi.tables(restaurantId),
       ]);
-      setRows(diners.data);
+      const active = new Set(['PENDING', 'NOT_SEATED', 'SEATED']);
+      setRows(
+        diners.data.filter((row) =>
+          lane === 'active' ? active.has(row.status) : !active.has(row.status),
+        ),
+      );
       setTables(floor.data);
     } catch (err) {
       setRows([]);
@@ -69,7 +74,7 @@ export function DinerQueueScreen() {
     } finally {
       setLoading(false);
     }
-  }, [restaurantId, status]);
+  }, [restaurantId, lane]);
 
   useEffect(() => {
     void load();
@@ -114,16 +119,14 @@ export function DinerQueueScreen() {
           ))}
         </select>
       </Field>
-      <Field label="Status">
-        <select name="status" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="PENDING">PENDING</option>
-          <option value="NOT_SEATED">NOT_SEATED</option>
-          <option value="SEATED">SEATED</option>
-          <option value="COMPLETED">COMPLETED</option>
-          <option value="CANCELLED">CANCELLED</option>
-          <option value="">All</option>
-        </select>
-      </Field>
+      <div className="row-actions">
+        <Button variant={lane === 'active' ? 'primary' : 'secondary'} onClick={() => setLane('active')}>
+          Active
+        </Button>
+        <Button variant={lane === 'history' ? 'primary' : 'secondary'} onClick={() => setLane('history')}>
+          History
+        </Button>
+      </div>
       {loading ? (
         <div role="status">
           <p className="lede">Loading…</p>

@@ -15,7 +15,6 @@ import { MerchantProvisioningService } from '../src/modules/onboarding/applicati
 import { StaffAuthModule } from '../src/modules/identity/staff-authentication/staff-auth.module';
 import type { StaffPrincipal } from '../src/modules/identity/staff-authentication/staff-principal';
 import { OrderingModule } from '../src/modules/ordering/ordering.module';
-import { OrderService } from '../src/modules/ordering/application/order.service';
 import { createApp } from '../src/main';
 
 describe('Stage F combo / bundle', () => {
@@ -25,7 +24,6 @@ describe('Stage F combo / bundle', () => {
   let provisioning: MerchantProvisioningService;
   let catalog: CatalogWriteService;
   let combos: ComboService;
-  let orders: OrderService;
   let httpApp: INestApplication;
 
   const uniq = (p: string) => `${p}-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
@@ -63,7 +61,6 @@ describe('Stage F combo / bundle', () => {
     provisioning = app.get(MerchantProvisioningService);
     catalog = app.get(CatalogWriteService);
     combos = app.get(ComboService);
-    orders = app.get(OrderService);
     httpApp = await createApp();
     await httpApp.init();
   });
@@ -205,41 +202,47 @@ describe('Stage F combo / bundle', () => {
     const combo = await seedCombo(seeded, { substitutable: true });
     const { http } = await registerConsumer();
 
-    const badPick = await http().post('/api/v1/discover/quote').send({
-      comboId: combo.id,
-      quantity: 1,
-      type: 'TAKE_AWAY',
-      selections: [
-        { slotId: combo.slots[0].id, menuItemId: seeded.coke.id },
-        { slotId: combo.slots[1].id, menuItemId: seeded.coke.id },
-      ],
-    });
+    const badPick = await http()
+      .post('/api/v1/discover/quote')
+      .send({
+        comboId: combo.id,
+        quantity: 1,
+        type: 'TAKE_AWAY',
+        selections: [
+          { slotId: combo.slots[0].id, menuItemId: seeded.coke.id },
+          { slotId: combo.slots[1].id, menuItemId: seeded.coke.id },
+        ],
+      });
     expect(badPick.status).toBe(400);
     expect(badPick.body.code).toBe('INVALID_SELECTION');
 
     const fixed = await seedCombo(seeded);
-    const swap = await http().post('/api/v1/discover/quote').send({
-      comboId: fixed.id,
-      quantity: 1,
-      type: 'TAKE_AWAY',
-      selections: [
-        { slotId: fixed.slots[0].id, menuItemId: seeded.fries.id },
-        { slotId: fixed.slots[1].id, menuItemId: seeded.coke.id },
-      ],
-    });
+    const swap = await http()
+      .post('/api/v1/discover/quote')
+      .send({
+        comboId: fixed.id,
+        quantity: 1,
+        type: 'TAKE_AWAY',
+        selections: [
+          { slotId: fixed.slots[0].id, menuItemId: seeded.fries.id },
+          { slotId: fixed.slots[1].id, menuItemId: seeded.coke.id },
+        ],
+      });
     expect(swap.status).toBe(400);
     expect(swap.body.code).toBe('INVALID_SELECTION');
 
     await catalog.updateItem(seeded.staff, seeded.coke.id, { availability: 'SOLDOUT' });
-    const blocked = await http().post('/api/v1/discover/quote').send({
-      comboId: combo.id,
-      quantity: 1,
-      type: 'TAKE_AWAY',
-      selections: [
-        { slotId: combo.slots[0].id, menuItemId: seeded.pizza.id },
-        { slotId: combo.slots[1].id, menuItemId: seeded.coke.id },
-      ],
-    });
+    const blocked = await http()
+      .post('/api/v1/discover/quote')
+      .send({
+        comboId: combo.id,
+        quantity: 1,
+        type: 'TAKE_AWAY',
+        selections: [
+          { slotId: combo.slots[0].id, menuItemId: seeded.pizza.id },
+          { slotId: combo.slots[1].id, menuItemId: seeded.coke.id },
+        ],
+      });
     expect(blocked.status).toBe(400);
     expect(blocked.body.code).toBe('REQUIRED_COMPONENT_UNAVAILABLE');
     expect(blocked.body.components).toBeUndefined();
@@ -336,12 +339,14 @@ describe('Stage F combo / bundle', () => {
     ).rejects.toBeTruthy();
 
     const { http } = await registerConsumer();
-    const write = await http().post('/api/v1/catalog/combos').send({
-      restaurantId: a.restaurantId,
-      name: 'Nope',
-      comboPriceMinor: 100,
-      slots: [{ options: [{ menuItemId: a.pizza.id }] }],
-    });
+    const write = await http()
+      .post('/api/v1/catalog/combos')
+      .send({
+        restaurantId: a.restaurantId,
+        name: 'Nope',
+        comboPriceMinor: 100,
+        slots: [{ options: [{ menuItemId: a.pizza.id }] }],
+      });
     expect(write.status).toBe(401);
   });
 

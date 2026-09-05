@@ -368,10 +368,13 @@ export function lineFromOrderItem(input: {
   currencyCode: string;
   merchantId: string;
   restaurantId: string;
+  addOns?: unknown;
 }): CommercialLineInput {
+  const combo = comboFromAddOns(input.addOns);
   return {
     menuItemId: input.menuItemId ?? null,
     variantId: null,
+    comboId: combo?.comboId ?? null,
     name: input.nameSnapshot,
     variantSize: input.variantSnapshot ?? null,
     quantity: input.quantity,
@@ -382,6 +385,29 @@ export function lineFromOrderItem(input: {
     currencyCode: input.currencyCode,
     merchantId: input.merchantId,
     restaurantId: input.restaurantId,
+    components: combo?.components,
+  };
+}
+
+function comboFromAddOns(addOns: unknown): {
+  comboId: string;
+  components: Array<{ menuItemId: string; name: string }>;
+} | null {
+  if (!addOns || typeof addOns !== 'object') return null;
+  const snap = addOns as {
+    schema?: string;
+    comboId?: string;
+    components?: Array<{ menuItemId?: string; menuItemName?: string; name?: string }>;
+  };
+  if (snap.schema !== 'combo.v1' || typeof snap.comboId !== 'string') return null;
+  return {
+    comboId: snap.comboId,
+    components: (snap.components ?? [])
+      .filter((row) => typeof row.menuItemId === 'string')
+      .map((row) => ({
+        menuItemId: row.menuItemId!,
+        name: row.menuItemName ?? row.name ?? row.menuItemId!,
+      })),
   };
 }
 

@@ -368,7 +368,7 @@ export class CartService {
     merchantId: string,
     type?: OrderTypeName,
   ) {
-    let cart = await this.carts.getOrCreate(userId);
+    const cart = await this.carts.getOrCreate(userId);
     if (cart.restaurantId && cart.restaurantId !== restaurantId) {
       return this.carts.replaceForRestaurant(cart.id, restaurantId, merchantId, type ?? cart.type);
     }
@@ -421,7 +421,10 @@ function unpricedLine(it: {
 
 function selectionsFromSnapshot(addOns: unknown): ComboSelectionInput[] | undefined {
   if (!addOns || typeof addOns !== 'object') return undefined;
-  const snap = addOns as { schema?: string; components?: Array<{ slotId?: string; menuItemId?: string }> };
+  const snap = addOns as {
+    schema?: string;
+    components?: Array<{ slotId?: string; menuItemId?: string }>;
+  };
   if (snap.schema !== 'combo.v1' || !Array.isArray(snap.components)) return undefined;
   const selections = snap.components
     .filter((row) => typeof row.slotId === 'string' && typeof row.menuItemId === 'string')

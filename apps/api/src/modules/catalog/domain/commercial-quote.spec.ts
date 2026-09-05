@@ -255,6 +255,33 @@ describe('composeCommercialQuote (Stage D)', () => {
     expect(snap.fees).toEqual([]);
     expect(snap.grandTotalMinor).toBe('45000');
     expect(snap.lines[0]?.unitMerchandiseMinor).toBe('25000');
+    expect(snap.lines[0]?.comboId).toBeNull();
+  });
+
+  it('lifts combo.v1 addOns onto the commercial snapshot line', () => {
+    const quote = composeCommercialQuote({
+      lines: [
+        lineFromOrderItem({
+          nameSnapshot: 'Meal',
+          unitPriceMinor: 29900n,
+          quantity: 1,
+          currencyCode: 'INR',
+          merchantId: MERCHANT,
+          restaurantId: RESTAURANT,
+          addOns: {
+            schema: 'combo.v1',
+            comboId: 'combo-1',
+            components: [{ menuItemId: 'pizza', menuItemName: 'Pizza' }],
+          },
+        }),
+      ],
+      merchantId: MERCHANT,
+      restaurantId: RESTAURANT,
+    });
+    expect(snapshotCommercial(quote).lines[0]?.comboId).toBe('combo-1');
+    expect(snapshotCommercial(quote).lines[0]?.components).toEqual([
+      { menuItemId: 'pizza', name: 'Pizza' },
+    ]);
   });
 
   it('quotes a fixed combo as one merchandise line without a second calculator', () => {

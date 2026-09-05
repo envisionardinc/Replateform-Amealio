@@ -217,6 +217,7 @@ export class OrderService {
             currencyCode,
             merchantId: restaurant.merchantId,
             restaurantId: input.restaurantId,
+            addOns: it.addOns,
           }),
         ),
         discountMinor: discountTotalMinor,

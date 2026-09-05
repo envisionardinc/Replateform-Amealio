@@ -207,7 +207,10 @@ export function quoteCombo(input: {
     if (!item) {
       throw new ComboError('INVALID_COMPONENT', 'combo component is not a catalog item');
     }
-    if (item.restaurantId !== input.combo.restaurantId || item.merchantId !== input.combo.merchantId) {
+    if (
+      item.restaurantId !== input.combo.restaurantId ||
+      item.merchantId !== input.combo.merchantId
+    ) {
       throw new ComboError('CROSS_TENANT_COMBO', 'combo component belongs to another merchant');
     }
     if (!componentOrderableForCombo(item)) {

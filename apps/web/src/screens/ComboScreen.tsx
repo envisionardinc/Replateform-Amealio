@@ -182,7 +182,9 @@ export function ComboScreen() {
             {quote ? (
               <QuoteTotals
                 currencyCode={quote.currencyCode}
-                merchandiseSubtotalMinor={quote.merchandiseSubtotalMinor ?? quote.lineMerchandiseMinor}
+                merchandiseSubtotalMinor={
+                  quote.merchandiseSubtotalMinor ?? quote.lineMerchandiseMinor
+                }
                 discountMinor={quote.discountMinor}
                 taxTotalMinor={quote.taxTotalMinor}
                 feeTotalMinor={quote.feeTotalMinor}

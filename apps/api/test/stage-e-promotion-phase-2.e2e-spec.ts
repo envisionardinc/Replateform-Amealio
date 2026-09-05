@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -471,8 +473,6 @@ describe('Stage E promotion phase 2', () => {
   });
 
   it('does not import the Phase 1 kernel from the Stage D calculator', () => {
-    const { readFileSync } = require('fs') as typeof import('fs');
-    const { join } = require('path') as typeof import('path');
     for (const file of [
       '../src/modules/catalog/domain/commercial-quote.ts',
       '../src/modules/catalog/application/commercial-quote.service.ts',

@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  INestApplication,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { validateEnv } from '../src/config/env.validation';

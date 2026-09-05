@@ -12,6 +12,7 @@ import { AddFromGlobalScreen } from './screens/AddFromGlobalScreen';
 import { CreateItemScreen } from './screens/CreateItemScreen';
 import { MerchantItemDetailScreen } from './screens/MerchantItemDetailScreen';
 import { MerchantMenusScreen } from './screens/MerchantMenusScreen';
+import { DinerQueueScreen } from './screens/DinerQueueScreen';
 
 export function App() {
   return (
@@ -42,6 +43,14 @@ export function App() {
             <RequireSuperAdmin>
               <GlobalItemDetailScreen />
             </RequireSuperAdmin>
+          }
+        />
+        <Route
+          path="/diner"
+          element={
+            <RequireMerchant>
+              <DinerQueueScreen />
+            </RequireMerchant>
           }
         />
         <Route

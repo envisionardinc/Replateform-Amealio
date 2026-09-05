@@ -65,6 +65,7 @@ export function Layout() {
                 <NavLink to="/" end>
                   Orders
                 </NavLink>
+                <NavLink to="/diner">Diners</NavLink>
                 <NavLink to="/catalog">Catalog</NavLink>
               </>
             ) : null}
@@ -90,6 +91,7 @@ export function Layout() {
             <NavLink to="/" end>
               Orders
             </NavLink>
+            <NavLink to="/diner">Diners</NavLink>
             <NavLink to="/catalog">Catalog</NavLink>
           </>
         ) : null}

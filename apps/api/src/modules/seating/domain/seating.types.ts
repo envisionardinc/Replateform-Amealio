@@ -49,6 +49,24 @@ export interface UpdateSeatingRequestInput {
   cancelReason?: string | null;
 }
 
+/** Consumer Book a Table / Reservation create. Client may not send occupancy or type authority. */
+export type ConsumerDinerIntent = 'SEATING' | 'RESERVATION';
+
+export interface CreateConsumerDinerInput {
+  restaurantId: string;
+  intent: ConsumerDinerIntent;
+  partySize: number;
+  kidsCount?: number | null;
+  highChairs?: number | null;
+  specialRequests?: string | null;
+  reservationAt?: string | Date | null;
+}
+
+export interface ListMerchantDinerQuery {
+  restaurantId: string;
+  status?: SeatingStatusName;
+}
+
 export interface SeatingAreaRecord {
   id: string;
   restaurantId: string;
@@ -82,6 +100,8 @@ export interface SeatingRequestRecord {
   specialRequests: string | null;
   reservationAt: Date | null;
   tableId: string | null;
+  tableCode: string | null;
   confirmedAt: Date | null;
   cancelReason: string | null;
+  createdAt: Date;
 }

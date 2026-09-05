@@ -71,6 +71,13 @@ export function RestaurantScreen() {
           {restaurant?.city ?? ''} · Standard menu is assembled from published catalog items.
           Channel rules use Home Delivery on this slice.
         </p>
+        {restaurant ? (
+          <div className="row-actions">
+            <Link className="btn btn-primary" to={`/restaurants/${restaurant.id}/book-a-table`}>
+              Book a Table
+            </Link>
+          </div>
+        ) : null}
         {customMenus.length > 0 ? (
           <div>
             <h2>Custom menus</h2>

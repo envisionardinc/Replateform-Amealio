@@ -673,6 +673,47 @@ export const profileApi = {
     }),
 };
 
+export type DinerRequest = {
+  id: string;
+  restaurantId: string;
+  type: 'WALK_IN' | 'WAITLIST' | 'RESERVATION';
+  status: 'PENDING' | 'NOT_SEATED' | 'SEATED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
+  partySize: number;
+  kidsCount: number | null;
+  highChairs: number | null;
+  specialRequests: string | null;
+  reservationAt: string | null;
+  tableId: string | null;
+  tableCode: string | null;
+  confirmedAt: string | null;
+  cancelReason: string | null;
+  createdAt: string;
+  canCancel: boolean;
+};
+
+export const dinerApi = {
+  create: (body: {
+    restaurantId: string;
+    intent: 'SEATING' | 'RESERVATION';
+    partySize: number;
+    kidsCount?: number;
+    highChairs?: number;
+    specialRequests?: string;
+    reservationAt?: string;
+  }) =>
+    api<DinerRequest>('/api/v1/diner', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  list: () => api<{ data: DinerRequest[] }>('/api/v1/diner'),
+  get: (id: string) => api<DinerRequest>(`/api/v1/diner/${id}`),
+  cancel: (id: string, cancelReason?: string) =>
+    api<DinerRequest>(`/api/v1/diner/${id}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify(cancelReason ? { cancelReason } : {}),
+    }),
+};
+
 export const ordersApi = {
   get: (id: string) => api<Order>(`/api/v1/me/orders/${id}`),
   list: (query: { lane?: 'active' | 'history'; status?: string } = {}) => {

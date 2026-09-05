@@ -35,6 +35,7 @@ export function Layout() {
             <Link to="/">Home</Link>
             <Link to="/cart">Cart</Link>
             {signedIn ? <Link to="/orders">Orders</Link> : null}
+            {signedIn ? <Link to="/diner">Tables</Link> : null}
             {signedIn ? <Link to="/profile">Profile</Link> : null}
           </nav>
           {signedIn ? (

@@ -545,6 +545,59 @@ export const merchantCatalogApi = {
     }),
 };
 
+export type MerchantDiner = {
+  id: string;
+  restaurantId: string;
+  merchantId: string;
+  userId: string | null;
+  type: 'WALK_IN' | 'WAITLIST' | 'RESERVATION';
+  status: 'PENDING' | 'NOT_SEATED' | 'SEATED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
+  partySize: number;
+  kidsCount: number | null;
+  highChairs: number | null;
+  specialRequests: string | null;
+  reservationAt: string | null;
+  tableId: string | null;
+  tableCode: string | null;
+  confirmedAt: string | null;
+  cancelReason: string | null;
+  createdAt: string;
+  canCancel: boolean;
+};
+
+export type MerchantTable = {
+  id: string;
+  seatingAreaId: string;
+  code: string;
+  name: string | null;
+  capacity: number;
+  isActive: boolean;
+  status: 'AVAILABLE' | 'OCCUPIED' | 'DIRTY' | 'ON_HOLD' | 'UNAVAILABLE';
+};
+
+export const merchantDinerApi = {
+  list: (query: { restaurantId: string; status?: string }) => {
+    const params = new URLSearchParams();
+    params.set('restaurantId', query.restaurantId);
+    if (query.status) params.set('status', query.status);
+    return api<{ data: MerchantDiner[] }>(`/api/v1/merchant/diner?${params.toString()}`);
+  },
+  get: (id: string) => api<MerchantDiner>(`/api/v1/merchant/diner/${id}`),
+  tables: (restaurantId: string) =>
+    api<{ data: MerchantTable[] }>(
+      `/api/v1/merchant/diner/tables?restaurantId=${encodeURIComponent(restaurantId)}`,
+    ),
+  accept: (id: string) =>
+    api<MerchantDiner>(`/api/v1/merchant/diner/${id}/accept`, { method: 'PATCH' }),
+  seat: (id: string, tableId: string) =>
+    api<MerchantDiner>(`/api/v1/merchant/diner/${id}/seat`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tableId }),
+    }),
+  complete: (id: string) =>
+    api<MerchantDiner>(`/api/v1/merchant/diner/${id}/complete`, { method: 'PATCH' }),
+};
+
 export const merchantOrdersApi = {
   list: (query: { status?: string; type?: string; lane?: string } = {}) => {
     const params = new URLSearchParams();

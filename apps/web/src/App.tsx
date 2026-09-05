@@ -13,6 +13,9 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { ComboScreen } from './screens/ComboScreen';
 import { CustomMenuScreen } from './screens/CustomMenuScreen';
 import { RestaurantScreen } from './screens/RestaurantScreen';
+import { BookATableScreen } from './screens/BookATableScreen';
+import { DinerListScreen } from './screens/DinerListScreen';
+import { DinerStatusScreen } from './screens/DinerStatusScreen';
 
 export function App() {
   return (
@@ -21,6 +24,9 @@ export function App() {
         <Route path="/" element={<HomeScreen />} />
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/restaurants/:id" element={<RestaurantScreen />} />
+        <Route path="/restaurants/:restaurantId/book-a-table" element={<BookATableScreen />} />
+        <Route path="/diner" element={<DinerListScreen />} />
+        <Route path="/diner/:id" element={<DinerStatusScreen />} />
         <Route path="/restaurants/:restaurantId/menus/:menuId" element={<CustomMenuScreen />} />
         <Route path="/items/:id" element={<ItemScreen />} />
         <Route path="/combos/:id" element={<ComboScreen />} />

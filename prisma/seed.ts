@@ -237,20 +237,74 @@ async function main() {
   });
 
   // --- Consumer user + profile + address ---
+  const consumerSecret = await bcrypt.hash('ConsumerSecret123!', 10);
   const user = await prisma.user.upsert({
     where: { phoneCountryCode_phone: { phoneCountryCode: '+91', phone: '9000000000' } },
-    update: {},
+    update: { passwordHash: consumerSecret, isVerified: true },
     create: {
       legacyId: 'seed-user-1',
       phoneCountryCode: '+91',
       phone: '9000000000',
       email: 'dev.user@example.test',
+      passwordHash: consumerSecret,
       isVerified: true,
       profile: { create: { preferences: { veg: true } } },
       addresses: {
         create: [
           { line1: 'DEV 1 Test Street', city: 'Bengaluru', pinCode: '560001', isDefault: true },
         ],
+      },
+    },
+  });
+
+  const hall = await prisma.seatingArea.upsert({
+    where: { restaurantId_name: { restaurantId: restaurant.id, name: 'Main Hall' } },
+    update: {},
+    create: { restaurantId: restaurant.id, name: 'Main Hall' },
+  });
+  await prisma.restaurantTable.upsert({
+    where: { seatingAreaId_code: { seatingAreaId: hall.id, code: 'T1' } },
+    update: { isActive: true, capacity: 4 },
+    create: { seatingAreaId: hall.id, code: 'T1', capacity: 4, status: 'AVAILABLE' },
+  });
+  await prisma.restaurantTable.upsert({
+    where: { seatingAreaId_code: { seatingAreaId: hall.id, code: 'T2' } },
+    update: { isActive: true, capacity: 4 },
+    create: { seatingAreaId: hall.id, code: 'T2', capacity: 4, status: 'AVAILABLE' },
+  });
+
+  const seatingSubId = await stableId('sub-seating', merchant.id);
+  await prisma.subscription.upsert({
+    where: { id: seatingSubId },
+    update: {
+      status: 'ACTIVE',
+      restaurantId: restaurant.id,
+      config: {
+        casual_dining: true,
+        casual_dining_status: {
+          seating: {
+            value: true,
+            reservation: { value: true },
+            walkin_waitlist: { value: true },
+          },
+        },
+      },
+    },
+    create: {
+      id: seatingSubId,
+      merchantId: merchant.id,
+      restaurantId: restaurant.id,
+      productType: 'SEATING',
+      status: 'ACTIVE',
+      config: {
+        casual_dining: true,
+        casual_dining_status: {
+          seating: {
+            value: true,
+            reservation: { value: true },
+            walkin_waitlist: { value: true },
+          },
+        },
       },
     },
   });

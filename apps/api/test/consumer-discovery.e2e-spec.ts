@@ -135,7 +135,7 @@ describe('Consumer discovery (doc 92 public HTTP e2e)', () => {
       data: { name: uniq('Mains'), type: 'FOOD' },
     });
     const empty = await prisma.category.create({
-      data: { name: uniq('Desserts'), type: 'FOOD' },
+      data: { name: uniq('Desserts'), type: 'FOOD', code: uniq('EMPTY').slice(0, 24) },
     });
     const menu = await prisma.menu.create({
       data: {

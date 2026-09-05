@@ -39,7 +39,10 @@ export class TaxonomyQuery {
 
   async listCategoryRail(): Promise<DiscoveryTaxonomy> {
     const categories = await this.prisma.category.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [{ code: { not: null } }, { menuSections: { some: {} } }],
+      },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, type: true, status: true },
     });

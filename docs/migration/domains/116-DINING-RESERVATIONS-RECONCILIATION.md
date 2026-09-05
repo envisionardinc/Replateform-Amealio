@@ -3,7 +3,7 @@
 **Status:** FORENSIC ONLY. No production behavior changed.  
 **Date:** 2026-09-05  
 **Starting HEAD:** `de573bb3e4a6f019ebdcf89ef6db91ccb1a2f9a0`  
-**Final HEAD:** documentation-only commit on `replatform/backend-consolidation` (SHA stamped after commit).  
+**Final HEAD:** `5940cbc043c11875b81f354fa7f7f5a04c856a2d` (documentation-only; no production files).  
 **Governing rule:** [../00-BEHAVIORAL-RECONCILIATION-RULE.md](../00-BEHAVIORAL-RECONCILIATION-RULE.md)  
 **Machine-readable matrix:** [116-DINING-RESERVATIONS-GAP-MATRIX.json](./116-DINING-RESERVATIONS-GAP-MATRIX.json)
 
@@ -70,7 +70,7 @@ Accepted prior slices at that HEAD: Stages A–G implemented; Stage I implemente
 
 ## 2. Final HEAD
 
-Documentation-only. Production files untouched. SHA stamped after the docs commit.
+`5940cbc043c11875b81f354fa7f7f5a04c856a2d` — documentation-only commit on the same branch. No Prisma, API, React, seed, CSS, or contract change. A follow-up stamp on this file does not change production behavior.
 
 ## 3. Repositories inspected
 

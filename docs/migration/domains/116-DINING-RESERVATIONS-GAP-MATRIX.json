@@ -4,7 +4,7 @@
   "stage": "DINING_RESERVATIONS",
   "status": "forensic_only",
   "acceptedHead": "de573bb3e4a6f019ebdcf89ef6db91ccb1a2f9a0",
-  "finalHead": "pending_docs_commit_stamp",
+  "finalHead": "5940cbc043c11875b81f354fa7f7f5a04c856a2d",
   "implementation": "IMPLEMENT_NOW_AFTER_GO",
   "productionBehaviorChanged": false,
   "schemaChanged": false,

@@ -28,13 +28,13 @@ For every major business domain:
 
 ## Classification
 
-| Class | Meaning |
-| ----- | ------- |
-| PRESERVE | amealio intent is clear and safe; keep it |
-| IMPROVE | same intent, safer or clearer mechanism |
-| CORRECT | legacy or industry pattern is unsafe / obsolete; do not copy |
-| OWNER DECISION | genuine product/finance choice; do not guess |
-| FUTURE | out of the next implementation slice |
+| Class          | Meaning                                                      |
+| -------------- | ------------------------------------------------------------ |
+| PRESERVE       | amealio intent is clear and safe; keep it                    |
+| IMPROVE        | same intent, safer or clearer mechanism                      |
+| CORRECT        | legacy or industry pattern is unsafe / obsolete; do not copy |
+| OWNER DECISION | genuine product/finance choice; do not guess                 |
+| FUTURE         | out of the next implementation slice                         |
 
 ## Current application
 
@@ -42,3 +42,4 @@ For every major business domain:
 - Consumer ordering + payment: [domains/90-CONSUMER-ORDERING-PAYMENT-TARGET-BEHAVIOR-CONTRACT.md](./domains/90-CONSUMER-ORDERING-PAYMENT-TARGET-BEHAVIOR-CONTRACT.md)
 - Self-delivery: [domains/91-SELF-DELIVERY-TARGET-BEHAVIOR-CONTRACT.md](./domains/91-SELF-DELIVERY-TARGET-BEHAVIOR-CONTRACT.md)
 - User app + Home Page V2: [domains/92-USER-APP-HOME-PAGE-V2-TARGET-BEHAVIOR-CONTRACT.md](./domains/92-USER-APP-HOME-PAGE-V2-TARGET-BEHAVIOR-CONTRACT.md)
+- Frontend design system: [93-AMEALIO-FRONTEND-DESIGN-SYSTEM-RECONCILIATION.md](./93-AMEALIO-FRONTEND-DESIGN-SYSTEM-RECONCILIATION.md)

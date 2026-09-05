@@ -99,6 +99,8 @@ export function ProfileScreen() {
       {isAuthenticated() ? (
         <p>
           <Link to="/favorites">Favorites</Link>
+          {' · '}
+          <Link to="/addresses">Saved addresses</Link>
         </p>
       ) : null}
       {view.kind === 'unauthenticated' ? (

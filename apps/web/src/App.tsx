@@ -7,6 +7,7 @@ import { ItemScreen } from './screens/ItemScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { OrderScreen } from './screens/OrderScreen';
 import { OrdersScreen } from './screens/OrdersScreen';
+import { AddressesScreen } from './screens/AddressesScreen';
 import { FavoritesScreen } from './screens/FavoritesScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { RestaurantScreen } from './screens/RestaurantScreen';
@@ -25,6 +26,7 @@ export function App() {
         <Route path="/orders/:id" element={<OrderScreen />} />
         <Route path="/profile" element={<ProfileScreen />} />
         <Route path="/favorites" element={<FavoritesScreen />} />
+        <Route path="/addresses" element={<AddressesScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

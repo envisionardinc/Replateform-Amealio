@@ -344,6 +344,44 @@ export const favoritesApi = {
     ),
 };
 
+export type SavedAddress = {
+  id: string;
+  label: string | null;
+  line1: string;
+  line2: string | null;
+  city: string | null;
+  state: string | null;
+  pinCode: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SavedAddressWrite = {
+  label?: string | null;
+  line1: string;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pinCode?: string | null;
+  isDefault?: boolean;
+};
+
+export const addressesApi = {
+  list: () => api<{ data: SavedAddress[] }>('/api/v1/me/addresses'),
+  create: (body: SavedAddressWrite) =>
+    api<SavedAddress>('/api/v1/me/addresses', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patch: (id: string, body: Partial<SavedAddressWrite>) =>
+    api<SavedAddress>(`/api/v1/me/addresses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  remove: (id: string) => api<{ id: string }>(`/api/v1/me/addresses/${id}`, { method: 'DELETE' }),
+};
+
 export const profileApi = {
   get: () => api<ConsumerProfile>('/api/v1/me/profile'),
   patch: (body: ConsumerProfilePatch) =>

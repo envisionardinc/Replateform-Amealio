@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtStaffGuard } from '../identity/staff-authentication/guards/jwt-staff.guard';
 import { StaffAuthorizationGuard } from '../identity/staff-authentication/authorization/staff-authorization.guard';
@@ -8,6 +8,11 @@ import { CatalogService } from './application/catalog.service';
 import { CatalogWriteService } from './application/catalog-write.service';
 import { ComboService } from './application/combo.service';
 import type { CreateComboInput, UpdateComboInput } from './application/combo.service';
+import {
+  MerchandisingRelationService,
+  type CreateMerchandisingInput,
+  type UpdateMerchandisingInput,
+} from './application/merchandising-relation.service';
 import type {
   ChannelConfigInput,
   CreateItemInput,
@@ -34,6 +39,7 @@ export class CatalogController {
     private readonly catalog: CatalogService,
     private readonly writes: CatalogWriteService,
     private readonly combos: ComboService,
+    private readonly merchandising: MerchandisingRelationService,
   ) {}
 
   private principal(req: Request & RequestWithStaffPrincipal): StaffPrincipalType {
@@ -276,6 +282,57 @@ export class CatalogController {
     return this.combos
       .update(this.principal(req), comboId, normalizeMoney(input))
       .then((row) => this.combos.serialize(row));
+  }
+
+  @Get('restaurants/:restaurantId/merchandising-relations')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  listRestaurantRelations(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Param('restaurantId') restaurantId: string,
+  ) {
+    return this.merchandising
+      .listForRestaurant(this.principal(req), restaurantId)
+      .then((rows) => rows.map((row) => this.merchandising.serialize(row)));
+  }
+
+  @Get('items/:sourceItemId/merchandising-relations')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  listItemRelations(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Param('sourceItemId') sourceItemId: string,
+  ) {
+    return this.merchandising
+      .listForSource(this.principal(req), sourceItemId)
+      .then((rows) => rows.map((row) => this.merchandising.serialize(row)));
+  }
+
+  @Post('merchandising-relations')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  createRelation(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Body() input: CreateMerchandisingInput,
+  ) {
+    return this.merchandising
+      .create(this.principal(req), input)
+      .then((row) => this.merchandising.serialize(row));
+  }
+
+  @Patch('merchandising-relations/:id')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  updateRelation(
+    @Req() req: Request & RequestWithStaffPrincipal,
+    @Param('id') id: string,
+    @Body() input: UpdateMerchandisingInput,
+  ) {
+    return this.merchandising
+      .update(this.principal(req), id, input)
+      .then((row) => this.merchandising.serialize(row));
+  }
+
+  @Delete('merchandising-relations/:id')
+  @RequireStaffRoles('MERCHANT_OWNER', 'MERCHANT_STAFF')
+  removeRelation(@Req() req: Request & RequestWithStaffPrincipal, @Param('id') id: string) {
+    return this.merchandising.remove(this.principal(req), id);
   }
 }
 

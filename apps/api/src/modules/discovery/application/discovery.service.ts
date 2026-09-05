@@ -4,6 +4,7 @@ import { MenuItemRepository } from '../../catalog/infrastructure/menu-item.repos
 import { MenuRepository } from '../../catalog/infrastructure/menu.repository';
 import { CommercialQuoteService } from '../../catalog/application/commercial-quote.service';
 import { ComboService } from '../../catalog/application/combo.service';
+import { MerchandisingRelationService } from '../../catalog/application/merchandising-relation.service';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
 import { PromotionApplicationService } from '../../offer/application/promotion-application.service';
 import { intentCouponCode, serializePromotion } from '../../offer/domain/promotion-application';
@@ -31,6 +32,7 @@ export class DiscoveryService {
     private readonly quotes: MerchandiseQuoteService,
     private readonly commercial: CommercialQuoteService,
     private readonly combos: ComboService,
+    private readonly merchandising: MerchandisingRelationService,
     private readonly promotions: PromotionApplicationService,
   ) {}
 
@@ -134,7 +136,8 @@ export class DiscoveryService {
       throw new NotFoundException('Item not found');
     }
     await this.requireDiscoverable(item.restaurantId);
-    return serializeConsumerItem(item);
+    const pairsWellWith = await this.merchandising.listConsumerForSource(item.id, channel);
+    return { ...serializeConsumerItem(item), pairsWellWith };
   }
 
   async getCombo(id: string, channel?: OrderChannel) {

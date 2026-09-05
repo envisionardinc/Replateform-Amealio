@@ -519,6 +519,99 @@ async function main() {
     },
   });
 
+  const lassi = await prisma.menuItem.upsert({
+    where: { legacyId: 'seed-item-lassi' },
+    update: {
+      isPublished: true,
+      availability: 'AVAILABLE',
+      menuSectionId: section.id,
+      name: 'DEV Mango Lassi',
+      description: 'Complementary drink for Stage G cross-sell',
+    },
+    create: {
+      legacyId: 'seed-item-lassi',
+      merchantId: merchant.id,
+      restaurantId: restaurant.id,
+      menuSectionId: section.id,
+      name: 'DEV Mango Lassi',
+      description: 'Complementary drink for Stage G cross-sell',
+      availability: 'AVAILABLE',
+      isPublished: true,
+    },
+  });
+  await prisma.itemVariant.deleteMany({ where: { menuItemId: lassi.id } });
+  await prisma.itemVariant.create({
+    data: {
+      menuItemId: lassi.id,
+      size: 'Regular',
+      sku: 'DEV-LASSI-REG',
+      priceMinor: 7900n,
+      currencyCode: 'INR',
+      isDefault: true,
+      available: true,
+    },
+  });
+
+  const unpublishedSide = await prisma.menuItem.upsert({
+    where: { legacyId: 'seed-item-unpublished-side' },
+    update: { isPublished: false, availability: 'AVAILABLE', name: 'DEV Hidden Papad' },
+    create: {
+      legacyId: 'seed-item-unpublished-side',
+      merchantId: merchant.id,
+      restaurantId: restaurant.id,
+      name: 'DEV Hidden Papad',
+      description: 'Unpublished complementary target',
+      availability: 'AVAILABLE',
+      isPublished: false,
+    },
+  });
+  await prisma.itemVariant.deleteMany({ where: { menuItemId: unpublishedSide.id } });
+  await prisma.itemVariant.create({
+    data: {
+      menuItemId: unpublishedSide.id,
+      size: 'Regular',
+      sku: 'DEV-PAPAD',
+      priceMinor: 2900n,
+      currencyCode: 'INR',
+      available: true,
+    },
+  });
+
+  await prisma.merchandisingRelation.deleteMany({
+    where: { sourceItemId: item.id },
+  });
+  await prisma.merchandisingRelation.createMany({
+    data: [
+      {
+        merchantId: merchant.id,
+        restaurantId: restaurant.id,
+        type: 'CROSS_SELL',
+        sourceItemId: item.id,
+        targetItemId: lassi.id,
+        sortOrder: 1,
+        status: 'ACTIVE',
+      },
+      {
+        merchantId: merchant.id,
+        restaurantId: restaurant.id,
+        type: 'CROSS_SELL',
+        sourceItemId: item.id,
+        targetItemId: sold.id,
+        sortOrder: 2,
+        status: 'ACTIVE',
+      },
+      {
+        merchantId: merchant.id,
+        restaurantId: restaurant.id,
+        type: 'CROSS_SELL',
+        sourceItemId: item.id,
+        targetItemId: unpublishedSide.id,
+        sortOrder: 3,
+        status: 'ACTIVE',
+      },
+    ],
+  });
+
   const closedMerchant = await prisma.merchant.upsert({
     where: { legacyId: 'seed-merchant-closed' },
     update: {},

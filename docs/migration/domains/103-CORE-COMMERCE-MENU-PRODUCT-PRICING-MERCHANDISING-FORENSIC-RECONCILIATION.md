@@ -596,11 +596,13 @@ Money remains **integer minor units**. Clients send configuration intent only.
 - v1 actions remain order-level percent/fixed/cap + delivery-fee discount as already designed in 101.
 - Item / variant / category / BOGO / buy-X-get-Y / spend-X-get-Y / audience / daypart / stacking / funding / unique codes: classify in §12 / §14.
 
-### 9.6 Merchandising relationships (define, do not implement)
+### 9.6 Merchandising relationships
 
-- **Upsell** = merchant-defined upgrade from variant A → higher-value variant/item B (or premium modifier). Legacy: absent. Target concept: `MerchandisingRelation{type:UPSELL}`.
-- **Cross-sell** = merchant-defined complementary item or category. Legacy: category list. Target: `MerchandisingRelation{type:CROSS_SELL}` at item or category, deterministic, not ML.
-- **Personalization foundation** = prefs, favorites, dietary filters, explicit merchant tags. Intelligence remains FUTURE.
+Canonical Stage G contract and implementation: [110](./110-STAGE-G-UPSELL-CROSSSELL.md).
+
+- **Upsell** = merchant-defined upgrade from variant A → higher-value variant/item B (or premium modifier). Legacy: absent. **Not implemented** — variants / modifiers / combos already cover upgrade UX (`OD-UPSELL` FUTURE).
+- **Cross-sell** = merchant-defined complementary **item**. Legacy: category list (POS). Target implemented: `MerchandisingRelation{type:CROSS_SELL}` item→item, deterministic, not ML. Category complementary is a follow-up.
+- **Personalization foundation** = prefs, favorites, dietary filters, explicit merchant tags. Intelligence remains Stage H. **Do not start H without GO.**
 
 ---
 

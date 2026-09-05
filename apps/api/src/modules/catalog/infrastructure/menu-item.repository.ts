@@ -130,6 +130,7 @@ export class MenuItemRepository {
     channel?: OrderChannel;
     menuSectionIds?: string[];
     itemId?: string;
+    itemIds?: string[];
   }): Promise<ConsumerCatalogItem[]> {
     try {
       const rows = await this.prisma.menuItem.findMany({
@@ -138,6 +139,7 @@ export class MenuItemRepository {
           deletedAt: null,
           isPublished: true,
           ...(input.itemId ? { id: input.itemId } : {}),
+          ...(input.itemIds?.length ? { id: { in: input.itemIds } } : {}),
           ...(input.menuSectionIds ? { menuSectionId: { in: input.menuSectionIds } } : {}),
         },
         select: {

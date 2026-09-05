@@ -10,6 +10,8 @@ import { MerchandiseQuoteService } from './application/merchandise-quote.service
 import { CommercialQuoteService } from './application/commercial-quote.service';
 import { ComboService } from './application/combo.service';
 import { ComboRepository } from './infrastructure/combo.repository';
+import { MerchandisingRelationService } from './application/merchandising-relation.service';
+import { MerchandisingRelationRepository } from './infrastructure/merchandising-relation.repository';
 import { CatalogController } from './catalog.controller';
 
 /**
@@ -31,6 +33,8 @@ import { CatalogController } from './catalog.controller';
     CommercialQuoteService,
     ComboRepository,
     ComboService,
+    MerchandisingRelationRepository,
+    MerchandisingRelationService,
   ],
   exports: [
     MenuRepository,
@@ -42,6 +46,8 @@ import { CatalogController } from './catalog.controller';
     CommercialQuoteService,
     ComboRepository,
     ComboService,
+    MerchandisingRelationRepository,
+    MerchandisingRelationService,
   ],
 })
 export class CatalogModule {}

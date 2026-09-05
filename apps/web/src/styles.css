@@ -630,10 +630,37 @@ select:focus {
   animation: shimmer 1.2s linear infinite;
 }
 
+.pairs-well {
+  margin-top: var(--ame-space-5);
+}
+
+.pairs-well h2,
+.pairs-card h3 {
+  margin: 0 0 var(--ame-space-2);
+  color: var(--ame-navy);
+  font-family: var(--ame-font);
+}
+
+.pairs-rail {
+  display: grid;
+  gap: var(--ame-space-3);
+}
+
+.pairs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ame-space-2);
+  margin-top: var(--ame-space-3);
+}
+
 @media (min-width: 768px) {
   .chip-rail {
     flex-wrap: wrap;
     overflow: visible;
+  }
+
+  .pairs-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

@@ -11,6 +11,7 @@ import {
   cartApi,
   discoverApi,
   type CatalogModifierGroup,
+  type CrossSellItem,
   type MenuItem,
   type MerchandiseQuote,
 } from '../lib/api';
@@ -23,7 +24,7 @@ import {
   type SelectionMap,
 } from '../lib/merchandise';
 import { formatMinor } from '../lib/money';
-import { isAuthenticated } from '../lib/session';
+import { getCouponCode, isAuthenticated } from '../lib/session';
 
 export function ItemScreen() {
   const { id = '' } = useParams();
@@ -236,7 +237,94 @@ export function ItemScreen() {
             </div>
           </Card>
         ) : null}
+        {item?.pairsWellWith && item.pairsWellWith.length > 0 ? (
+          <PairsWellWith
+            sourceId={item.id}
+            items={item.pairsWellWith}
+            onAdded={() => navigate('/cart')}
+          />
+        ) : null}
       </StatusPanel>
+    </section>
+  );
+}
+
+function PairsWellWith({
+  sourceId,
+  items,
+  onAdded,
+}: {
+  sourceId: string;
+  items: CrossSellItem[];
+  onAdded: () => void;
+}) {
+  const navigate = useNavigate();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function addPair(row: CrossSellItem) {
+    if (row.requiresCustomization) {
+      navigate(`/items/${row.id}`);
+      return;
+    }
+    if (!isAuthenticated()) {
+      navigate(`/login?next=/items/${sourceId}`);
+      return;
+    }
+    const variant = row.variants.find((entry) => entry.available) ?? row.variants[0];
+    if (!variant) return;
+    setBusyId(row.id);
+    setError(null);
+    try {
+      await cartApi.add(
+        {
+          variantId: variant.id,
+          quantity: 1,
+          restaurantId: row.restaurantId,
+          type: 'HOME_DELIVERY',
+        },
+        getCouponCode() || undefined,
+      );
+      onAdded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add the suggested item');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section className="pairs-well" aria-labelledby="pairs-well-heading">
+      <h2 id="pairs-well-heading">Pairs well with</h2>
+      <p className="lede">Optional extras. These are suggestions, not required choices.</p>
+      <StatusPanel error={error} />
+      <div className="pairs-rail">
+        {items.map((row) => {
+          const variant = row.variants.find((entry) => entry.available) ?? row.variants[0];
+          const price = variant
+            ? formatMinor(variant.priceMinor, variant.currencyCode)
+            : null;
+          return (
+            <Card key={row.relation.id} className="pairs-card">
+              <h3>{row.name}</h3>
+              <p className="lede">{row.description || 'No description'}</p>
+              {price ? <p className="price">{price}</p> : null}
+              <div className="pairs-actions">
+                <Button variant="secondary" onClick={() => navigate(`/items/${row.id}`)}>
+                  View
+                </Button>
+                <Button
+                  type="button"
+                  disabled={!row.orderable || busyId === row.id || !variant}
+                  onClick={() => void addPair(row)}
+                >
+                  {busyId === row.id ? 'Adding…' : row.requiresCustomization ? 'Customize' : 'Add'}
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     </section>
   );
 }

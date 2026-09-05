@@ -37,7 +37,7 @@
     {"id": "G-PROMO-2", "domain": "promotion", "class": "PRESERVE", "summary": "Keep Phase 1 kernel isolated; do not start Phase 2"},
     {"id": "G-PROMO-3", "domain": "promotion", "class": "CORRECT", "summary": "Usage increment at apply is forbidden; redeem at commit"},
     {"id": "G-UPSELL-1", "domain": "merchandising", "class": "FUTURE", "decision": "OD-UPSELL", "summary": "No true upsell engine in legacy"},
-    {"id": "G-XSELL-1", "domain": "merchandising", "class": "PRESERVE", "improve": true, "summary": "Preserve category cross-sell; improve to item-level relations"},
+    {"id": "G-XSELL-1", "domain": "merchandising", "class": "PRESERVE", "improve": true, "summary": "Preserve category cross-sell intent; Stage G implements item-level CROSS_SELL (doc 110)"},
     {"id": "G-PERS-1", "domain": "personalization", "class": "PRESERVE", "future": true, "summary": "Deterministic prefs/favorites/sort stay; AI is FUTURE"},
     {"id": "G-AVAIL-1", "domain": "availability", "class": "PRESERVE", "improve": true, "summary": "Keep multi-layer availability; enforce consistently"},
     {"id": "G-AVAIL-2", "domain": "availability", "class": "IMPROVE", "summary": "Addon sold-out is weak"},

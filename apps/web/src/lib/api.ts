@@ -125,6 +125,20 @@ export type CatalogModifierGroup = {
   modifiers: CatalogModifier[];
 };
 
+export type CrossSellItem = {
+  id: string;
+  restaurantId: string;
+  name: string;
+  description: string | null;
+  availability: string;
+  isPublished: boolean;
+  orderable: boolean;
+  soldOut?: boolean;
+  requiresCustomization: boolean;
+  relation: { id: string; type: 'CROSS_SELL'; sortOrder: number };
+  variants: ItemVariant[];
+};
+
 export type MenuItem = {
   id: string;
   restaurantId: string;
@@ -138,6 +152,7 @@ export type MenuItem = {
   variants: ItemVariant[];
   modifierGroups?: CatalogModifierGroup[];
   soldOut?: boolean;
+  pairsWellWith?: CrossSellItem[];
 };
 
 export type ComboSlotOption = {

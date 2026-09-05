@@ -35,7 +35,15 @@ describe('CatalogController', () => {
     getForStaff: jest.fn(),
     serialize: jest.fn((row: unknown) => row),
   };
-  const controller = new CatalogController(catalog as any, writes as any, combos as any);
+  const merchandising = {
+    create: jest.fn(),
+    update: jest.fn(),
+    remove: jest.fn(),
+    listForSource: jest.fn(),
+    listForRestaurant: jest.fn(),
+    serialize: jest.fn((row: unknown) => row),
+  };
+  const controller = new CatalogController(catalog as any, writes as any, combos as any, merchandising as any);
 
   const principal = (role: StaffPrincipal['staffRole'], merchantId = 'merchant-1'): StaffPrincipal => ({
     staffMemberId: 'staff-1',
@@ -69,6 +77,8 @@ describe('CatalogController', () => {
       'createVariant', 'updateVariant', 'setChannelConfig', 'createAddOnGroup',
       'updateAddOnGroup',       'createAddOn', 'updateAddOn', 'setAddOnVariantPrice',
       'listCombos', 'getCombo', 'createCombo', 'updateCombo',
+      'listRestaurantRelations', 'listItemRelations', 'createRelation',
+      'updateRelation', 'removeRelation',
     ] as const;
 
     for (const method of methods) {

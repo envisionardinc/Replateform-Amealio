@@ -370,8 +370,9 @@ model Merchant {
   subscriptions   Subscription[]
   menus           Menu[]
   menuItems       MenuItem[]
-  combos          Combo[]
-  orders          Order[]
+  combos                 Combo[]
+  merchandisingRelations MerchandisingRelation[]
+  orders                 Order[]
   offers          Offer[]
   settlements     Settlement[]
   deliveryTasks   DeliveryTask[]
@@ -540,8 +541,9 @@ model Restaurant {
   features          RestaurantFeature[]
   menus             Menu[]
   menuItems         MenuItem[]
-  combos            Combo[]
-  orders            Order[]
+  combos                 Combo[]
+  merchandisingRelations MerchandisingRelation[]
+  orders                 Order[]
   offers            Offer[]
   settlements       Settlement[]
   subscriptions     Subscription[]
@@ -776,10 +778,12 @@ model MenuItem {
   updatedAt     DateTime         @updatedAt
   deletedAt     DateTime?
 
-  variants       ItemVariant[]
-  channelConfigs ItemChannelConfig[]
-  addOnGroups    AddOnGroup[]
-  comboOptions   ComboSlotOption[]
+  variants              ItemVariant[]
+  channelConfigs        ItemChannelConfig[]
+  addOnGroups           AddOnGroup[]
+  comboOptions          ComboSlotOption[]
+  merchandisingSources  MerchandisingRelation[] @relation("MerchandisingSource")
+  merchandisingTargets  MerchandisingRelation[] @relation("MerchandisingTarget")
 
   @@index([restaurantId])
   @@index([merchantId])
@@ -938,6 +942,40 @@ model ComboSection {
 
   @@id([comboId, menuSectionId])
   @@index([menuSectionId])
+}
+
+// Stage G merchant-owned complementary merchandising (doc 110).
+// CROSS_SELL only. Not a variant, modifier, combo, promotion, or Stage H rank.
+enum MerchandisingRelationType {
+  CROSS_SELL
+}
+
+enum MerchandisingRelationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model MerchandisingRelation {
+  id           String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId   String                       @db.Uuid
+  merchant     Merchant                     @relation(fields: [merchantId], references: [id])
+  restaurantId String                       @db.Uuid
+  restaurant   Restaurant                   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  type         MerchandisingRelationType    @default(CROSS_SELL)
+  sourceItemId String                       @db.Uuid
+  sourceItem   MenuItem                     @relation("MerchandisingSource", fields: [sourceItemId], references: [id], onDelete: Cascade)
+  targetItemId String                       @db.Uuid
+  targetItem   MenuItem                     @relation("MerchandisingTarget", fields: [targetItemId], references: [id], onDelete: Restrict)
+  sortOrder    Int                          @default(0)
+  status       MerchandisingRelationStatus  @default(ACTIVE)
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  @@unique([sourceItemId, targetItemId, type])
+  @@index([restaurantId, type, status])
+  @@index([sourceItemId, type, status, sortOrder])
+  @@index([merchantId])
+  @@index([targetItemId])
 }
 
 // =====================================================================

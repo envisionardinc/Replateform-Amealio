@@ -3,7 +3,8 @@
 **Status:** IMPLEMENTED (Slice 1 only). Forensic contract unchanged.  
 **Date:** 2026-09-05  
 **Starting HEAD:** `1d969d89e195a2a421a8161ebc3d510e61eda59c`  
-**Implementation commits:** `2a7b1ea` (API/UI), `fa08766` (e2e), plus the merchant active-lane + documentation commits on this branch.  
+**Final HEAD:** `916be13bf3394a8036fe9d2597560221540f8229`  
+**Implementation commits:** `2a7b1ea` (API/UI), `fa08766` (e2e), `916be13` (merchant active lane + this record).  
 **Governing contract:** [116-DINING-RESERVATIONS-RECONCILIATION.md](./116-DINING-RESERVATIONS-RECONCILIATION.md)  
 **Gap matrix:** [116-DINING-RESERVATIONS-GAP-MATRIX.json](./116-DINING-RESERVATIONS-GAP-MATRIX.json)  
 **Foundation:** [45-SEATING-CONFIGURATION-REQUEST-FOUNDATION.md](./45-SEATING-CONFIGURATION-REQUEST-FOUNDATION.md)

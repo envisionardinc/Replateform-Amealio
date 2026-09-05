@@ -231,14 +231,16 @@ describe('composeCommercialQuote (Stage D)', () => {
 
   it('snapshots totals as strings so catalog changes cannot rewrite history', () => {
     const quote = composeCommercialQuote({
-      lines: [lineFromOrderItem({
-        nameSnapshot: 'Paneer',
-        unitPriceMinor: 25000n,
-        quantity: 2,
-        currencyCode: 'INR',
-        merchantId: MERCHANT,
-        restaurantId: RESTAURANT,
-      })],
+      lines: [
+        lineFromOrderItem({
+          nameSnapshot: 'Paneer',
+          unitPriceMinor: 25000n,
+          quantity: 2,
+          currencyCode: 'INR',
+          merchantId: MERCHANT,
+          restaurantId: RESTAURANT,
+        }),
+      ],
       discountMinor: 5000n,
       merchantId: MERCHANT,
       restaurantId: RESTAURANT,

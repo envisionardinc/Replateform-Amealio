@@ -170,9 +170,7 @@ export function OrderScreen() {
             {` · Tax ${formatMinor(order.taxTotalMinor, order.currencyCode)}`}
             {` · Fees ${formatMinor(order.feeTotalMinor, order.currencyCode)}`}
           </p>
-          <p className="price">
-            Total {formatMinor(order.grandTotalMinor, order.currencyCode)}
-          </p>
+          <p className="price">Total {formatMinor(order.grandTotalMinor, order.currencyCode)}</p>
           {order.paymentIntents.map((p) => (
             <p className="lede" key={p.id}>
               Payment {p.method} · {p.status} · {formatMinor(p.amountMinor, p.currencyCode)}

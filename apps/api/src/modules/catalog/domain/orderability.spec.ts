@@ -38,11 +38,11 @@ describe('consumer orderability (Stage B)', () => {
 
   it('rejects items with no available variant or an unavailable required group', () => {
     expect(isConsumerOrderable({ ...base, variants: [{ available: false }] })).toBe(false);
-    expect(
-      isConsumerOrderable({ ...base, groups: [{ available: false, minSelect: 1 }] }),
-    ).toBe(false);
-    expect(
-      isConsumerOrderable({ ...base, groups: [{ available: false, minSelect: 0 }] }),
-    ).toBe(true);
+    expect(isConsumerOrderable({ ...base, groups: [{ available: false, minSelect: 1 }] })).toBe(
+      false,
+    );
+    expect(isConsumerOrderable({ ...base, groups: [{ available: false, minSelect: 0 }] })).toBe(
+      true,
+    );
   });
 });

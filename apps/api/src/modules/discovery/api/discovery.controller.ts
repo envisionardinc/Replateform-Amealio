@@ -75,10 +75,7 @@ export class DiscoveryController {
   }
 
   @Get('restaurants/:id/menu')
-  menu(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query('type') type?: OrderChannel,
-  ) {
+  menu(@Param('id', ParseUUIDPipe) id: string, @Query('type') type?: OrderChannel) {
     return this.discovery.getMenu(id, parseChannel(type));
   }
 
@@ -88,18 +85,12 @@ export class DiscoveryController {
   }
 
   @Get('menus/:menuId')
-  customMenu(
-    @Param('menuId', ParseUUIDPipe) menuId: string,
-    @Query('type') type?: OrderChannel,
-  ) {
+  customMenu(@Param('menuId', ParseUUIDPipe) menuId: string, @Query('type') type?: OrderChannel) {
     return this.discovery.getCustomMenu(menuId, parseChannel(type));
   }
 
   @Get('items/:id')
-  item(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query('type') type?: OrderChannel,
-  ) {
+  item(@Param('id', ParseUUIDPipe) id: string, @Query('type') type?: OrderChannel) {
     return this.discovery.getItem(id, parseChannel(type));
   }
 

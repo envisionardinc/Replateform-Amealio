@@ -5,10 +5,7 @@ import { MenuRepository } from '../../catalog/infrastructure/menu.repository';
 import { MerchandiseQuoteService } from '../../catalog/application/merchandise-quote.service';
 import type { ConsumerCatalogItem, OrderChannel } from '../../catalog/domain/catalog.types';
 import type { ModifierGroupSelectionInput } from '../../catalog/domain/merchandise-configuration';
-import {
-  appearsOnConsumerMenu,
-  isConsumerOrderable,
-} from '../../catalog/domain/orderability';
+import { appearsOnConsumerMenu, isConsumerOrderable } from '../../catalog/domain/orderability';
 import type { RestaurantRecord } from '../../merchant/domain/merchant.types';
 import { DISCOVERY_FEED, type DiscoveryFeedProvider } from '../domain/discovery-feed';
 import { TaxonomyQuery } from './taxonomy.query';
@@ -56,7 +53,9 @@ export class DiscoveryService {
       kind: 'STANDARD' as const,
       restaurantId,
       channel: channel ?? null,
-      items: items.filter((item) => appearsOnConsumerMenu(item, channel)).map(serializeConsumerItem),
+      items: items
+        .filter((item) => appearsOnConsumerMenu(item, channel))
+        .map(serializeConsumerItem),
     };
   }
 

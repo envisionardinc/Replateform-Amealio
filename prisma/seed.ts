@@ -195,10 +195,27 @@ async function main() {
     data: {
       menuItemId: item.id,
       size: 'Regular',
+      sku: 'DEV-PBM-REG',
       uomId: uom.id,
       priceMinor: 24900n, // ₹249.00 in paise
       currencyCode: 'INR',
       available: true,
+    },
+  });
+  await prisma.addOnGroup.deleteMany({ where: { menuItemId: item.id } });
+  await prisma.addOnGroup.create({
+    data: {
+      menuItemId: item.id,
+      name: 'Spice',
+      minSelect: 1,
+      maxSelect: 1,
+      available: true,
+      addOns: {
+        create: [
+          { name: 'Mild', priceMinor: 0n, isDefault: true, sortOrder: 1 },
+          { name: 'Hot', priceMinor: 1000n, sortOrder: 2 },
+        ],
+      },
     },
   });
 
@@ -316,6 +333,74 @@ async function main() {
       priceMinor: 4900n,
       currencyCode: 'INR',
       available: true,
+    },
+  });
+
+  const customMenu = await prisma.menu.upsert({
+    where: { legacyId: 'seed-menu-custom-1' },
+    update: { type: 'CUSTOM', visibility: true, name: 'DEV Chef Specials' },
+    create: {
+      legacyId: 'seed-menu-custom-1',
+      merchantId: merchant.id,
+      restaurantId: restaurant.id,
+      name: 'DEV Chef Specials',
+      type: 'CUSTOM',
+      visibility: true,
+    },
+  });
+  const customSection = await prisma.menuSection.upsert({
+    where: { id: await stableId('section-specials', customMenu.id) },
+    update: { name: 'Specials' },
+    create: {
+      id: await stableId('section-specials', customMenu.id),
+      menuId: customMenu.id,
+      name: 'Specials',
+      sortOrder: 1,
+    },
+  });
+  const tasting = await prisma.menuItem.upsert({
+    where: { legacyId: 'seed-item-tasting' },
+    update: {
+      isPublished: true,
+      availability: 'AVAILABLE',
+      menuSectionId: customSection.id,
+    },
+    create: {
+      legacyId: 'seed-item-tasting',
+      merchantId: merchant.id,
+      restaurantId: restaurant.id,
+      menuSectionId: customSection.id,
+      name: 'DEV Tasting Plate',
+      description: 'Custom menu catalog item',
+      availability: 'AVAILABLE',
+      isPublished: true,
+    },
+  });
+  await prisma.itemVariant.deleteMany({ where: { menuItemId: tasting.id } });
+  await prisma.itemVariant.create({
+    data: {
+      menuItemId: tasting.id,
+      size: 'Regular',
+      sku: 'DEV-TASTE-REG',
+      priceMinor: 39900n,
+      currencyCode: 'INR',
+      available: true,
+    },
+  });
+  await prisma.addOnGroup.deleteMany({ where: { menuItemId: tasting.id } });
+  await prisma.addOnGroup.create({
+    data: {
+      menuItemId: tasting.id,
+      name: 'Dip',
+      minSelect: 1,
+      maxSelect: 1,
+      available: true,
+      addOns: {
+        create: [
+          { name: 'Mint', priceMinor: 0n, isDefault: true, sortOrder: 1 },
+          { name: 'Tamarind', priceMinor: 1500n, sortOrder: 2 },
+        ],
+      },
     },
   });
 

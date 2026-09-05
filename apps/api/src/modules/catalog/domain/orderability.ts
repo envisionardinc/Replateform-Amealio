@@ -18,7 +18,9 @@ export interface OrderabilityInput {
   groups: ReadonlyArray<{ available: boolean; minSelect: number }>;
 }
 
-export function isPublishedVisible(input: Pick<OrderabilityInput, 'deletedAt' | 'isPublished'>): boolean {
+export function isPublishedVisible(
+  input: Pick<OrderabilityInput, 'deletedAt' | 'isPublished'>,
+): boolean {
   return input.deletedAt === null && input.isPublished;
 }
 

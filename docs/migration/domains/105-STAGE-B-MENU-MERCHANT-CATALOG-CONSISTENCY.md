@@ -88,3 +88,24 @@ Celebration Packages. Combos. Tax / fees / surcharges. Promotion Phase 2. Upsell
 ## Historical orders
 
 Orders keep `unitPriceMinor` + `addOns` JSON snapshot. Menu publication changes do not rewrite past orders. Typed order-line snapshot remains FUTURE.
+
+## Tests
+
+- `catalog/domain/orderability.spec.ts`
+- `catalog/domain/materialization-product.spec.ts`
+- `test/stage-b-menu-consistency.e2e-spec.ts`
+- Stage A merchandise unit + e2e remain the quote authority
+- Promotion Phase 1 kernel specs remain isolated
+
+## Remaining gaps / owner decisions
+
+| Item | Class |
+|---|---|
+| One `MenuItem.menuSectionId` (no multi-menu membership) | FUTURE |
+| Menu-specific price | Stage D if evidenced |
+| Per-variant × channel price | FUTURE (doc 47) |
+| Home feed still `take: 100`, no geo rank | FUTURE |
+| Merchant catalog / menu management UI | NEW / FUTURE |
+| Super Admin Global Catalog UI | FUTURE |
+| Empty `source_payload` still materializes a name-only unpublished draft | PRESERVE |
+| Typed historical order-line snapshot | FUTURE |

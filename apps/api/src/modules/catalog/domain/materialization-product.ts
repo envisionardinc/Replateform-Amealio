@@ -57,7 +57,9 @@ const CHANNELS = new Set<OrderChannel>([
 export function parseMaterializationProduct(sourcePayload: unknown): MaterializationProduct | null {
   const root = asObject(sourcePayload);
   if (!root) return null;
-  const raw = asObject(root.product) ?? (root.variants || root.addOnGroups || root.channelConfigs ? root : null);
+  const raw =
+    asObject(root.product) ??
+    (root.variants || root.addOnGroups || root.channelConfigs ? root : null);
   if (!raw) return null;
 
   const variants = Array.isArray(raw.variants)
@@ -67,7 +69,9 @@ export function parseMaterializationProduct(sourcePayload: unknown): Materializa
     ? raw.addOnGroups.map(parseGroup).filter((row): row is MaterializationGroup => row !== null)
     : [];
   const channelConfigs = Array.isArray(raw.channelConfigs)
-    ? raw.channelConfigs.map(parseChannel).filter((row): row is MaterializationChannel => row !== null)
+    ? raw.channelConfigs
+        .map(parseChannel)
+        .filter((row): row is MaterializationChannel => row !== null)
     : [];
   if (!variants.length && !addOnGroups.length && !channelConfigs.length) return null;
   return { variants, addOnGroups, channelConfigs };

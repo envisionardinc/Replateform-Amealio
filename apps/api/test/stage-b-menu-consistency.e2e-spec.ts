@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createApp } from '../src/main';
@@ -87,13 +89,15 @@ describe('Stage B menu + merchant catalog consistency', () => {
     expect(names).toContain('Idli');
     expect(names).toContain('Sold Dosa');
     expect(names).not.toContain('Secret');
-    expect(menu.body.items.find((row: { name: string }) => row.name === 'Idli').orderable).toBe(true);
-    expect(menu.body.items.find((row: { name: string }) => row.name === 'Sold Dosa').orderable).toBe(
-      false,
+    expect(menu.body.items.find((row: { name: string }) => row.name === 'Idli').orderable).toBe(
+      true,
     );
-    expect(menu.body.items.find((row: { name: string }) => row.name === 'Idli').variants[0].sku).toBe(
-      'IDL-R',
-    );
+    expect(
+      menu.body.items.find((row: { name: string }) => row.name === 'Sold Dosa').orderable,
+    ).toBe(false);
+    expect(
+      menu.body.items.find((row: { name: string }) => row.name === 'Idli').variants[0].sku,
+    ).toBe('IDL-R');
 
     expect((await http().get(`/api/v1/discover/items/${published.id}`)).status).toBe(200);
     expect((await http().get(`/api/v1/discover/items/${sold.id}`)).body.orderable).toBe(false);
@@ -140,7 +144,8 @@ describe('Stage B menu + merchant catalog consistency', () => {
     expect(customHd.body.items.map((row: { id: string }) => row.id)).not.toContain(item.id);
 
     expect(
-      (await http().get(`/api/v1/discover/items/${item.id}`).query({ type: 'HOME_DELIVERY' })).status,
+      (await http().get(`/api/v1/discover/items/${item.id}`).query({ type: 'HOME_DELIVERY' }))
+        .status,
     ).toBe(404);
 
     const dineIn = await http().get(`/api/v1/discover/restaurants/${restaurantId}/menu`).query({
@@ -186,7 +191,9 @@ describe('Stage B menu + merchant catalog consistency', () => {
     expect(listed.body.menus.map((row: { id: string }) => row.id)).not.toContain(hidden.id);
 
     expect((await http().get(`/api/v1/discover/menus/${hidden.id}`)).status).toBe(404);
-    expect((await http().get(`/api/v1/discover/menus/${visible.id}`)).body.items[0].id).toBe(item.id);
+    expect((await http().get(`/api/v1/discover/menus/${visible.id}`)).body.items[0].id).toBe(
+      item.id,
+    );
 
     await expect(
       catalog.updateMenu(staffOf(b.merchantId), visible.id, { name: 'Stolen' }),
@@ -221,11 +228,13 @@ describe('Stage B menu + merchant catalog consistency', () => {
         },
       ],
     });
-    const quote = await http().post('/api/v1/discover/quote').send({
-      variantId: item.variants[0].id,
-      quantity: 1,
-      modifierGroups: [{ groupId: item.addOnGroups[0].id, selections: [] }],
-    });
+    const quote = await http()
+      .post('/api/v1/discover/quote')
+      .send({
+        variantId: item.variants[0].id,
+        quantity: 1,
+        modifierGroups: [{ groupId: item.addOnGroups[0].id, selections: [] }],
+      });
     expect(quote.status).toBe(400);
   });
 
@@ -282,15 +291,13 @@ describe('Stage B menu + merchant catalog consistency', () => {
   });
 
   it('does not import the promotion evaluation kernel from discovery or catalog writes', () => {
-    const fs = require('fs') as typeof import('fs');
-    const path = require('path') as typeof import('path');
     const files = [
       '../src/modules/discovery/application/discovery.service.ts',
       '../src/modules/catalog/application/catalog-write.service.ts',
       '../src/modules/ordering/application/cart.service.ts',
     ];
     for (const file of files) {
-      const src = fs.readFileSync(path.join(__dirname, file), 'utf8');
+      const src = readFileSync(join(__dirname, file), 'utf8');
       expect(src).not.toMatch(/PromotionEvaluationService/);
     }
   });

@@ -22,7 +22,11 @@ describe('materialization product snapshot', () => {
         channelConfigs: [{ channel: 'HOME_DELIVERY', enabled: true }],
       },
     });
-    expect(product?.variants?.[0]).toMatchObject({ size: 'Small', sku: 'PIZ-S', priceMinor: 10000n });
+    expect(product?.variants?.[0]).toMatchObject({
+      size: 'Small',
+      sku: 'PIZ-S',
+      priceMinor: 10000n,
+    });
     expect(product?.addOnGroups?.[0].addOns?.[0].variantPrices?.[0].priceMinor).toBe(200n);
     expect(product?.channelConfigs?.[0].channel).toBe('HOME_DELIVERY');
   });

@@ -100,10 +100,15 @@ describe('Consumer experience slice (doc 92 HTTP e2e)', () => {
     const home = await http().get('/api/v1/discover/home');
     expect(home.status).toBe(200);
     expect(home.body.source).toBe('CANONICAL');
-    const ids = home.body.sections[0].restaurants.map((r: { id: string }) => r.id);
-    expect(ids).toContain(a.restaurant.id);
-    expect(ids).toContain(b.restaurant.id);
-    expect(ids).not.toContain(closed.restaurant.id);
+    const homeIds = home.body.sections[0].restaurants.map((r: { id: string }) => r.id);
+    expect(homeIds).not.toContain(closed.restaurant.id);
+
+    // Home is capped (take 100). Shared test DBs can fill that window, so name
+    // search is the durable cross-merchant browse assertion.
+    const foundA = await http().get('/api/v1/discover/restaurants').query({ q: a.restaurant.name });
+    const foundB = await http().get('/api/v1/discover/restaurants').query({ q: b.restaurant.name });
+    expect(foundA.body.data.map((r: { id: string }) => r.id)).toContain(a.restaurant.id);
+    expect(foundB.body.data.map((r: { id: string }) => r.id)).toContain(b.restaurant.id);
 
     expect((await http().get(`/api/v1/discover/restaurants/${closed.restaurant.id}`)).status).toBe(
       404,

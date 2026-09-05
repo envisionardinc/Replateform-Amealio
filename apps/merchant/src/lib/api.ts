@@ -147,12 +147,164 @@ export type DeliveryPerson = {
 export const staffAuthApi = {
   login: (body: { email: string; password: string }) =>
     api<StaffAuth>('/api/v1/auth/staff/login', { method: 'POST', body: JSON.stringify(body) }),
+  me: () => api<Staff>('/api/v1/auth/staff/me'),
   logout: async (refreshToken: string) => {
     await api<unknown>('/api/v1/auth/staff/logout', {
       method: 'POST',
       body: JSON.stringify({ refreshToken }),
     });
   },
+};
+
+export type GlobalCatalog = {
+  id: string;
+  name: string;
+  description: string | null;
+  cuisineType: string | null;
+  status: string;
+};
+
+export type GlobalCategory = {
+  id: string;
+  catalogId: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+};
+
+export type GlobalItem = {
+  id: string;
+  catalogId: string;
+  categoryId: string | null;
+  name: string;
+  description: string | null;
+  sourcePayload: unknown;
+};
+
+export type MerchantRestaurant = {
+  id: string;
+  name: string;
+  city: string | null;
+  status: string;
+};
+
+export type MerchantMenu = {
+  id: string;
+  name: string;
+  restaurantId: string;
+};
+
+export type MerchantSection = {
+  id: string;
+  menuId: string;
+  name: string;
+};
+
+export type MerchantCatalogItem = {
+  id: string;
+  merchantId: string;
+  restaurantId: string;
+  menuSectionId: string | null;
+  name: string;
+  description: string | null;
+  availability: string;
+  isPublished: boolean;
+  globalSource?: {
+    sourceItemId: string;
+    sourceItemName: string;
+    catalogId: string;
+    catalogName: string;
+  } | null;
+  variants?: Array<{ id: string; size: string | null; sku: string | null; priceMinor: string }>;
+  addOnGroups?: Array<{
+    id: string;
+    name: string;
+    minSelect: number;
+    maxSelect: number | null;
+    addOns: Array<{ id: string; name: string; priceMinor: string }>;
+  }>;
+  channelConfigs?: Array<{
+    id: string;
+    channel: string;
+    enabled: boolean;
+    priceOverrideMinor: string | null;
+  }>;
+};
+
+export const platformCatalogApi = {
+  list: () => api<GlobalCatalog[]>('/api/v1/platform-catalog/global'),
+  get: (id: string) =>
+    api<{ catalog: GlobalCatalog; categories: GlobalCategory[]; items: GlobalItem[] }>(
+      `/api/v1/platform-catalog/global/${id}`,
+    ),
+  create: (body: {
+    name: string;
+    description?: string | null;
+    cuisineType?: string | null;
+    status?: string;
+  }) =>
+    api<GlobalCatalog>('/api/v1/platform-catalog/global', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  update: (
+    id: string,
+    body: {
+      name?: string;
+      description?: string | null;
+      cuisineType?: string | null;
+      status?: string;
+    },
+  ) =>
+    api<GlobalCatalog>(`/api/v1/platform-catalog/global/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  createCategory: (catalogId: string, body: { name: string; description?: string | null }) =>
+    api<GlobalCategory>(`/api/v1/platform-catalog/global/${catalogId}/categories`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  createItem: (
+    catalogId: string,
+    body: {
+      name: string;
+      description?: string | null;
+      categoryId?: string | null;
+      sourcePayload?: unknown;
+    },
+  ) =>
+    api<GlobalItem>(`/api/v1/platform-catalog/global/${catalogId}/items`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  getItem: (id: string) => api<GlobalItem>(`/api/v1/platform-catalog/global-items/${id}`),
+  materialize: (
+    sourceItemId: string,
+    body: { restaurantId: string; catalogId?: string; menuSectionId?: string | null },
+  ) =>
+    api<{ menuItemId: string; materializationId: string }>(
+      `/api/v1/platform-catalog/global-items/${sourceItemId}/materialize`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+};
+
+export const merchantCatalogApi = {
+  restaurants: () => api<MerchantRestaurant[]>('/api/v1/catalog/restaurants'),
+  items: (restaurantId: string) =>
+    api<MerchantCatalogItem[]>(`/api/v1/catalog/restaurants/${restaurantId}/items`),
+  menus: (restaurantId: string) =>
+    api<MerchantMenu[]>(`/api/v1/catalog/restaurants/${restaurantId}/menus`),
+  sections: (menuId: string) => api<MerchantSection[]>(`/api/v1/catalog/menus/${menuId}/sections`),
+  getItem: (id: string) => api<MerchantCatalogItem>(`/api/v1/catalog/items/${id}`),
+  updateItem: (
+    id: string,
+    body: { name?: string; description?: string | null; isPublished?: boolean },
+  ) =>
+    api<MerchantCatalogItem>(`/api/v1/catalog/items/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
 };
 
 export const merchantOrdersApi = {

@@ -3,16 +3,40 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from '../../../web/src/design-system/Button';
 import { Wordmark } from '../../../web/src/design-system/Wordmark';
 import { staffAuthApi } from '../lib/api';
-import { clearSession, getRefreshToken, isAuthenticated } from '../lib/session';
+import {
+  clearSession,
+  getRefreshToken,
+  getStaff,
+  isAuthenticated,
+  isMerchantStaff,
+  isSuperAdmin,
+  setStaff,
+} from '../lib/session';
 
 export function Layout() {
   const navigate = useNavigate();
   const [signedIn, setSignedIn] = useState(isAuthenticated);
+  const [staffRole, setStaffRole] = useState(getStaff()?.staffRole ?? null);
+
   useEffect(() => {
-    const sync = () => setSignedIn(isAuthenticated());
+    const sync = () => {
+      setSignedIn(isAuthenticated());
+      setStaffRole(getStaff()?.staffRole ?? null);
+    };
     window.addEventListener('amealio-staff-session', sync);
     return () => window.removeEventListener('amealio-staff-session', sync);
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated() || getStaff()) return;
+    staffAuthApi
+      .me()
+      .then((staff) => setStaff(staff))
+      .catch(() => {
+        clearSession();
+        navigate('/login');
+      });
+  }, [navigate, signedIn]);
 
   async function logout() {
     const refresh = getRefreshToken();
@@ -25,15 +49,28 @@ export function Layout() {
     navigate('/login');
   }
 
+  const showMerchantNav = signedIn && isMerchantStaff();
+  const showAdminNav = signedIn && isSuperAdmin();
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-staff-role={staffRole ?? 'anon'}>
       <header className="app-header">
-        <Link to="/" aria-label="amealio merchant home">
+        <Link to={showAdminNav ? '/global-catalog' : '/'} aria-label="amealio staff home">
           <Wordmark invert />
         </Link>
         <div className="app-header-end">
-          <nav className="app-header-nav" aria-label="Merchant">
-            <Link to="/">Orders</Link>
+          <nav className="app-header-nav" aria-label="Staff">
+            {showMerchantNav ? (
+              <>
+                <NavLink to="/" end>
+                  Orders
+                </NavLink>
+                <NavLink to="/catalog">Catalog</NavLink>
+              </>
+            ) : null}
+            {showAdminNav ? (
+              <NavLink to="/global-catalog">Global Catalog</NavLink>
+            ) : null}
           </nav>
           {signedIn ? (
             <Button variant="secondary" onClick={() => void logout()}>
@@ -47,10 +84,18 @@ export function Layout() {
       <main className="app-main">
         <Outlet />
       </main>
-      <nav className="app-tabbar" aria-label="Merchant">
-        <NavLink to="/" end>
-          Orders
-        </NavLink>
+      <nav className="app-tabbar" aria-label="Staff">
+        {showMerchantNav ? (
+          <>
+            <NavLink to="/" end>
+              Orders
+            </NavLink>
+            <NavLink to="/catalog">Catalog</NavLink>
+          </>
+        ) : null}
+        {showAdminNav ? (
+          <NavLink to="/global-catalog">Global Catalog</NavLink>
+        ) : null}
         {signedIn ? (
           <button type="button" onClick={() => void logout()}>
             Sign out

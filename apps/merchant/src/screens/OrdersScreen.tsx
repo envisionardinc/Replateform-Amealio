@@ -8,7 +8,7 @@ import { Banner } from '../../../web/src/design-system/Banner';
 import { Skeleton } from '../../../web/src/design-system/Skeleton';
 import { merchantOrdersApi, type MerchantOrder } from '../lib/api';
 import { formatMinor, isCapturedPayment } from '../lib/money';
-import { isAuthenticated } from '../lib/session';
+import { isAuthenticated, isSuperAdmin } from '../lib/session';
 
 function tone(status: string): 'info' | 'success' | 'warning' | 'danger' | 'neutral' {
   if (status === 'CANCELLED' || status === 'RETURNED') return 'danger';
@@ -47,6 +47,7 @@ export function OrdersScreen() {
   }, [load]);
 
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  if (isSuperAdmin()) return <Navigate to="/global-catalog" replace />;
 
   return (
     <section>

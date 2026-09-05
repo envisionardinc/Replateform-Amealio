@@ -20,8 +20,8 @@ export function LoginScreen() {
     setError(null);
     try {
       const res = await staffAuthApi.login({ email: email.trim(), password });
-      setSession(res.accessToken, res.refreshToken);
-      navigate('/');
+      setSession(res.accessToken, res.refreshToken, res.staff);
+      navigate(res.staff.staffRole === 'SUPER_ADMIN' ? '/global-catalog' : '/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not sign in');
     } finally {
@@ -31,8 +31,10 @@ export function LoginScreen() {
 
   return (
     <section>
-      <h1>Merchant sign in</h1>
-      <p className="lede">Staff email + password. Consumer sessions are not used here.</p>
+      <h1>Staff sign in</h1>
+      <p className="lede">
+        Super Admin and merchant staff use the same login. Consumer sessions are not used here.
+      </p>
       {error ? <Banner tone="error">{error}</Banner> : null}
       <Card as="form" onSubmit={onSubmit}>
         <Field label="Email">

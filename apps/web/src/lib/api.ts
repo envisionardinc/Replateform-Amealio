@@ -288,6 +288,37 @@ export const checkoutApi = {
     }),
 };
 
+export type ConsumerProfile = {
+  userId: string;
+  phoneCountryCode: string;
+  phone: string;
+  email: string | null;
+  isVerified: boolean;
+  detailsSubmitted: boolean;
+  completionPercentage: number;
+  preferences: {
+    dietary_preferences: string[];
+    allergies: string[];
+  };
+};
+
+export type ConsumerProfilePatch = {
+  email?: string | null;
+  preferences?: {
+    dietary_preferences?: string[] | null;
+    allergies?: string[] | null;
+  };
+};
+
+export const profileApi = {
+  get: () => api<ConsumerProfile>('/api/v1/me/profile'),
+  patch: (body: ConsumerProfilePatch) =>
+    api<ConsumerProfile>('/api/v1/me/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+};
+
 export const ordersApi = {
   get: (id: string) => api<Order>(`/api/v1/me/orders/${id}`),
   list: (query: { lane?: 'active' | 'history'; status?: string } = {}) => {

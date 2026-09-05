@@ -7,6 +7,7 @@ import { ItemScreen } from './screens/ItemScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { OrderScreen } from './screens/OrderScreen';
 import { OrdersScreen } from './screens/OrdersScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
 import { RestaurantScreen } from './screens/RestaurantScreen';
 
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
         <Route path="/checkout" element={<CheckoutScreen />} />
         <Route path="/orders" element={<OrdersScreen />} />
         <Route path="/orders/:id" element={<OrderScreen />} />
+        <Route path="/profile" element={<ProfileScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

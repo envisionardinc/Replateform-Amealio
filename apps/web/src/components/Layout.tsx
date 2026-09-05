@@ -35,6 +35,7 @@ export function Layout() {
             <Link to="/">Home</Link>
             <Link to="/cart">Cart</Link>
             {signedIn ? <Link to="/orders">Orders</Link> : null}
+            {signedIn ? <Link to="/profile">Profile</Link> : null}
           </nav>
           {signedIn ? (
             <Button variant="secondary" onClick={() => void logout()}>
@@ -54,6 +55,7 @@ export function Layout() {
         </NavLink>
         <NavLink to="/cart">Cart</NavLink>
         {signedIn ? <NavLink to="/orders">Orders</NavLink> : <NavLink to="/login">Sign in</NavLink>}
+        {signedIn ? <NavLink to="/profile">Profile</NavLink> : null}
       </nav>
     </div>
   );

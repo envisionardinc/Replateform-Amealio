@@ -353,6 +353,22 @@ select:focus {
   color: var(--ame-warning);
 }
 
+.banner-success {
+  background: var(--ame-success-bg);
+  color: var(--ame-success);
+}
+
+.field input[readonly] {
+  background: var(--ame-page);
+  color: var(--ame-muted);
+  border-color: var(--ame-border);
+}
+
+.chip-wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
 .badge {
   display: inline-block;
   font-family: var(--ame-font);

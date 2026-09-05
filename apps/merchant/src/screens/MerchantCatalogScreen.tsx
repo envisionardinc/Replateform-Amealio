@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../../web/src/design-system/Badge';
 import { Banner } from '../../../web/src/design-system/Banner';
 import { Card } from '../../../web/src/design-system/Card';
@@ -11,10 +11,12 @@ import {
   type MerchantCatalogItem,
   type MerchantRestaurant,
 } from '../lib/api';
+import { catalogRestaurantHref } from '../lib/catalog-form';
 
 export function MerchantCatalogScreen() {
+  const [search, setSearch] = useSearchParams();
   const [restaurants, setRestaurants] = useState<MerchantRestaurant[]>([]);
-  const [restaurantId, setRestaurantId] = useState('');
+  const [restaurantId, setRestaurantId] = useState(search.get('restaurantId') ?? '');
   const [items, setItems] = useState<MerchantCatalogItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,7 @@ export function MerchantCatalogScreen() {
       setItems([]);
       return;
     }
+    setSearch({ restaurantId }, { replace: true });
     let cancelled = false;
     merchantCatalogApi
       .items(restaurantId)
@@ -66,12 +69,19 @@ export function MerchantCatalogScreen() {
     <section>
       <h1>Merchant Catalog</h1>
       <p className="lede">
-        Restaurant-owned items. Use Add from Global to copy a Global Item into this catalog.
+        Restaurant-owned MenuItems. Create an item from scratch, or copy one from Global Catalog.
+        Global import is optional. Unpublished items stay hidden from consumers.
       </p>
       {error ? <Banner tone="error">{error}</Banner> : null}
       <div className="row-actions">
-        <Link className="btn btn-primary" to="/catalog/add-from-global">
+        <Link className="btn btn-primary" to={catalogRestaurantHref('/catalog/items/new', restaurantId)}>
+          Create item
+        </Link>
+        <Link className="btn btn-secondary" to={catalogRestaurantHref('/catalog/add-from-global', restaurantId)}>
           Add from Global
+        </Link>
+        <Link className="btn btn-secondary" to={catalogRestaurantHref('/catalog/menus', restaurantId)}>
+          Custom Menus
         </Link>
       </div>
       <Field label="Restaurant">
@@ -88,15 +98,21 @@ export function MerchantCatalogScreen() {
         </select>
       </Field>
       {loading ? <Skeleton /> : null}
+      {!loading && items.length === 0 ? <p className="lede">No items yet. Create one or add from Global.</p> : null}
       {items.map((item) => (
         <Card key={item.id}>
           <div className="row">
             <div>
               <h2>{item.name}</h2>
               <p className="lede">{item.description || 'No description'}</p>
-              <Badge tone={item.isPublished ? 'success' : 'warning'}>
-                {item.isPublished ? 'Published' : 'Unpublished'}
-              </Badge>
+              <div className="row-actions">
+                <Badge tone={item.isPublished ? 'success' : 'warning'}>
+                  {item.isPublished ? 'Published' : 'Unpublished'}
+                </Badge>
+                <Badge tone={item.availability === 'AVAILABLE' ? 'success' : 'warning'}>
+                  {item.availability}
+                </Badge>
+              </div>
             </div>
             <Link to={`/catalog/items/${item.id}`}>Open</Link>
           </div>

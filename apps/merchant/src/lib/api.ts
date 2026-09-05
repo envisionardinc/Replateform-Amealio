@@ -192,12 +192,73 @@ export type MerchantMenu = {
   id: string;
   name: string;
   restaurantId: string;
+  type?: string;
+  visibility?: boolean;
+  description?: string | null;
 };
 
 export type MerchantSection = {
   id: string;
   menuId: string;
   name: string;
+  sortOrder?: number;
+  description?: string | null;
+};
+
+export const ORDER_CHANNELS = [
+  'DINE_IN',
+  'TAKE_AWAY',
+  'CURB_SIDE',
+  'SKIP_LINE',
+  'HOME_DELIVERY',
+  'CATERING',
+] as const;
+
+export type OrderChannel = (typeof ORDER_CHANNELS)[number];
+
+export type MerchantVariant = {
+  id: string;
+  size: string | null;
+  sku: string | null;
+  priceMinor: string;
+  currencyCode?: string;
+  isDefault?: boolean;
+  available?: boolean;
+};
+
+export type MerchantAddOnVariantPrice = {
+  id: string;
+  addOnId: string;
+  variantId: string;
+  priceMinor: string;
+};
+
+export type MerchantAddOn = {
+  id: string;
+  name: string;
+  priceMinor: string;
+  available?: boolean;
+  isDefault?: boolean;
+  sortOrder?: number;
+  variantPrices?: MerchantAddOnVariantPrice[];
+};
+
+export type MerchantAddOnGroup = {
+  id: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number | null;
+  allowQuantity?: boolean;
+  available?: boolean;
+  sortOrder?: number;
+  addOns: MerchantAddOn[];
+};
+
+export type MerchantChannelConfig = {
+  id: string;
+  channel: string;
+  enabled: boolean;
+  priceOverrideMinor: string | null;
 };
 
 export type MerchantCatalogItem = {
@@ -215,20 +276,9 @@ export type MerchantCatalogItem = {
     catalogId: string;
     catalogName: string;
   } | null;
-  variants?: Array<{ id: string; size: string | null; sku: string | null; priceMinor: string }>;
-  addOnGroups?: Array<{
-    id: string;
-    name: string;
-    minSelect: number;
-    maxSelect: number | null;
-    addOns: Array<{ id: string; name: string; priceMinor: string }>;
-  }>;
-  channelConfigs?: Array<{
-    id: string;
-    channel: string;
-    enabled: boolean;
-    priceOverrideMinor: string | null;
-  }>;
+  variants?: MerchantVariant[];
+  addOnGroups?: MerchantAddOnGroup[];
+  channelConfigs?: MerchantChannelConfig[];
 };
 
 export const platformCatalogApi = {
@@ -297,13 +347,201 @@ export const merchantCatalogApi = {
     api<MerchantMenu[]>(`/api/v1/catalog/restaurants/${restaurantId}/menus`),
   sections: (menuId: string) => api<MerchantSection[]>(`/api/v1/catalog/menus/${menuId}/sections`),
   getItem: (id: string) => api<MerchantCatalogItem>(`/api/v1/catalog/items/${id}`),
+  createItem: (body: {
+    restaurantId: string;
+    name: string;
+    description?: string | null;
+    menuSectionId?: string | null;
+    availability?: string;
+    isPublished?: boolean;
+    variants?: Array<{
+      size?: string | null;
+      sku?: string | null;
+      priceMinor: string;
+      currencyCode?: string;
+      isDefault?: boolean;
+      available?: boolean;
+    }>;
+    channelConfigs?: Array<{
+      channel: OrderChannel;
+      enabled?: boolean;
+      priceOverrideMinor?: string | null;
+    }>;
+    addOnGroups?: Array<{
+      name: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+      addOns?: Array<{
+        name: string;
+        priceMinor?: string;
+        available?: boolean;
+        isDefault?: boolean;
+        sortOrder?: number;
+      }>;
+    }>;
+  }) =>
+    api<MerchantCatalogItem>('/api/v1/catalog/items', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   updateItem: (
     id: string,
-    body: { name?: string; description?: string | null; isPublished?: boolean },
+    body: {
+      name?: string;
+      description?: string | null;
+      isPublished?: boolean;
+      availability?: string;
+      menuSectionId?: string | null;
+    },
   ) =>
     api<MerchantCatalogItem>(`/api/v1/catalog/items/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
+    }),
+  createVariant: (
+    menuItemId: string,
+    body: {
+      size?: string | null;
+      sku?: string | null;
+      priceMinor: string;
+      currencyCode?: string;
+      isDefault?: boolean;
+      available?: boolean;
+    },
+  ) =>
+    api<MerchantVariant>(`/api/v1/catalog/items/${menuItemId}/variants`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateVariant: (
+    variantId: string,
+    body: {
+      size?: string | null;
+      sku?: string | null;
+      priceMinor?: string;
+      isDefault?: boolean;
+      available?: boolean;
+    },
+  ) =>
+    api<MerchantVariant>(`/api/v1/catalog/variants/${variantId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  setChannelConfig: (
+    menuItemId: string,
+    body: { channel: OrderChannel; enabled?: boolean; priceOverrideMinor?: string | null },
+  ) =>
+    api<MerchantChannelConfig>(`/api/v1/catalog/items/${menuItemId}/channel-config`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  createAddOnGroup: (
+    menuItemId: string,
+    body: {
+      name: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+    },
+  ) =>
+    api<MerchantAddOnGroup>(`/api/v1/catalog/items/${menuItemId}/add-on-groups`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateAddOnGroup: (
+    groupId: string,
+    body: {
+      name?: string;
+      minSelect?: number;
+      maxSelect?: number | null;
+      allowQuantity?: boolean;
+      available?: boolean;
+      sortOrder?: number;
+    },
+  ) =>
+    api<MerchantAddOnGroup>(`/api/v1/catalog/add-on-groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  createAddOn: (
+    addOnGroupId: string,
+    body: {
+      name: string;
+      priceMinor?: string;
+      available?: boolean;
+      isDefault?: boolean;
+      sortOrder?: number;
+    },
+  ) =>
+    api<MerchantAddOn>(`/api/v1/catalog/add-on-groups/${addOnGroupId}/add-ons`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateAddOn: (
+    addOnId: string,
+    body: {
+      name?: string;
+      priceMinor?: string;
+      available?: boolean;
+      isDefault?: boolean;
+      sortOrder?: number;
+    },
+  ) =>
+    api<MerchantAddOn>(`/api/v1/catalog/add-ons/${addOnId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  setAddOnVariantPrice: (addOnId: string, body: { variantId: string; priceMinor: string }) =>
+    api<MerchantAddOn>(`/api/v1/catalog/add-ons/${addOnId}/variant-prices`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  createMenu: (body: {
+    restaurantId: string;
+    name: string;
+    description?: string | null;
+    type?: 'CUSTOM' | 'STANDARD';
+    visibility?: boolean;
+  }) =>
+    api<MerchantMenu>('/api/v1/catalog/menus', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateMenu: (
+    menuId: string,
+    body: { name?: string; description?: string | null; type?: string; visibility?: boolean },
+  ) =>
+    api<MerchantMenu>(`/api/v1/catalog/menus/${menuId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  createSection: (body: {
+    menuId: string;
+    name: string;
+    description?: string | null;
+    sortOrder?: number;
+  }) =>
+    api<MerchantSection>('/api/v1/catalog/sections', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateSection: (
+    sectionId: string,
+    body: { name?: string; description?: string | null; sortOrder?: number },
+  ) =>
+    api<MerchantSection>(`/api/v1/catalog/sections/${sectionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  reorderSections: (menuId: string, order: Array<{ sectionId: string; sortOrder: number }>) =>
+    api<unknown>(`/api/v1/catalog/menus/${menuId}/sections/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ order }),
     }),
 };
 

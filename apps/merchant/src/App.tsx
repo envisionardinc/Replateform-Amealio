@@ -9,7 +9,9 @@ import { GlobalCatalogDetailScreen } from './screens/GlobalCatalogDetailScreen';
 import { GlobalItemDetailScreen } from './screens/GlobalItemDetailScreen';
 import { MerchantCatalogScreen } from './screens/MerchantCatalogScreen';
 import { AddFromGlobalScreen } from './screens/AddFromGlobalScreen';
+import { CreateItemScreen } from './screens/CreateItemScreen';
 import { MerchantItemDetailScreen } from './screens/MerchantItemDetailScreen';
+import { MerchantMenusScreen } from './screens/MerchantMenusScreen';
 
 export function App() {
   return (
@@ -55,6 +57,22 @@ export function App() {
           element={
             <RequireMerchant>
               <AddFromGlobalScreen />
+            </RequireMerchant>
+          }
+        />
+        <Route
+          path="/catalog/menus"
+          element={
+            <RequireMerchant>
+              <MerchantMenusScreen />
+            </RequireMerchant>
+          }
+        />
+        <Route
+          path="/catalog/items/new"
+          element={
+            <RequireMerchant>
+              <CreateItemScreen />
             </RequireMerchant>
           }
         />

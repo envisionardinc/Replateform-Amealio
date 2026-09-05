@@ -98,6 +98,32 @@ describe('CatalogService tenant isolation', () => {
     expect(restaurants.listByMerchant).not.toHaveBeenCalled();
   });
 
+  it('attaches Global Catalog lineage on restaurant item lists', async () => {
+    scope.assertRestaurantInScope.mockResolvedValue(undefined);
+    items.listByRestaurant.mockResolvedValue([
+      { id: 'item-local', name: 'Scratch' },
+      { id: 'item-copy', name: 'Copied' },
+    ]);
+    items.findGlobalSourceByMenuItemId.mockImplementation(async (id: string) =>
+      id === 'item-copy'
+        ? {
+            sourceItemId: 'g-1',
+            sourceItemName: 'Global Paneer',
+            catalogId: 'c-1',
+            catalogName: 'North Indian',
+          }
+        : null,
+    );
+    await expect(service.getItemsForRestaurant(merchantStaff('m1'), 'r1')).resolves.toEqual([
+      { id: 'item-local', name: 'Scratch', globalSource: null },
+      {
+        id: 'item-copy',
+        name: 'Copied',
+        globalSource: expect.objectContaining({ sourceItemId: 'g-1' }),
+      },
+    ]);
+  });
+
   it('attaches Global Catalog lineage as source information, not a synced state', async () => {
     items.findById.mockResolvedValue({ id: 'item-1', restaurantId: 'r1' });
     scope.assertRestaurantInScope.mockResolvedValue(undefined);

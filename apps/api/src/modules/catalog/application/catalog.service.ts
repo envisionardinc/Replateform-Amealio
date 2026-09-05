@@ -78,7 +78,11 @@ export class CatalogService {
     availableOnly = false,
   ) {
     await this.scope.assertRestaurantInScope(principal, restaurantId);
-    return this.items.listByRestaurant(restaurantId, availableOnly);
+    const rows = await this.items.listByRestaurant(restaurantId, availableOnly);
+    const sources = await Promise.all(
+      rows.map((row) => this.items.findGlobalSourceByMenuItemId(row.id)),
+    );
+    return rows.map((row, index) => ({ ...row, globalSource: sources[index] }));
   }
 
   private async assertMenuInScope(principal: StaffPrincipal, menu: MenuRecord): Promise<void> {

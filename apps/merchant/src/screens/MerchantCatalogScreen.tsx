@@ -106,6 +106,9 @@ export function MerchantCatalogScreen() {
               <h2>{item.name}</h2>
               <p className="lede">{item.description || 'No description'}</p>
               <div className="row-actions">
+                <Badge tone={item.globalSource ? 'info' : 'neutral'}>
+                  {item.globalSource ? 'Imported from Global' : 'Merchant created'}
+                </Badge>
                 <Badge tone={item.isPublished ? 'success' : 'warning'}>
                   {item.isPublished ? 'Published' : 'Unpublished'}
                 </Badge>

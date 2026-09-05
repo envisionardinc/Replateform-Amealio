@@ -291,7 +291,7 @@ Legacy combo is a **separate `Combo` collection**, not a modifier and not merely
 
 **Classification of legacy “combo”:** a **bundle / meal-deal entity** whose components reference items, priced as a **fixed bundle**, weakly validated. It is not a modifier group and not a true parent/child inventory BOM.
 
-Target today: **no Combo model** (doc 47 deferred).
+Target Stage F: first-class `Combo` / `ComboSlot` / `ComboSlotOption` (doc [109](./109-STAGE-F-COMBO-BUNDLE.md)). Not a modifier and not a Celebration Package.
 
 ### 6.8 Pricing
 

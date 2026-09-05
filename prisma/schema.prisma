@@ -370,6 +370,7 @@ model Merchant {
   subscriptions   Subscription[]
   menus           Menu[]
   menuItems       MenuItem[]
+  combos          Combo[]
   orders          Order[]
   offers          Offer[]
   settlements     Settlement[]
@@ -539,6 +540,7 @@ model Restaurant {
   features          RestaurantFeature[]
   menus             Menu[]
   menuItems         MenuItem[]
+  combos            Combo[]
   orders            Order[]
   offers            Offer[]
   settlements       Settlement[]
@@ -747,7 +749,8 @@ model MenuSection {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  items MenuItem[]
+  items  MenuItem[]
+  combos ComboSection[]
 
   @@index([menuId])
 }
@@ -776,6 +779,7 @@ model MenuItem {
   variants       ItemVariant[]
   channelConfigs ItemChannelConfig[]
   addOnGroups    AddOnGroup[]
+  comboOptions   ComboSlotOption[]
 
   @@index([restaurantId])
   @@index([merchantId])
@@ -870,6 +874,70 @@ model AddOnVariantPrice {
   @@unique([addOnId, variantId])
   @@index([variantId])
   @@index([addOnId])
+}
+
+// Stage F food combo / meal deal (doc 109). Not a MenuItem, not a modifier,
+// not a Celebration Package. Components reference existing MenuItem rows.
+model Combo {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId      String           @db.Uuid
+  merchant        Merchant         @relation(fields: [merchantId], references: [id])
+  restaurantId    String           @db.Uuid
+  restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  isPublished     Boolean          @default(false)
+  availability    ItemAvailability @default(AVAILABLE)
+  substitutable   Boolean          @default(false)
+  comboPriceMinor BigInt
+  currencyCode    String           @default("INR")
+  sortOrder       Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  slots    ComboSlot[]
+  sections ComboSection[]
+  cartItems CartItem[]
+
+  @@index([restaurantId])
+  @@index([merchantId])
+}
+
+model ComboSlot {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  comboId   String @db.Uuid
+  combo     Combo  @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  name      String?
+  sortOrder Int    @default(0)
+
+  options ComboSlotOption[]
+
+  @@index([comboId])
+}
+
+model ComboSlotOption {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slotId     String   @db.Uuid
+  slot       ComboSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  menuItemId String   @db.Uuid
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  isDefault  Boolean  @default(false)
+  sortOrder  Int      @default(0)
+
+  @@unique([slotId, menuItemId])
+  @@index([menuItemId])
+}
+
+// Custom Menu membership by reference (Stage B): one Combo identity, no clone.
+model ComboSection {
+  comboId       String      @db.Uuid
+  combo         Combo       @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  menuSectionId String      @db.Uuid
+  menuSection   MenuSection @relation(fields: [menuSectionId], references: [id], onDelete: Cascade)
+
+  @@id([comboId, menuSectionId])
+  @@index([menuSectionId])
 }
 
 // =====================================================================
@@ -1018,11 +1086,14 @@ model CartItem {
   cart          Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   menuItemId    String? @db.Uuid
   variantId     String? @db.Uuid
+  comboId       String? @db.Uuid
+  combo         Combo?  @relation(fields: [comboId], references: [id], onDelete: SetNull)
   quantity      Int     @default(1)
   customization Json?
   addOns        Json?
 
   @@index([cartId])
+  @@index([comboId])
 }
 
 model Order {

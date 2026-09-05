@@ -1,0 +1,153 @@
+{
+  "document": "112-STAGE-I-GLOBAL-MERCHANT-CATALOG-RECONCILIATION",
+  "date": "2026-09-05",
+  "stage": "I",
+  "status": "forensic_only",
+  "acceptedHead": "a5645e0d6636e8d7067c764c0e2dc2d4cc7c3e1a",
+  "implementation": "DEFER",
+  "classification": ["PRESERVE", "IMPROVE", "CORRECT", "OWNER_DECISION", "FUTURE"],
+  "supersedes": {
+    "no_global_catalog_claim": ["34-SUPERADMIN-PLATFORM-FOUNDATION-RECONCILIATION.md", "42", "46"],
+    "authoritative_instead": ["75-PLATFORM-CATALOG-REALITY-RECONCILIATION.md", "76", "77", "78", "82", "83", "84", "85", "86"]
+  },
+  "unavailableRepos": ["Amealio-VendorApp", "Amealio-Homepage-V2-RAG-Server"],
+  "inspectedRepos": [
+    "amealio-vendordashboard",
+    "amealio_web_app",
+    "amealiodashboardmvp-",
+    "amealio-nestjs-backend",
+    "amealio-self-delivery-app",
+    "replateform-amealio"
+  ],
+  "contracts": {
+    "A": "global_item_catalog",
+    "B": "merchant_item_catalog",
+    "C": "chain_catalog_deferred",
+    "D": "global_experience_catalogue_media_folders",
+    "E": "merchant_experience"
+  },
+  "hardBoundaries": [
+    "celebration_packages",
+    "occasion_packages",
+    "festival_packages",
+    "event_food_packages",
+    "experience_packages",
+    "stage_h",
+    "stage_j",
+    "upload_assets",
+    "live_global_sync"
+  ],
+  "materialization": {
+    "model": "copy_not_inheritance",
+    "itemLineageTable": "platform_catalog_item_materializations",
+    "itemLineageUnique": ["source_item_id", "menu_item_id"],
+    "sourceDelete": "RESTRICT",
+    "publishedOnCopy": false,
+    "experienceLineage": false,
+    "experienceServerClone": false,
+    "consumerReadsGlobal": false
+  },
+  "existingTarget": {
+    "itemModule": "apps/api/src/modules/platform-catalog",
+    "itemMigration": "prisma/migrations/20260903160000_global_catalog_source/migration.sql",
+    "experienceModule": "apps/api/src/modules/platform-experience-catalogue",
+    "experienceMigration": "prisma/migrations/20260904180000_platform_experience_catalogue/migration.sql",
+    "experienceMapper": "apps/api/src/modules/experience/domain/platform-folder-media.mapper.ts",
+    "merchantCatalog": "apps/api/src/modules/catalog",
+    "merchantUiCatalog": false
+  },
+  "itemFieldMap": [
+    {"field": "identity", "class": "TRANSFORM"},
+    {"field": "name", "class": "COPY"},
+    {"field": "description", "class": "COPY"},
+    {"field": "category_menu_section", "class": "TRANSFORM"},
+    {"field": "image_media", "class": "DO_NOT_COPY"},
+    {"field": "variants_sku_size_price", "class": "COPY", "when": "sourcePayload.product.variants"},
+    {"field": "channel_config", "class": "COPY", "when": "sourcePayload.product.channelConfigs"},
+    {"field": "availability_enum", "class": "TRANSFORM"},
+    {"field": "publication", "class": "TRANSFORM", "target": "isPublished=false"},
+    {"field": "modifier_groups_addons_rules", "class": "COPY", "when": "sourcePayload.product.addOnGroups"},
+    {"field": "variant_modifier_prices", "class": "COPY", "when": "variantPrices"},
+    {"field": "tags_dietary_health_allergy", "class": "DO_NOT_COPY"},
+    {"field": "tax_fee", "class": "DO_NOT_COPY"},
+    {"field": "sort_order", "class": "NOT_EVIDENCED"},
+    {"field": "external_ids", "class": "DO_NOT_COPY"},
+    {"field": "schedule_lead_time", "class": "DO_NOT_COPY"},
+    {"field": "is_global_flags", "class": "DO_NOT_COPY"},
+    {"field": "audit", "class": "TRANSFORM"},
+    {"field": "live_sync", "class": "DO_NOT_COPY"}
+  ],
+  "experienceFieldMap": [
+    {"field": "name", "class": "COPY"},
+    {"field": "description", "class": "COPY"},
+    {"field": "category", "class": "COPY"},
+    {"field": "subcategory", "class": "COPY"},
+    {"field": "tags", "class": "COPY"},
+    {"field": "userBenefits", "class": "COPY"},
+    {"field": "termsAndConditions", "class": "COPY"},
+    {"field": "status", "class": "DO_NOT_COPY"},
+    {"field": "isAiGenerated", "class": "DO_NOT_COPY"},
+    {"field": "photos", "class": "REFERENCE"},
+    {"field": "photoThumbnails", "class": "TRANSFORM"},
+    {"field": "videos", "class": "REFERENCE"},
+    {"field": "promotionalVideos", "class": "DO_NOT_COPY"},
+    {"field": "sourceFolderId", "class": "DO_NOT_COPY"}
+  ],
+  "gaps": [
+    {"id": "I-A-1", "domain": "global_item", "class": "PRESERVE", "summary": "Platform source distinct from merchant menu"},
+    {"id": "I-A-2", "domain": "global_item", "class": "PRESERVE", "summary": "Copy/materialize, not live inheritance"},
+    {"id": "I-A-3", "domain": "global_item", "class": "PRESERVE", "summary": "Super Admin mutate; merchant discover + materialize"},
+    {"id": "I-A-4", "domain": "global_item", "class": "PRESERVE", "summary": "Consumer never reads Global Catalog"},
+    {"id": "I-A-5", "domain": "global_item", "class": "FUTURE", "summary": "No DELETE; source FK RESTRICT while copies exist"},
+    {"id": "I-A-6", "domain": "global_item", "class": "IMPROVE", "summary": "No PATCH global item/category yet"},
+    {"id": "I-A-7", "domain": "global_item", "class": "FUTURE", "summary": "assign_items membership API not required for first UI"},
+    {"id": "I-A-8", "domain": "global_item", "class": "FUTURE", "summary": "Full vendorItems field copy deferred (doc 77)"},
+    {"id": "I-A-9", "domain": "global_item", "class": "OWNER_DECISION", "decision": "OD-I-DUP", "summary": "Legacy name-per-vendor vs target multi-copy"},
+    {"id": "I-A-10", "domain": "global_item", "class": "OWNER_DECISION", "decision": "OD-I-TEMP", "summary": "Temp-local + commit path absent on Nest"},
+    {"id": "I-B-1", "domain": "merchant_item", "class": "PRESERVE", "summary": "Existing MenuItem graph is the operational catalog"},
+    {"id": "I-B-2", "domain": "merchant_item", "class": "IMPROVE", "summary": "No merchant catalog / add-from-global UI"},
+    {"id": "I-C-1", "domain": "chain", "class": "FUTURE", "summary": "Legacy chain catalogue exists; not in target"},
+    {"id": "I-D-1", "domain": "experience_folder", "class": "PRESERVE", "summary": "Platform folder + URL media API exists"},
+    {"id": "I-D-2", "domain": "experience_folder", "class": "PRESERVE", "summary": "No server Experience clone"},
+    {"id": "I-D-3", "domain": "experience_folder", "class": "IMPROVE", "summary": "No Super Admin folder UI on Nest"},
+    {"id": "I-E-1", "domain": "merchant_experience", "class": "PRESERVE", "summary": "Merchant Experience + mapper"},
+    {"id": "I-UPL-1", "domain": "upload", "class": "FUTURE", "summary": "Doc 86 upload/S3 remains blocked"},
+    {"id": "I-CEL-1", "domain": "celebration", "class": "FUTURE", "summary": "Celebration Packages out of scope"},
+    {"id": "I-AUTH-1", "domain": "auth", "class": "CORRECT", "summary": "Do not copy legacy open reads; never trust client merchantId"},
+    {"id": "I-PUB-1", "domain": "publication", "class": "IMPROVE", "summary": "Materialize unpublished rather than copy legacy currentState"}
+  ],
+  "resolvedDecisions": {
+    "OD-I-1": "no_propagation",
+    "OD-I-2": "copies_already_independent",
+    "OD-I-3": "no_automatic_precedence_merchant_selects",
+    "OD-I-4": "chain_future",
+    "OD-I-5": "no_versioning",
+    "OD-I-6": "media_library_plus_metadata_seed",
+    "OD-I-7": "no_experience_propagation",
+    "OD-I-8": "do_not_invent_source_folder_id",
+    "OD-I-9": "merchant_may_edit_copies",
+    "OD-I-10": "super_admin_source_merchant_operational"
+  },
+  "unresolvedOwnerDecisions": {
+    "OD-I-DUP": "duplicate_materialization_key",
+    "OD-I-TEMP": "require_temp_local_two_phase_on_nest"
+  },
+  "firstSlice": {
+    "decision": "DEFER",
+    "reason": [
+      "forensic_hard_stop",
+      "server_foundations_already_exist",
+      "remaining_work_is_ui_plus_optional_completeness",
+      "OD-I-DUP_and_OD-I-TEMP_unresolved_for_import_complete",
+      "do_not_change_behavior_before_contract_review"
+    ],
+    "proposedAfterGoIfAccepted": {
+      "reuse": ["platform-catalog HTTP", "catalog write HTTP", "platform-experience-catalogue HTTP", "experiences HTTP"],
+      "ui": ["super_admin_global_catalog_list_create_detail", "merchant_add_from_global"],
+      "exclude": ["chain", "temp_local", "delete", "upload", "experience_server_clone", "celebrations", "stage_h", "stage_j"]
+    }
+  },
+  "productionBehaviorChanged": false,
+  "celebrationsChanged": false,
+  "stageJStarted": false
+}

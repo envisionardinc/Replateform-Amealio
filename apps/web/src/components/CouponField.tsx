@@ -40,7 +40,7 @@ export function CouponField({ applied, error, busy, onApply, onClear }: CouponFi
               void onClear();
             }}
           >
-            Remove
+            Remove code
           </Button>
         ) : null}
       </div>

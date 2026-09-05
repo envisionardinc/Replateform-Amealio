@@ -237,8 +237,81 @@ export class SeatingRepository {
     restaurantId: string;
     timeZone: string;
   }): Promise<SeatingRequestRecord[]> {
+    return this.findActiveSeatingSameLocalDayOn(this.prisma, args);
+  }
+
+  /**
+   * Create a consumer WALK_IN/WAITLIST only when no active same-local-day row
+   * exists for the same user+restaurant. Serializes concurrent creates with a
+   * transaction-scoped advisory lock (existing schema; no unique index).
+   * RESERVATION must not use this path.
+   */
+  async createWalkInOrWaitlistIfNoActiveSameDay(data: {
+    merchantId: string;
+    restaurantId: string;
+    userId: string;
+    type: 'WALK_IN' | 'WAITLIST';
+    status: SeatingStatusName;
+    partySize: number;
+    kidsCount: number | null;
+    highChairs: number | null;
+    specialRequests: string | null;
+    reservationAt: Date | null;
+    tableId: string | null;
+    legacyId: string | null;
+    timeZone: string;
+  }): Promise<SeatingRequestRecord> {
+    return this.prisma.$transaction(async (tx) => {
+      const today = localDateKey(new Date(), data.timeZone);
+      const lockKey = `seating-same-day:${data.userId}:${data.restaurantId}:${today}`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+      const existing = await this.findActiveSeatingSameLocalDayOn(tx, {
+        userId: data.userId,
+        restaurantId: data.restaurantId,
+        timeZone: data.timeZone,
+      });
+      if (existing.length > 0) {
+        throw new ConflictException(
+          'An active table request already exists for this restaurant today',
+        );
+      }
+
+      const row = await tx.seatingRequest.create({
+        data: {
+          merchantId: data.merchantId,
+          restaurantId: data.restaurantId,
+          userId: data.userId,
+          type: data.type,
+          status: data.status,
+          partySize: data.partySize,
+          kidsCount: data.kidsCount,
+          highChairs: data.highChairs,
+          specialRequests: data.specialRequests,
+          reservationAt: data.reservationAt,
+          tableId: data.tableId,
+          legacyId: data.legacyId,
+        },
+        select: REQUEST_SELECT,
+      });
+      return this.toRequest(row);
+    });
+  }
+
+  private async findActiveSeatingSameLocalDayOn(
+    db: {
+      seatingRequest: {
+        findMany: PrismaService['seatingRequest']['findMany'];
+      };
+    },
+    args: {
+      userId: string;
+      restaurantId: string;
+      timeZone: string;
+    },
+  ): Promise<SeatingRequestRecord[]> {
     const since = new Date(Date.now() - 36 * 3600_000);
-    const rows = await this.prisma.seatingRequest.findMany({
+    const rows = await db.seatingRequest.findMany({
       where: {
         userId: args.userId,
         restaurantId: args.restaurantId,
@@ -250,7 +323,9 @@ export class SeatingRepository {
       select: REQUEST_SELECT,
     });
     const today = localDateKey(new Date(), args.timeZone);
-    return rows.filter((r) => localDateKey(r.createdAt, args.timeZone) === today).map((r) => this.toRequest(r));
+    return rows
+      .filter((r) => localDateKey(r.createdAt, args.timeZone) === today)
+      .map((r) => this.toRequest(r));
   }
 
   async updateRequest(

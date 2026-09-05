@@ -270,24 +270,12 @@ export class SeatingService {
       }
     }
 
-    if (type === 'WALK_IN' || type === 'WAITLIST') {
-      const timeZone = await this.repo.findRestaurantTimezone(restaurant.id);
-      const existing = await this.repo.findActiveSeatingSameLocalDay({
-        userId,
-        restaurantId: restaurant.id,
-        timeZone,
-      });
-      if (existing.length > 0) {
-        throw new ConflictException('An active table request already exists for this restaurant today');
-      }
-    }
-
-    return this.repo.createRequest({
+    const request = {
       merchantId: restaurant.merchantId,
       restaurantId: restaurant.id,
       userId,
       type,
-      status: 'PENDING',
+      status: 'PENDING' as const,
       partySize: input.partySize,
       kidsCount: input.kidsCount ?? null,
       highChairs: input.highChairs ?? null,
@@ -295,7 +283,18 @@ export class SeatingService {
       reservationAt,
       tableId: null,
       legacyId: null,
-    });
+    };
+
+    if (type === 'WALK_IN' || type === 'WAITLIST') {
+      const timeZone = await this.repo.findRestaurantTimezone(restaurant.id);
+      return this.repo.createWalkInOrWaitlistIfNoActiveSameDay({
+        ...request,
+        type,
+        timeZone,
+      });
+    }
+
+    return this.repo.createRequest(request);
   }
 
   async listMine(userId: string): Promise<SeatingRequestRecord[]> {

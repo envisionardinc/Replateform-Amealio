@@ -454,4 +454,207 @@ describe('Stage 116 dining / reservations runtime (HTTP e2e)', () => {
     const table = await prisma.restaurantTable.findUniqueOrThrow({ where: { id: world.table.id } });
     expect(table.status).toBe('OCCUPIED');
   });
+
+  it('creates a RESERVATION only when reservationAt is present and does not store walk-in/waitlist', async () => {
+    const world = await seedWorld();
+    const consumer = await registerConsumer();
+    const reservationAt = '2026-09-06T19:30:00.000Z';
+
+    const missing = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({ restaurantId: world.restaurant.id, intent: 'RESERVATION', partySize: 2 });
+    expect(missing.status).toBe(400);
+    expect(
+      await prisma.seatingRequest.count({
+        where: { userId: consumer.userId, restaurantId: world.restaurant.id },
+      }),
+    ).toBe(0);
+
+    const created = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({
+        restaurantId: world.restaurant.id,
+        intent: 'RESERVATION',
+        partySize: 4,
+        reservationAt,
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.type).toBe('RESERVATION');
+    expect(created.body.status).toBe('PENDING');
+    expect(created.body.reservationAt).toBe(reservationAt);
+    expect(created.body.type).not.toBe('WALK_IN');
+    expect(created.body.type).not.toBe('WAITLIST');
+
+    const row = await prisma.seatingRequest.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(row.type).toBe('RESERVATION');
+    expect(row.reservationAt?.toISOString()).toBe(reservationAt);
+    expect(row.userId).toBe(consumer.userId);
+  });
+
+  it('persists SEATING as WALK_IN when walkin_waitlist is not true', async () => {
+    const world = await seedWorld();
+    await prisma.subscription.deleteMany({
+      where: { merchantId: world.merchant.id, productType: 'SEATING' },
+    });
+    await enableSeating(world.merchant.id, world.restaurant.id, {
+      walkin_waitlist: { value: false },
+    });
+    const consumer = await registerConsumer();
+
+    const forced = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({
+        restaurantId: world.restaurant.id,
+        intent: 'SEATING',
+        partySize: 2,
+        type: 'WAITLIST',
+      });
+    expect(forced.status).toBe(400);
+
+    const created = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({ restaurantId: world.restaurant.id, intent: 'SEATING', partySize: 2 });
+    expect(created.status).toBe(201);
+    expect(created.body.type).toBe('WALK_IN');
+
+    const row = await prisma.seatingRequest.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(row.type).toBe('WALK_IN');
+  });
+
+  it('derives WAITLIST on the server when walkin_waitlist.value is true', async () => {
+    const world = await seedWorld();
+    const consumer = await registerConsumer();
+
+    const forced = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({
+        restaurantId: world.restaurant.id,
+        intent: 'SEATING',
+        partySize: 2,
+        type: 'WALK_IN',
+      });
+    expect(forced.status).toBe(400);
+
+    const created = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({ restaurantId: world.restaurant.id, intent: 'SEATING', partySize: 3 });
+    expect(created.status).toBe(201);
+    expect(created.body.type).toBe('WAITLIST');
+
+    const row = await prisma.seatingRequest.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(row.type).toBe('WAITLIST');
+  });
+
+  it('rejects diner create with 403 when seating is disabled and writes no request', async () => {
+    const world = await seedWorld();
+    await prisma.subscription.deleteMany({
+      where: { merchantId: world.merchant.id, productType: 'SEATING' },
+    });
+    await prisma.subscription.create({
+      data: {
+        merchantId: world.merchant.id,
+        restaurantId: world.restaurant.id,
+        productType: 'SEATING',
+        status: 'ACTIVE',
+        config: {
+          casual_dining: true,
+          casual_dining_status: {
+            seating: {
+              value: false,
+              reservation: { value: true },
+              walkin_waitlist: { value: true },
+            },
+          },
+        },
+      },
+    });
+    const consumer = await registerConsumer();
+
+    const denied = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({ restaurantId: world.restaurant.id, intent: 'SEATING', partySize: 2 });
+    expect(denied.status).toBe(403);
+    expect(
+      await prisma.seatingRequest.count({
+        where: { userId: consumer.userId, restaurantId: world.restaurant.id },
+      }),
+    ).toBe(0);
+  });
+
+  it('rejects a second same-day WALK_IN/WAITLIST for the same user and restaurant', async () => {
+    const world = await seedWorld();
+    const consumer = await registerConsumer();
+
+    const first = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({ restaurantId: world.restaurant.id, intent: 'SEATING', partySize: 2 });
+    expect(first.status).toBe(201);
+    expect(first.body.type).toBe('WAITLIST');
+
+    const reservation = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({
+        restaurantId: world.restaurant.id,
+        intent: 'RESERVATION',
+        partySize: 2,
+        reservationAt: '2026-09-06T20:00:00.000Z',
+      });
+    expect(reservation.status).toBe(201);
+    expect(reservation.body.type).toBe('RESERVATION');
+
+    const duplicate = await http()
+      .post('/api/v1/diner')
+      .set('Authorization', `Bearer ${consumer.token}`)
+      .send({ restaurantId: world.restaurant.id, intent: 'SEATING', partySize: 4 });
+    expect(duplicate.status).toBe(409);
+
+    const active = await prisma.seatingRequest.findMany({
+      where: {
+        userId: consumer.userId,
+        restaurantId: world.restaurant.id,
+        type: { in: ['WALK_IN', 'WAITLIST'] },
+        status: { in: ['PENDING', 'NOT_SEATED', 'SEATED'] },
+        deletedAt: null,
+      },
+    });
+    expect(active).toHaveLength(1);
+    expect(active[0].id).toBe(first.body.id);
+  });
+
+  it('cannot let two concurrent same-day seating creates both succeed', async () => {
+    const world = await seedWorld();
+    const consumer = await registerConsumer();
+    const body = { restaurantId: world.restaurant.id, intent: 'SEATING' as const, partySize: 2 };
+
+    const [one, two] = await Promise.all([
+      http().post('/api/v1/diner').set('Authorization', `Bearer ${consumer.token}`).send(body),
+      http().post('/api/v1/diner').set('Authorization', `Bearer ${consumer.token}`).send(body),
+    ]);
+
+    const statuses = [one.status, two.status].sort();
+    expect(statuses).toEqual([201, 409]);
+    const created = [one, two].filter((r) => r.status === 201);
+    expect(created).toHaveLength(1);
+
+    const active = await prisma.seatingRequest.findMany({
+      where: {
+        userId: consumer.userId,
+        restaurantId: world.restaurant.id,
+        type: { in: ['WALK_IN', 'WAITLIST'] },
+        status: { in: ['PENDING', 'NOT_SEATED', 'SEATED'] },
+        deletedAt: null,
+      },
+    });
+    expect(active).toHaveLength(1);
+    expect(active[0].id).toBe(created[0].body.id);
+  });
 });
